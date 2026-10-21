@@ -35,6 +35,10 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   }
 }
 
+function on<T>(event: string, listener: (payload: T) => void): () => void {
+  return bridge().on(event, listener as (payload: unknown) => void);
+}
+
 // ---- Types ----
 
 /** A presentation. */
@@ -84,6 +88,13 @@ export const Decks = {
   },
   raw(value: unknown): Promise<unknown> {
     return call("Decks.Raw", value);
+  },
+  /**
+   * Fires when a deck changed on disk.
+   * Calls listener with each payload of Decks.Changed; returns a function that stops listening.
+   */
+  onChanged(listener: (payload: Deck) => void): () => void {
+    return on<Deck>("Decks.Changed", listener);
   },
 } as const;
 

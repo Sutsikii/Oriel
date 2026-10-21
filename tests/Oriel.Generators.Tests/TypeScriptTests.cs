@@ -54,6 +54,9 @@ public class TypeScriptTests
             public List<string?> Search(string query, int limit = 10, Theme? theme = null) => new();
 
             public System.Text.Json.JsonElement Raw(System.Text.Json.JsonElement value) => value;
+
+            /// <summary>Fires when a deck changed on disk.</summary>
+            public Event<Deck> Changed { get; } = new();
         }
 
         [Service]

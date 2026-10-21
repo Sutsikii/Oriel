@@ -7,6 +7,7 @@ internal static class ServiceParser
 {
     public const string ServiceAttribute = "Oriel.ServiceAttribute";
     private const string IgnoreAttribute = "Oriel.ServiceIgnoreAttribute";
+    private const string EventType = "Oriel.Event<T>";
 
     public static ServiceResult Parse(GeneratorAttributeSyntaxContext context, CancellationToken cancellation)
     {
@@ -53,7 +54,34 @@ internal static class ServiceParser
             if (parsed is not null)
                 methods.Add(parsed);
         }
-        return new ServiceDef(TypeMapper.CSharpName(type), name, DocComments.Of(type, cancellation), methods.ToEquatableArray());
+        var events = new List<EventDef>();
+        foreach (var property in Events(type))
+        {
+            var payload = mapper.Map(((INamedTypeSymbol)property.Type).TypeArguments[0], property, $"the payload of {name}.{property.Name}");
+            if (payload is not null)
+                events.Add(new EventDef(property.Name, "on" + property.Name, DocComments.Of(property, cancellation), payload));
+        }
+
+        return new ServiceDef(TypeMapper.CSharpName(type), name, DocComments.Of(type, cancellation), methods.ToEquatableArray(), events.ToEquatableArray());
+    }
+
+    /// <summary>The public <c>Event&lt;T&gt;</c> properties of a service and its bases.</summary>
+    private static IEnumerable<IPropertySymbol> Events(INamedTypeSymbol type)
+    {
+        var taken = new HashSet<string>();
+        for (var t = type; t is not null && t.SpecialType != SpecialType.System_Object; t = t.BaseType)
+        {
+            foreach (var property in t.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (!property.IsStatic && property.DeclaredAccessibility == Accessibility.Public
+                    && property.GetMethod is not null
+                    && property.Type.OriginalDefinition.ToDisplayString() == EventType
+                    && taken.Add(property.Name))
+                {
+                    yield return property;
+                }
+            }
+        }
     }
 
     /// <summary>

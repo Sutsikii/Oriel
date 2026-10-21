@@ -27,6 +27,8 @@ export async function usage(): Promise<void> {
       void method;
     }
   }
+  const stop: () => void = Decks.onChanged((changed: Deck) => void changed.title);
+  stop();
   void [greeting, all];
 }
 
@@ -41,5 +43,7 @@ export function errors(deck: Deck): void {
   void Decks.open();
   // @ts-expect-error what Oriel passes (a CancellationToken) is not a parameter
   void Decks.save("p", deck, undefined);
+  // @ts-expect-error listeners get the payload's type
+  Decks.onChanged((n: number) => void n);
   void theme;
 }

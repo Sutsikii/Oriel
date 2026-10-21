@@ -64,6 +64,20 @@ internal static class CSharpEmitter
             using (w.Block($"public {name}({service.CSharp} service) : base({Names.Literal(service.Name)})"))
                 w.Line("_service = service;");
             w.Line();
+            if (service.Events.Count > 0)
+            {
+                using (w.Block("public override void Attach(global::Oriel.Generated.IEventSink sink)"))
+                {
+                    foreach (var e in service.Events)
+                    {
+                        var missing = Names.Literal($"{service.Name}.{e.CSharp} is null: give the event a value, as in `public Event<T> {e.CSharp} {{ get; }} = new();`");
+                        w.Line($"(_service.@{e.CSharp} ?? throw new global::System.InvalidOperationException({missing}))");
+                        using (w.Indent())
+                            w.Line($".Attach({Names.Literal(service.Name + "." + e.CSharp)}, static (writer, value) => {{ {WriteStatement(e.Payload, "writer", "value", 0)} }}, sink);");
+                    }
+                }
+                w.Line();
+            }
             using (w.Block($"public override async global::System.Threading.Tasks.ValueTask<global::Oriel.Generated.ValueWriter?> InvokeAsync(string method, {Element} args, global::Oriel.Generated.CallContext context)"))
             using (w.Block("switch (method)"))
             {

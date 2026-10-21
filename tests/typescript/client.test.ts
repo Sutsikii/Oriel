@@ -64,6 +64,15 @@ test("rejects with a CallError when the method fails", async () => {
   });
 });
 
+test("listens to an event until told to stop", () => {
+  const titles: string[] = [];
+  const stop = Decks.onChanged((deck) => titles.push(deck.title));
+  page.receive({ t: "event", n: "Decks.Changed", v: { title: "A" } });
+  stop();
+  page.receive({ t: "event", n: "Decks.Changed", v: { title: "B" } });
+  assert.deepEqual(titles, ["A"]);
+});
+
 test("says when the page is not in an Oriel window", async () => {
   delete (globalThis as { oriel?: unknown }).oriel;
   await assert.rejects(Greeter.greet("Ada"), /window\.oriel is missing/);

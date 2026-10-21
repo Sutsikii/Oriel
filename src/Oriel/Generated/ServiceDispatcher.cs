@@ -30,4 +30,12 @@ public abstract class ServiceDispatcher
     /// <exception cref="MethodNotFoundException">The service has no such method.</exception>
     /// <exception cref="CodecException">An argument is not of the method's type.</exception>
     public abstract ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context);
+
+    /// <summary>
+    /// Connects the service's events to <paramref name="sink"/>, once, as the
+    /// service is bound. Services without events do nothing.
+    /// </summary>
+    public virtual void Attach(IEventSink sink)
+    {
+    }
 }

@@ -138,7 +138,12 @@ internal sealed record MethodDef(string CSharp, string TypeScript, Doc Doc, Equa
 
 /// <summary>A <c>[Service]</c> class.</summary>
 /// <param name="Name">The name pages call it by.</param>
-internal sealed record ServiceDef(string CSharp, string Name, Doc Doc, EquatableArray<MethodDef> Methods);
+internal sealed record ServiceDef(string CSharp, string Name, Doc Doc, EquatableArray<MethodDef> Methods, EquatableArray<EventDef> Events);
+
+/// <summary>An <c>Event&lt;T&gt;</c> property of a service.</summary>
+/// <param name="CSharp">The name of the property.</param>
+/// <param name="TypeScript">The name of the function that listens to it: <c>onTick</c>.</param>
+internal sealed record EventDef(string CSharp, string TypeScript, Doc Doc, TypeRef Payload);
 
 /// <summary>Everything one <c>[Service]</c> class brings: itself, the types it uses and its errors.</summary>
 internal sealed record ServiceResult(
