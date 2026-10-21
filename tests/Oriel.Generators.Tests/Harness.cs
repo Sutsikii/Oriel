@@ -77,6 +77,16 @@ internal sealed class Harness
         return harness;
     }
 
+    /// <summary>The TypeScript client the compiled code registered.</summary>
+    public string TypeScript
+    {
+        get
+        {
+            _assembly ??= Load();
+            return TypeScriptClient.For(_assembly) ?? throw new InvalidOperationException("no TypeScript client registered");
+        }
+    }
+
     /// <summary>The ids of what the generator reported, in order.</summary>
     public IEnumerable<string> Ids => GeneratorDiagnostics.Select(d => d.Id);
 

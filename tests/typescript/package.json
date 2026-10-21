@@ -1,0 +1,13 @@
+{
+  "name": "oriel-typescript-tests",
+  "private": true,
+  "description": "Type-checks and runs the TypeScript client the Oriel generator writes.",
+  "type": "module",
+  "scripts": {
+    "test": "tsc -p . && node --test \"*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "~24.19.2",
+    "typescript": "~5.9.3"
+  }
+}

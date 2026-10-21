@@ -12,7 +12,8 @@ internal sealed record Project(
 
 /// <summary>
 /// The Oriel source generator. For the <c>[Service]</c> classes of a project,
-/// it writes their dispatchers and JSON codecs, and registers them with Oriel.
+/// it writes their dispatchers, the JSON codecs of their types and their
+/// TypeScript client, and registers them with Oriel as the assembly loads.
 /// docs/architecture.md walks through what it generates.
 /// </summary>
 [Generator(LanguageNames.CSharp)]
@@ -33,13 +34,16 @@ public sealed class OrielGenerator : IIncrementalGenerator
             ServiceParser.Parse)
             .WithTrackingName(ParseStep);
 
-        context.RegisterSourceOutput(services.Collect(), static (spc, results) =>
+        var assembly = context.CompilationProvider.Select(static (c, _) => c.AssemblyName ?? "the app");
+
+        context.RegisterSourceOutput(services.Collect().Combine(assembly), static (spc, input) =>
         {
+            var (results, assemblyName) = input;
             var project = Merge(results, out var diagnostics);
             foreach (var diagnostic in diagnostics)
                 spc.ReportDiagnostic(diagnostic.ToDiagnostic());
             if (project.Services.Count > 0)
-                spc.AddSource(SourceName, CSharpEmitter.Emit(project));
+                spc.AddSource(SourceName, CSharpEmitter.Emit(project, TypeScriptEmitter.Emit(project, assemblyName)));
         });
     }
 
