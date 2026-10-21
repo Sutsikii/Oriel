@@ -2,8 +2,97 @@
 
 **Desktop apps in C#, with a web frontend.**
 
-Oriel opens native windows that show a web page in the webview the operating
-system already has, and lets that page call your C# code through a
-TypeScript client generated from it.
+An oriel is a window that juts out of a wall. Oriel opens native windows
+that show your web frontend in the webview the system already has, and lets
+the page call your C# code through a **TypeScript client generated from it**.
 
-> Oriel is at an early stage: Windows is the first platform.
+```csharp
+/// <summary>Greets people.</summary>
+[Service]
+public class Greeter
+{
+    /// <summary>Returns a greeting for <paramref name="name"/>.</summary>
+    public Greeting Greet(string name, Tone tone = Tone.Friendly) => new($"Hello, {name}!", tone);
+
+    /// <summary>Fires when someone was greeted.</summary>
+    public Event<string> Greeted { get; } = new();
+}
+
+var app = new OrielApp(new AppOptions { Name = "Hello" });
+app.Bind(new Greeter());
+return app.Run(() => app.OpenWindow(new WindowOptions { Width = 800, Height = 600 }));
+```
+
+```ts
+import { CallError, Greeter } from "./oriel"; // generated from the C# above
+
+const greeting = await Greeter.greet("Ada", "pirate"); // { text: string; tone: Tone }
+Greeter.onGreeted((name) => console.log(`greeted ${name}`));
+```
+
+## Why Oriel
+
+- **Typed calls, no glue code.** Mark a class `[Service]`: its methods,
+  records, enums, nullable types and events show up in TypeScript, with their
+  documentation comments. Change the C#, and the page's compiler tells you
+  what broke.
+- **Any frontend.** Vite, React, Vue, Svelte, or plain HTML: the client is a
+  dependency-free module.
+- **Small and native.** No reflection anywhere, so apps publish with
+  NativeAOT: the example is a **1.9 MB** executable. No browser engine is
+  bundled, and no native library of Oriel's own: WebView2 is driven directly
+  through COM.
+- **Safe by default.** Only the app's own pages can call services; calls of a
+  page that navigated away are canceled, and their results never reach the
+  next page.
+- **Errors at compile time.** A type that cannot cross to pages is reported
+  where it is used, with the reason, instead of failing at run time.
+
+The .NET options for a web UI each leave something out: Blazor Hybrid needs
+Razor rather than a JavaScript frontend, Electron.NET bundles Chromium and
+Node, and lighter webview wrappers leave the calls untyped. Oriel is built
+around the typed bridge, the way [Wails](https://wails.io), Tauri and
+[MyGo](https://github.com/egoist/mygo) are in Go and Rust.
+
+## Measured
+
+The [hello example](examples/hello), published with NativeAOT, on Windows 11:
+
+| | |
+|---|---|
+| Executable | 1.9 MB, plus 5 KB of frontend |
+| Window shown | at once; page loaded and calling C# after about 0.4 s |
+| Memory, the app's process | 19 MB working set, 5 MB private |
+| Memory, with the 6 WebView2 processes | 318 MB working set, 150 MB private |
+
+The second memory line is the one to compare: the webview's processes are
+most of an app's footprint, as in every webview-based framework.
+
+## Status
+
+Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
+Runtime; Linux and macOS are planned. The calls, events, generator and
+Windows backend are done and tested; dialogs, menus, a CLI and installers are
+next. See the [roadmap](docs/roadmap.md).
+
+## Documentation
+
+- [Getting started](docs/getting-started.md): a first app, from service to
+  native executable.
+- [Services and the TypeScript client](docs/bindings.md): what pages can
+  call, and how types map.
+- [Building and shipping](docs/build.md): build properties, development
+  loop, publishing.
+- [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL005.
+- [The page protocol](docs/protocol.md): the messages under the client.
+- [Architecture](docs/architecture.md): how it works, for contributors.
+
+## Contributing
+
+Contributions are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+setup, the tests and the conventions, and the [roadmap](docs/roadmap.md)
+lists what to pick up.
+
+## License
+
+[MIT](LICENSE).
