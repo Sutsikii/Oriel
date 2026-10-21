@@ -18,6 +18,7 @@ internal sealed class PageConnection : IDisposable
 {
     private readonly ServiceTable _services;
     private readonly Action<string> _post;
+    private readonly OrielWindow? _window;
     private readonly Lock _lock = new();
     private string? _token;
     private CancellationTokenSource _page = new();
@@ -28,10 +29,12 @@ internal sealed class PageConnection : IDisposable
     /// Delivers a message to the page. It is called from any thread, and must
     /// be safe to call after the page is gone.
     /// </param>
-    public PageConnection(ServiceTable services, Action<string> post)
+    /// <param name="window">The window the page is in, passed to the methods that ask for it.</param>
+    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null)
     {
         _services = services;
         _post = post;
+        _window = window;
     }
 
     /// <summary>Raised when a call fails, with the method and the exception, before the page gets the error.</summary>
@@ -141,7 +144,7 @@ internal sealed class PageConnection : IDisposable
                     throw new CodecException($"'{method}' does not name a method as Service.Method");
                 if (!_services.TryGet(method[..dot], out var service))
                     throw new InvalidOperationException($"No service named {method[..dot]} is bound");
-                var result = await service.InvokeAsync(method[(dot + 1)..], args, new CallContext(cancellation)).ConfigureAwait(false);
+                var result = await service.InvokeAsync(method[(dot + 1)..], args, new CallContext(cancellation, _window)).ConfigureAwait(false);
                 reply = Protocol.ResultMessage(id, token, result);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)

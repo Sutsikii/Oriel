@@ -9,9 +9,10 @@ namespace Oriel.Generated;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class CallContext
 {
-    internal CallContext(CancellationToken cancellation)
+    internal CallContext(CancellationToken cancellation, OrielWindow? window = null)
     {
         Cancellation = cancellation;
+        Window = window;
     }
 
     /// <summary>
@@ -19,4 +20,7 @@ public sealed class CallContext
     /// reloaded or its window closed.
     /// </summary>
     public CancellationToken Cancellation { get; }
+
+    /// <summary>The window of the page that made the call.</summary>
+    public OrielWindow? Window { get; }
 }

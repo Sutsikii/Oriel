@@ -23,7 +23,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
         Url = url;
         _titleFollowsPage = options.Title is null;
         _title = options.Title ?? app.Options.Name;
-        Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)));
+        Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
     }
 

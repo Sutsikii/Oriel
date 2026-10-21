@@ -115,6 +115,22 @@ public class DispatcherTests
     }
 
     [Fact]
+    public async Task PassesTheCallersWindowWithoutThePageSendingIt()
+    {
+        var harness = Harness.Compile("""
+            [Service]
+            public class Windows
+            {
+                public string Where(OrielWindow window, string label) => label + (window is null ? ": no window" : ": a window");
+            }
+            """);
+
+        // The test calls with no window; the app passes the page's.
+        Assert.Equal("\"x: no window\"", await harness.Bind("Windows").Call("Where", """["x"]"""));
+        Assert.Contains("where(label: string): Promise<string> {", harness.TypeScript);
+    }
+
+    [Fact]
     public async Task ExposesInheritedMethods()
     {
         var service = Harness.Compile("""

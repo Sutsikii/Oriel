@@ -175,6 +175,7 @@ internal static class ServiceParser
     private static string? Injected(ITypeSymbol type) => type.ToDisplayString() switch
     {
         "System.Threading.CancellationToken" => "context.Cancellation",
+        "Oriel.OrielWindow" => "context.Window!",
         _ => null,
     };
 

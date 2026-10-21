@@ -139,6 +139,48 @@ public class OrielAppTests
         await run;
     }
 
+    /// <summary>A service whose method asks for the window that called it.</summary>
+    public sealed class Caller
+    {
+        public OrielWindow? Last { get; set; }
+    }
+
+    private sealed class CallerDispatcher(Caller caller) : ServiceDispatcher("Caller")
+    {
+        public override ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context)
+        {
+            caller.Last = context.Window;
+            return ValueTask.FromResult<ValueWriter?>(null);
+        }
+    }
+
+    [Fact]
+    public async Task TellsServicesWhichWindowCalled()
+    {
+        ServiceRegistry.Register<Caller>(c => new CallerDispatcher(c));
+        var app = App();
+        var caller = new Caller();
+        app.Bind(caller);
+        OrielWindow? first = null, second = null;
+        var run = RunAsync(app, () =>
+        {
+            first = app.OpenWindow();
+            second = app.OpenWindow();
+        });
+        await WaitUntil(() => _platform.Windows.Count == 2);
+        var windows = _platform.Windows.ToArray();
+
+        Post(app, windows[1], "https://app.oriel/", """{"t":"call","id":1,"k":"p","m":"Caller.Who","a":[]}""");
+        await NextReply(windows[1]);
+        Assert.Same(second, caller.Last);
+        Post(app, windows[0], "https://app.oriel/", """{"t":"call","id":1,"k":"q","m":"Caller.Who","a":[]}""");
+        await NextReply(windows[0]);
+        Assert.Same(first, caller.Last);
+
+        app.Quit();
+        await run;
+    }
+
     [Fact]
     public async Task IgnoresMessagesOfOtherOrigins()
     {
