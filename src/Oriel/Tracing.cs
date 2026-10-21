@@ -5,7 +5,7 @@ namespace Oriel;
 /// <summary>
 /// Traces what Oriel does to the standard error stream when <c>ORIEL_TRACE=1</c>:
 /// windows, webviews, navigations and messages. For finding out where things
-/// stop; see docs/contributing.md.
+/// stop; see CONTRIBUTING.md.
 /// </summary>
 internal static class Tracing
 {
