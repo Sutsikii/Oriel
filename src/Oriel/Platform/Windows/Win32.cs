@@ -164,6 +164,9 @@ internal static unsafe partial class Win32
     [LibraryImport("kernel32.dll")]
     public static partial nint GetModuleHandleW(char* name);
 
+    [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint ShellExecuteW(nint hwnd, string? operation, string file, string? parameters, string? directory, int showCommand);
+
     [LibraryImport("ole32.dll")]
     public static partial int CoInitializeEx(nint reserved, uint coInit);
 

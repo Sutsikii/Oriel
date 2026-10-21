@@ -63,6 +63,15 @@ public sealed class OrielWindow : IPlatformWindowEvents
     /// </summary>
     public event EventHandler<WebViewFailedEventArgs>? WebViewFailed;
 
+    /// <summary>
+    /// Raised on the UI thread when the page navigates or opens a window.
+    /// By default, the app's own pages stay in the window (or open in a new
+    /// <see cref="OrielWindow"/>), other web pages and mail links open in the
+    /// system's apps, and everything else is refused. Handlers may set
+    /// <see cref="NavigationRequestedEventArgs.Action"/> to do otherwise.
+    /// </summary>
+    public event EventHandler<NavigationRequestedEventArgs>? NavigationRequested;
+
     internal PageConnection Connection { get; }
 
     /// <summary>Closes the window.</summary>
@@ -106,6 +115,63 @@ public sealed class OrielWindow : IPlatformWindowEvents
     }
 
     void IPlatformWindowEvents.Failed(Exception error) => _app.ReportError(error);
+
+    NavigationAction IPlatformWindowEvents.NavigationStarting(string uri, bool isUserInitiated) =>
+        Navigate(uri, isNewWindow: false, isUserInitiated);
+
+    void IPlatformWindowEvents.NewWindowRequested(string uri, bool isUserInitiated)
+    {
+        if (Navigate(uri, isNewWindow: true, isUserInitiated) == NavigationAction.Allow)
+        {
+            _app.OpenWindow(new WindowOptions
+            {
+                Url = uri,
+                Width = Options.Width,
+                Height = Options.Height,
+                DevTools = Options.DevTools,
+                Permissions = Options.Permissions,
+            });
+        }
+    }
+
+    bool IPlatformWindowEvents.PermissionRequested(string uri, WebPermissions permission)
+    {
+        var granted = permission != WebPermissions.None
+            && (Options.Permissions & permission) == permission
+            && _app.Frontend.IsTrusted(uri);
+        Tracing.Write($"{uri} asks for {permission}: {(granted ? "granted" : "denied")}");
+        return granted;
+    }
+
+    /// <summary>
+    /// Decides what a navigation or a new window does, lets handlers change
+    /// it, and opens external pages. Returns what the backend should do.
+    /// </summary>
+    private NavigationAction Navigate(string uri, bool isNewWindow, bool isUserInitiated)
+    {
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var target))
+            return NavigationAction.Deny;
+        var args = new NavigationRequestedEventArgs(target, isNewWindow, isUserInitiated, NavigationPolicy.Decide(_app.Frontend, target, isNewWindow));
+        try
+        {
+            NavigationRequested?.Invoke(this, args);
+        }
+        catch (Exception e)
+        {
+            _app.ReportError(e);
+            args.Action = NavigationAction.Deny; // a broken handler lets nothing through
+        }
+
+        Tracing.Write($"{(isNewWindow ? "new window" : "navigation")} to {target}: {args.Action}");
+        if (args.Action == NavigationAction.OpenExternally)
+        {
+            // Only links the system opens safely: no file: or custom schemes, whatever a handler said.
+            if (target.Scheme is "http" or "https" or "mailto")
+                _app.OpenExternally(target);
+            return NavigationAction.Deny;
+        }
+        return args.Action;
+    }
 
     void IPlatformWindowEvents.WebViewFailed(WebViewFailure failure)
     {

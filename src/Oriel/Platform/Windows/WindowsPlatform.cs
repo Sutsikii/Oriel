@@ -87,6 +87,13 @@ internal sealed unsafe class WindowsPlatform : IPlatform
 
     public void Quit() => Win32.PostQuitMessage(0);
 
+    public void OpenExternally(Uri uri)
+    {
+        // ShellExecute returns a value above 32 when it succeeds.
+        if (Win32.ShellExecuteW(0, "open", uri.AbsoluteUri, null, null, Win32.SW_SHOWNORMAL) <= 32)
+            throw new InvalidOperationException($"Opening {uri} with the system's default app failed.");
+    }
+
     public IPlatformWindow OpenWindow(PlatformWindowOptions options, IPlatformWindowEvents events)
     {
         var window = new WindowsWebWindow(this, options, events);

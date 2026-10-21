@@ -23,6 +23,10 @@ internal sealed class UnsupportedPlatform : IPlatform
     {
     }
 
+    public void OpenExternally(Uri uri)
+    {
+    }
+
     public void Quit()
     {
     }

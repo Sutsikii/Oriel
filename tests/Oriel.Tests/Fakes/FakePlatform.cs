@@ -28,6 +28,10 @@ internal sealed class FakePlatform : IPlatform
 
     public void Post(Action action) => _queue.Add(action);
 
+    public ConcurrentQueue<Uri> OpenedExternally { get; } = new();
+
+    public void OpenExternally(Uri uri) => OpenedExternally.Enqueue(uri);
+
     public void Quit()
     {
         _quit = true;

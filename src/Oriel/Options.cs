@@ -49,4 +49,11 @@ public sealed class WindowOptions
 
     /// <summary>Whether the page's developer tools can be opened. Defaults to <see cref="OrielApp.IsDev"/>.</summary>
     public bool? DevTools { get; init; }
+
+    /// <summary>
+    /// What the app's pages may use, such as the camera or notifications.
+    /// Requests for anything else, and every request of other origins, are
+    /// denied. Defaults to <see cref="WebPermissions.None"/>.
+    /// </summary>
+    public WebPermissions Permissions { get; init; }
 }

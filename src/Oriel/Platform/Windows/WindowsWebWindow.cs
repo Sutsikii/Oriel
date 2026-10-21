@@ -224,6 +224,22 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         });
         Subscribe(WebView2.IID_DocumentTitleChangedEventHandler, WebView2.WebView.AddDocumentTitleChanged, (sender, _) =>
             _events.TitleChanged(WebView2.WebView.GetDocumentTitle(sender)));
+        Subscribe(WebView2.IID_NavigationStartingEventHandler, WebView2.WebView.AddNavigationStarting, (_, args) =>
+        {
+            var uri = WebView2.NavigationStartingEventArgs.GetUri(args);
+            if (_events.NavigationStarting(uri, WebView2.NavigationStartingEventArgs.IsUserInitiated(args)) != NavigationAction.Allow)
+                WebView2.NavigationStartingEventArgs.Cancel(args);
+        });
+        Subscribe(WebView2.IID_NewWindowRequestedEventHandler, WebView2.WebView.AddNewWindowRequested, (_, args) =>
+        {
+            // WebView2 never opens a window of its own: Oriel decides.
+            WebView2.NewWindowRequestedEventArgs.SetHandled(args);
+            _events.NewWindowRequested(WebView2.NewWindowRequestedEventArgs.GetUri(args), WebView2.NewWindowRequestedEventArgs.IsUserInitiated(args));
+        });
+        Subscribe(WebView2.IID_PermissionRequestedEventHandler, WebView2.WebView.AddPermissionRequested, (_, args) =>
+            WebView2.PermissionRequestedEventArgs.SetState(args, _events.PermissionRequested(
+                WebView2.PermissionRequestedEventArgs.GetUri(args),
+                WebView2.PermissionRequestedEventArgs.GetPermission(args))));
         Subscribe(WebView2.IID_ProcessFailedEventHandler, WebView2.WebView.AddProcessFailed, (_, args) =>
         {
             var failure = WebView2.ProcessFailedEventArgs.GetFailure(args);
