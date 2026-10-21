@@ -48,6 +48,20 @@ public sealed class Probe
     }
 
     public void Report(string result) => Reported.TrySetResult(result);
+
+    public TaskCompletionSource FirstLoad { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public TaskCompletionSource SecondLoad { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private int _loads;
+
+    public void Loaded()
+    {
+        if (Interlocked.Increment(ref _loads) == 1)
+            FirstLoad.TrySetResult();
+        else
+            SecondLoad.TrySetResult();
+    }
 }
 
 public sealed class EndToEndTests : IDisposable
@@ -156,6 +170,53 @@ public sealed class EndToEndTests : IDisposable
 
         Assert.Equal("reloaded", report);
         Assert.True(await probe.HangCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [EndToEndFact]
+    public async Task ReloadsThePageWhenItsRendererIsKilled()
+    {
+        File.WriteAllText(Path.Combine(_assets, "index.html"), """<script type="module">await oriel.call("E2E.Loaded", []);</script>""");
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var probe = new Probe();
+        app.Bind(probe);
+        var failures = new List<WebViewFailedEventArgs>();
+        OrielWindow? window = null;
+        var run = Task.Run(() => app.Run(() =>
+        {
+            window = app.OpenWindow(new WindowOptions { Width = 400, Height = 300 });
+            window.WebViewFailed += (_, e) => failures.Add(e);
+        }));
+
+        await probe.FirstLoad.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.True(KillRenderers() > 0, "no renderer process found");
+        await probe.SecondLoad.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var failure = Assert.Single(failures);
+        Assert.Equal((WebViewFailure.RendererExited, WebViewRecovery.Reload), (failure.Failure, failure.Recovery));
+        window!.Close();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>
+    /// Kills the renderer processes of this test's webviews: the children of
+    /// the browser processes this process started. Returns how many.
+    /// </summary>
+    private static int KillRenderers()
+    {
+        var script = $$"""
+            $all = Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'"
+            $browsers = $all | Where-Object ParentProcessId -eq {{Environment.ProcessId}} | ForEach-Object ProcessId
+            $renderers = $all | Where-Object { $browsers -contains $_.ParentProcessId -and $_.CommandLine -like '*--type=renderer*' }
+            $renderers | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+            @($renderers).Count
+            """;
+        using var ps = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("powershell", ["-NoProfile", "-Command", script])
+        {
+            RedirectStandardOutput = true,
+        })!;
+        var output = ps.StandardOutput.ReadToEnd();
+        ps.WaitForExit();
+        return int.TryParse(output.Trim(), out var n) ? n : 0;
     }
 
     [EndToEndFact]

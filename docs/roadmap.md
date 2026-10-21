@@ -11,7 +11,8 @@ self-contained piece of work.
 - The source generator: dispatchers, JSON codecs and the TypeScript client,
   without reflection; diagnostics for what it cannot generate.
 - Windows backend: Win32 windows with WebView2 through COM, no loader DLL;
-  dark title bar, per-monitor DPI, app files served at `https://app.oriel/`.
+  dark title bar, per-monitor DPI, app files served at `https://app.oriel/`;
+  pages recover from failures of the webview's processes.
 - Build integration: the client written on build, the frontend copied on
   publish, NativeAOT.
 - Installers: `OrielInstaller` builds a per-user Inno Setup installer on

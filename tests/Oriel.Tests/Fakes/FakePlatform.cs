@@ -61,4 +61,16 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
     }
 
     public void Close() => Events.Closed();
+
+    public int Reloads { get; private set; }
+
+    public int Recreations { get; private set; }
+
+    public string? ErrorPage { get; private set; }
+
+    public void Reload() => Reloads++;
+
+    public void Recreate() => Recreations++;
+
+    public void ShowErrorPage(string html) => ErrorPage = html;
 }

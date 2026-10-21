@@ -145,6 +145,25 @@ with Win32 and WebView2:
   `https://app.oriel/` to the app's files, and forwards messages and title
   changes.
 
+### When the webview fails
+
+WebView2 runs pages in processes of its own, which can fail: a renderer
+runs out of memory, a GPU driver crashes, the browser process is killed.
+The backend reports each `ProcessFailed` as a `WebViewFailure`, and
+`OrielWindow` decides with its `RecoveryPolicy`, in shared code:
+
+| Failure | Recovery |
+|---|---|
+| The page's renderer exited or hangs | Reload the page |
+| The browser process exited | Recreate the webview (and the environment, which died with it) |
+| A frame's renderer, the GPU process, another helper | Nothing: the page goes on, or WebView2 restarts the process |
+| Three recoveries within a minute | Show an error page with a link to try again, instead of looping |
+
+`OrielWindow.WebViewFailed` is raised first, so apps can log the failure
+or choose another recovery; failures that needed one are also reported to
+`OrielApp.Error`. The end-to-end tests kill a real renderer to check the
+page comes back.
+
 ### Calling another WebView2 method
 
 1. Find the interface's vtable in `WebView2.h` (from the

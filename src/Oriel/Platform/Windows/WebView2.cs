@@ -19,6 +19,7 @@ internal static unsafe class WebView2
     public static readonly Guid IID_WebMessageReceivedEventHandler = new("57213f19-00e6-49fa-8e07-898ea01ecbd2");
     public static readonly Guid IID_DocumentTitleChangedEventHandler = new("f5f2b923-953e-4042-9f95-f3a118e1afd4");
     public static readonly Guid IID_AddScriptCompletedHandler = new("b99369f3-9b11-47b5-bc6f-8e7895fcea17");
+    public static readonly Guid IID_ProcessFailedEventHandler = new("79e0aea4-990b-42d9-aa1d-0fcc2e5bc7f1");
 
     /// <summary>COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.</summary>
     public const int HostResourceAccessAllow = 1;
@@ -103,12 +104,23 @@ internal static unsafe class WebView2
                 Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, int>)Com.Slot(w, 6))(w, p), "NavigateToString");
         }
 
+        // 25: add_ProcessFailed(handler, EventRegistrationToken*)
+        public static void AddProcessFailed(nint w, nint handler)
+        {
+            long token;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, long*, int>)Com.Slot(w, 25))(w, handler, &token), "add_ProcessFailed");
+        }
+
         // 27: AddScriptToExecuteOnDocumentCreated(LPCWSTR javaScript, handler)
         public static void AddScriptToExecuteOnDocumentCreated(nint w, string script, nint handler)
         {
             fixed (char* p = script)
                 Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, nint, int>)Com.Slot(w, 27))(w, p, handler), "AddScriptToExecuteOnDocumentCreated");
         }
+
+        // 31: Reload()
+        public static void Reload(nint w) =>
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, int>)Com.Slot(w, 31))(w), "Reload");
 
         // 33: PostWebMessageAsString(LPCWSTR)
         public static int PostWebMessageAsString(nint w, string message)
@@ -176,6 +188,29 @@ internal static unsafe class WebView2
         // 14: put_AreDefaultContextMenusEnabled(BOOL)
         public static void SetDefaultContextMenusEnabled(nint s, bool value) =>
             Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(s, 14))(s, value ? 1 : 0), "put_AreDefaultContextMenusEnabled");
+    }
+
+    /// <summary>ICoreWebView2ProcessFailedEventArgs.</summary>
+    public static class ProcessFailedEventArgs
+    {
+        // 3: get_ProcessFailedKind(COREWEBVIEW2_PROCESS_FAILED_KIND*)
+        public static WebViewFailure GetFailure(nint a)
+        {
+            int kind;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, int*, int>)Com.Slot(a, 3))(a, &kind), "get_ProcessFailedKind");
+            return Failure(kind);
+        }
+
+        /// <summary>The failure of a COREWEBVIEW2_PROCESS_FAILED_KIND.</summary>
+        public static WebViewFailure Failure(int kind) => kind switch
+        {
+            0 => WebViewFailure.BrowserExited,
+            1 => WebViewFailure.RendererExited,
+            2 => WebViewFailure.RendererUnresponsive,
+            3 => WebViewFailure.FrameRendererExited,
+            6 => WebViewFailure.GpuExited,
+            _ => WebViewFailure.Other,
+        };
     }
 
     /// <summary>ICoreWebView2WebMessageReceivedEventArgs.</summary>

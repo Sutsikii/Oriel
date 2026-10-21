@@ -17,6 +17,9 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     private readonly IPlatformWindowEvents _events;
     private nint _controller;
     private nint _webview;
+    private nint _environment;
+    private string? _errorPage;
+    private bool _browserGone;
     private bool _destroyed;
 
     public WindowsWebWindow(WindowsPlatform platform, PlatformWindowOptions options, IPlatformWindowEvents events)
@@ -136,10 +139,39 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         return false;
     }
 
+    public void Reload()
+    {
+        if (_webview != 0 && !_browserGone)
+            WebView2.WebView.Reload(_webview);
+    }
+
+    public void Recreate()
+    {
+        if (_destroyed)
+            return;
+        Tracing.Write($"window {Hwnd:X} recreates its webview");
+        ReleaseWebView();
+        // The environment died with the browser process; the next window to ask creates another.
+        _platform.ForgetEnvironment(_environment);
+        _environment = 0;
+        _browserGone = false;
+        _platform.WithEnvironment(_options.UserDataFolder, CreateController, Fail);
+    }
+
+    public void ShowErrorPage(string html)
+    {
+        _errorPage = html;
+        if (_webview == 0 || _browserGone)
+            Recreate();
+        else
+            Navigate();
+    }
+
     private void CreateController(nint environment)
     {
         if (_destroyed)
             return;
+        _environment = environment;
         var handler = ComCallback.ForResult(WebView2.IID_ControllerCompletedHandler, (hr, controller) =>
         {
             if (hr < 0 || controller == 0)
@@ -192,6 +224,14 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         });
         Subscribe(WebView2.IID_DocumentTitleChangedEventHandler, WebView2.WebView.AddDocumentTitleChanged, (sender, _) =>
             _events.TitleChanged(WebView2.WebView.GetDocumentTitle(sender)));
+        Subscribe(WebView2.IID_ProcessFailedEventHandler, WebView2.WebView.AddProcessFailed, (_, args) =>
+        {
+            var failure = WebView2.ProcessFailedEventArgs.GetFailure(args);
+            Tracing.Write($"window {Hwnd:X}: webview failed ({failure})");
+            if (failure == WebViewFailure.BrowserExited)
+                _browserGone = true;
+            _events.WebViewFailed(failure);
+        });
 
         Resize();
         WebView2.Controller.SetVisible(_controller, true);
@@ -217,10 +257,11 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     /// <summary>Shows the page, or the error page that replaces a page that cannot be shown.</summary>
     private void Navigate()
     {
-        if (_options.ErrorPage is not null)
+        var errorPage = _errorPage ?? _options.ErrorPage;
+        if (errorPage is not null)
         {
             Tracing.Write($"window {Hwnd:X} cannot show {_options.Url}: shows an error page");
-            WebView2.WebView.NavigateToString(_webview, _options.ErrorPage);
+            WebView2.WebView.NavigateToString(_webview, errorPage);
             return;
         }
         Tracing.Write($"window {Hwnd:X} navigates to {_options.Url}");

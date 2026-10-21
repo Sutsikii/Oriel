@@ -38,6 +38,15 @@ internal interface IPlatformWindow
 
     /// <summary>Closes the window, as its close button would.</summary>
     void Close();
+
+    /// <summary>Reloads the page, after its renderer failed.</summary>
+    void Reload();
+
+    /// <summary>Creates the webview anew and loads the page, after the browser process failed.</summary>
+    void Recreate();
+
+    /// <summary>Shows <paramref name="html"/> in place of the page, which keeps failing.</summary>
+    void ShowErrorPage(string html);
 }
 
 /// <summary>What a backend window tells Oriel. Called on the UI thread.</summary>
@@ -54,6 +63,9 @@ internal interface IPlatformWindowEvents
 
     /// <summary>Something failed after the window opened, such as creating its webview.</summary>
     void Failed(Exception error);
+
+    /// <summary>A process of the webview failed. Oriel answers with one of the window's recovery methods.</summary>
+    void WebViewFailed(WebViewFailure failure);
 }
 
 /// <summary>
