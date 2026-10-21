@@ -251,6 +251,55 @@ public class OrielAppTests
     }
 
     [Fact]
+    public async Task ExplainsAPageMissingFromTheAppsFilesInsteadOfShowingNothing()
+    {
+        var assets = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(assets);
+        try
+        {
+            var app = App(assets: assets);
+            var errors = new List<Exception>();
+            app.Error += errors.Add;
+            var run = RunAsync(app, () => app.OpenWindow());
+            await WaitUntil(() => _platform.Windows.Count == 1);
+
+            var page = OnlyWindow().Options.ErrorPage;
+            Assert.NotNull(page);
+            Assert.Contains(System.Net.WebUtility.HtmlEncode(Path.Combine(assets, "index.html")), page);
+            var error = Assert.IsType<FileNotFoundException>(Assert.Single(errors));
+            Assert.Equal(Path.Combine(assets, "index.html"), error.FileName);
+
+            app.Quit();
+            await run;
+        }
+        finally
+        {
+            Directory.Delete(assets, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ShowsThePageWhenItIsThere()
+    {
+        var assets = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(Path.Combine(assets, "index.html"), "<!doctype html>");
+        try
+        {
+            var app = App(assets: assets);
+            var run = RunAsync(app, () => app.OpenWindow());
+            await WaitUntil(() => _platform.Windows.Count == 1);
+            Assert.Null(OnlyWindow().Options.ErrorPage);
+            app.Quit();
+            await run;
+        }
+        finally
+        {
+            Directory.Delete(assets, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RefusesToBindWhatIsNotAService()
     {
         var e = Assert.Throws<InvalidOperationException>(() => App().Bind(new object()));

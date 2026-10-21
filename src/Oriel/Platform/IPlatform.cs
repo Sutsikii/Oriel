@@ -56,7 +56,11 @@ internal interface IPlatformWindowEvents
     void Failed(Exception error);
 }
 
-/// <summary>A window to open, with everything resolved: sizes in device-independent pixels.</summary>
+/// <summary>
+/// A window to open, with everything resolved: sizes in device-independent
+/// pixels. When <c>ErrorPage</c> is set, the window shows that HTML instead of
+/// <c>Url</c>, which cannot be shown.
+/// </summary>
 internal sealed record PlatformWindowOptions(
     string Title,
     int Width,
@@ -67,4 +71,5 @@ internal sealed record PlatformWindowOptions(
     string BridgeScript,
     bool DevTools,
     string? AssetsFolder,
+    string? ErrorPage,
     string UserDataFolder);

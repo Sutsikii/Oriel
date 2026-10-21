@@ -202,10 +202,7 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             if (hr < 0)
                 Fail(new COMException($"Injecting the page runtime failed with 0x{hr:X8}", hr));
             else if (!_destroyed)
-            {
-                Tracing.Write($"window {Hwnd:X} navigates to {_options.Url}");
-                WebView2.WebView.Navigate(_webview, _options.Url.AbsoluteUri);
-            }
+                Navigate();
         });
         try
         {
@@ -215,6 +212,19 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         {
             Com.Release(added);
         }
+    }
+
+    /// <summary>Shows the page, or the error page that replaces a page that cannot be shown.</summary>
+    private void Navigate()
+    {
+        if (_options.ErrorPage is not null)
+        {
+            Tracing.Write($"window {Hwnd:X} cannot show {_options.Url}: shows an error page");
+            WebView2.WebView.NavigateToString(_webview, _options.ErrorPage);
+            return;
+        }
+        Tracing.Write($"window {Hwnd:X} navigates to {_options.Url}");
+        WebView2.WebView.Navigate(_webview, _options.Url.AbsoluteUri);
     }
 
     private void Subscribe(in Guid iid, Action<nint, nint> add, Action<nint, nint> handle)

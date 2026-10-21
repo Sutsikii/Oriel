@@ -50,6 +50,30 @@ public class FrontendTests
         Assert.Equal(trusted, s_dev.IsTrusted(source));
     }
 
+    [Fact]
+    public void FindsThePagesMissingFromTheAppsFiles()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(folder, "my pages"));
+        File.WriteAllText(Path.Combine(folder, "index.html"), "");
+        File.WriteAllText(Path.Combine(folder, "my pages", "about.html"), "");
+        try
+        {
+            var app = new Frontend(null, folder);
+            Assert.Null(app.MissingFile(app.Resolve("/")));
+            Assert.Null(app.MissingFile(app.Resolve("/my%20pages/about.html")));
+            Assert.Equal(Path.Combine(folder, "settings.html"), app.MissingFile(app.Resolve("/settings.html")));
+
+            // Pages of a dev server or of other sites are not the app's files.
+            Assert.Null(app.MissingFile(new Uri("https://example.com/")));
+            Assert.Null(new Frontend("http://localhost:5173", folder).MissingFile(new Uri("http://localhost:5173/x.html")));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData("localhost:5173")]
     [InlineData("file:///C:/app")]

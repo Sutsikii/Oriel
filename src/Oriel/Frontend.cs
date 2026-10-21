@@ -52,6 +52,20 @@ internal sealed class Frontend
         return new UriBuilder(resolved) { Path = resolved.AbsolutePath + "index.html" }.Uri;
     }
 
+    /// <summary>
+    /// The file the app's own page <paramref name="url"/> would be served from
+    /// when that file does not exist; null when it exists, or when the page
+    /// is not one of the app's files (a dev server's, or another site's).
+    /// </summary>
+    public string? MissingFile(Uri url)
+    {
+        if (IsDev || url.Scheme != "https" || !string.Equals(url.Host, AppHost, StringComparison.OrdinalIgnoreCase))
+            return null;
+        var relative = Uri.UnescapeDataString(url.AbsolutePath).TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var path = Path.GetFullPath(Path.Combine(AssetsFolder, relative));
+        return File.Exists(path) ? null : path;
+    }
+
     /// <summary>Whether a document at <paramref name="source"/> may call services: it is one of the app's pages.</summary>
     public bool IsTrusted(string source)
     {

@@ -96,6 +96,13 @@ internal static unsafe class WebView2
                 Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, int>)Com.Slot(w, 5))(w, p), "Navigate");
         }
 
+        // 6: NavigateToString(LPCWSTR htmlContent)
+        public static void NavigateToString(nint w, string html)
+        {
+            fixed (char* p = html)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, int>)Com.Slot(w, 6))(w, p), "NavigateToString");
+        }
+
         // 27: AddScriptToExecuteOnDocumentCreated(LPCWSTR javaScript, handler)
         public static void AddScriptToExecuteOnDocumentCreated(nint w, string script, nint handler)
         {

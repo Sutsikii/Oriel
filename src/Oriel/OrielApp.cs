@@ -152,6 +152,11 @@ public sealed class OrielApp : IEventSink
         var window = new OrielWindow(this, options, Frontend.Resolve(options.Url));
         lock (_lock)
             _windows.Add(window);
+        // A page missing from the app's files would show as a blank window:
+        // say what is missing instead, in the window and to Error.
+        var missing = Frontend.MissingFile(window.Url);
+        if (missing is not null)
+            ReportError(new FileNotFoundException($"The page {window.Url} is not in the app's files: {missing} does not exist.", missing));
         var native = new PlatformWindowOptions(
             options.Title ?? Options.Name,
             Math.Max(1, options.Width),
@@ -162,6 +167,7 @@ public sealed class OrielApp : IEventSink
             BridgeScript.Source,
             options.DevTools ?? IsDev,
             IsDev ? null : Frontend.AssetsFolder,
+            missing is null ? null : MissingPage(window.Url, missing),
             Path.Combine(DataFolder(Environment.SpecialFolder.LocalApplicationData), "WebView"));
         Dispatch(() => window.Open(_platform, native));
         return window;
@@ -221,6 +227,31 @@ public sealed class OrielApp : IEventSink
         var dir = Path.Combine(Environment.GetFolderPath(root), IsDev ? Options.Name + " Dev" : Options.Name);
         Directory.CreateDirectory(dir);
         return dir;
+    }
+
+    /// <summary>What a window shows when its page is missing from the app's files.</summary>
+    internal static string MissingPage(Uri url, string file)
+    {
+        static string e(string text) => System.Net.WebUtility.HtmlEncode(text);
+        return $$"""
+            <!doctype html>
+            <html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>Page not found</title>
+            <style>
+              body { font: 15px/1.5 "Segoe UI", system-ui, sans-serif; margin: 0; padding: 40px; }
+              h1 { font-size: 20px; margin: 0 0 12px; }
+              code { font: 13px Consolas, monospace; background: #8882; padding: 2px 5px; border-radius: 4px; word-break: break-all; }
+              li { margin: 6px 0; }
+            </style></head>
+            <body>
+              <h1>This window has no page to show</h1>
+              <p>It opens <code>{{e(url.ToString())}}</code>, which is served from <code>{{e(file)}}</code>, and that file does not exist.</p>
+              <ul>
+                <li>Run the published app: <code>dotnet publish -c Release</code> builds the frontend and copies it to <code>wwwroot</code>.</li>
+                <li>In a Debug build, build the frontend first (<code>npm run build</code>), then the app, so that <code>wwwroot</code> is copied beside it.</li>
+                <li>While developing, use <code>npm run dev</code>: pages then come from the dev server.</li>
+              </ul>
+            </body></html>
+            """;
     }
 
     private static int WriteTypeScript(string path)
