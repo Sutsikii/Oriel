@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Settings of apps using Oriel, imported before the project's own. Every
+    property can be set in the app's project; docs/build.md describes them.
+  -->
+  <PropertyGroup>
+    <!-- Where the TypeScript client is written after each build, relative to the project. Empty: nowhere. -->
+    <OrielTypeScriptOutput Condition="'$(OrielTypeScriptOutput)' == ''"></OrielTypeScriptOutput>
+    <!-- The folder of the built frontend, copied to wwwroot beside the executable. Empty: none. -->
+    <OrielFrontendDist Condition="'$(OrielFrontendDist)' == ''"></OrielFrontendDist>
+    <!-- The folder of the frontend's sources, where OrielFrontendBuildCommand runs. -->
+    <OrielFrontendDirectory Condition="'$(OrielFrontendDirectory)' == ''">frontend</OrielFrontendDirectory>
+    <!-- Builds the frontend before it is copied, in Release builds: for instance "npm run build". -->
+    <OrielFrontendBuildCommand Condition="'$(OrielFrontendBuildCommand)' == ''"></OrielFrontendBuildCommand>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../src/Oriel/Oriel.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../src/Oriel.Generators/Oriel.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)../src/Oriel/build/Oriel.targets" />
+</Project>

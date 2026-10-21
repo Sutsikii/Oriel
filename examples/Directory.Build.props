@@ -1,0 +1,5 @@
+<Project>
+  <!-- The examples use Oriel from source, as an app uses its package. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <Import Project="$(MSBuildThisFileDirectory)../src/Oriel/build/Oriel.props" />
+</Project>

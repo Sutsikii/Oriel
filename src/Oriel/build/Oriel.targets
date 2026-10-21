@@ -1,0 +1,49 @@
+<Project>
+  <!--
+    Build steps of apps using Oriel. docs/build.md describes them.
+  -->
+
+  <!--
+    Writes the TypeScript client: runs the app with ORIEL_GENERATE, which
+    makes OrielApp.Run write the client of the services and return at once.
+    The file is only rewritten when it changed, so dev servers do not reload
+    for nothing.
+  -->
+  <Target Name="OrielWriteTypeScript"
+          AfterTargets="Build"
+          Condition="'$(OrielTypeScriptOutput)' != '' and '$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' != 'false'">
+    <PropertyGroup>
+      <_OrielTypeScriptPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/$(OrielTypeScriptOutput)'))</_OrielTypeScriptPath>
+      <_OrielHost Condition="'$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</_OrielHost>
+      <_OrielHost Condition="'$(_OrielHost)' == ''">dotnet</_OrielHost>
+    </PropertyGroup>
+    <Exec Command="&quot;$(_OrielHost)&quot; &quot;$(TargetPath)&quot;"
+          EnvironmentVariables="ORIEL_GENERATE=$(_OrielTypeScriptPath);ORIEL_DEV_URL="
+          StandardOutputImportance="low" />
+    <Message Importance="normal" Text="Oriel: TypeScript client at $(_OrielTypeScriptPath)" />
+  </Target>
+
+  <!-- Builds the frontend in Release builds, when a command is set. -->
+  <Target Name="OrielBuildFrontend"
+          BeforeTargets="OrielCollectFrontend"
+          Condition="'$(OrielFrontendBuildCommand)' != '' and '$(Configuration)' == 'Release' and '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="$(OrielFrontendBuildCommand)" WorkingDirectory="$(MSBuildProjectDirectory)/$(OrielFrontendDirectory)" />
+  </Target>
+
+  <!--
+    Copies the built frontend to wwwroot, which OrielApp serves pages from.
+    Collected when the target runs rather than when the project loads, so a
+    frontend built during the build is included.
+  -->
+  <Target Name="OrielCollectFrontend"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(OrielFrontendDist)' != ''">
+    <ItemGroup>
+      <_OrielFrontendFile Include="$(MSBuildProjectDirectory)/$(OrielFrontendDist)/**/*" />
+      <Content Include="@(_OrielFrontendFile)"
+               Link="wwwroot/%(RecursiveDir)%(Filename)%(Extension)"
+               CopyToOutputDirectory="PreserveNewest"
+               CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>
