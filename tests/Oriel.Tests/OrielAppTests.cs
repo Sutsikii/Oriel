@@ -299,6 +299,90 @@ public class OrielAppTests
         }
     }
 
+    /// <summary>Opens a window of an app on a manual clock, and reports its webview failed once per <paramref name="failures"/>.</summary>
+    private async Task<(FakeWindow Native, List<WebViewFailedEventArgs> Raised, List<Exception> Errors)> Fail(
+        WebViewFailure[] failures, Action<WebViewFailedEventArgs>? handle = null, ManualTime? time = null)
+    {
+        var app = new OrielApp(new AppOptions { Name = "OrielTests", AssetsDirectory = @"C:\app\wwwroot" }, _platform, null, time ?? new ManualTime());
+        var raised = new List<WebViewFailedEventArgs>();
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        var run = RunAsync(app, () =>
+        {
+            var window = app.OpenWindow();
+            window.WebViewFailed += (_, e) =>
+            {
+                handle?.Invoke(e);
+                raised.Add(e);
+            };
+        });
+        await WaitUntil(() => _platform.Windows.Count == 1);
+        var native = OnlyWindow();
+        errors.Clear(); // the missing page of C:\app\wwwroot
+        var done = new TaskCompletionSource();
+        app.Dispatch(() =>
+        {
+            foreach (var failure in failures)
+                native.Events.WebViewFailed(failure);
+            done.SetResult();
+        });
+        await done.Task;
+        app.Quit();
+        await run;
+        return (native, raised, errors);
+    }
+
+    [Fact]
+    public async Task ReloadsThePageWhenItsRendererFails()
+    {
+        var (native, raised, errors) = await Fail([WebViewFailure.RendererExited]);
+        Assert.Equal(1, native.Reloads);
+        var args = Assert.Single(raised);
+        Assert.Equal((WebViewFailure.RendererExited, WebViewRecovery.Reload), (args.Failure, args.Recovery));
+        Assert.Contains("failed (RendererExited); recovery: Reload", Assert.Single(errors).Message);
+    }
+
+    [Fact]
+    public async Task RecreatesTheWebViewWhenTheBrowserFails()
+    {
+        var (native, _, _) = await Fail([WebViewFailure.BrowserExited]);
+        Assert.Equal((0, 1), (native.Reloads, native.Recreations));
+    }
+
+    [Fact]
+    public async Task ShowsAnErrorPageWhenThePageKeepsFailing()
+    {
+        var (native, raised, _) = await Fail(Enumerable.Repeat(WebViewFailure.RendererExited, 4).ToArray());
+        Assert.Equal(3, native.Reloads);
+        Assert.Equal(WebViewRecovery.ErrorPage, raised[^1].Recovery);
+        Assert.Contains("This window stopped working", native.ErrorPage);
+        Assert.Contains("href=\"https://app.oriel/index.html\"", native.ErrorPage);
+    }
+
+    [Fact]
+    public async Task LetsTheAppDecideHowToRecover()
+    {
+        var (native, _, _) = await Fail([WebViewFailure.RendererExited], e => e.Recovery = WebViewRecovery.None);
+        Assert.Equal(0, native.Reloads);
+    }
+
+    [Fact]
+    public async Task RecoversEvenWhenAHandlerThrows()
+    {
+        var (native, _, errors) = await Fail([WebViewFailure.RendererExited], _ => throw new InvalidOperationException("handler bug"));
+        Assert.Equal(1, native.Reloads);
+        Assert.Contains(errors, e => e.Message == "handler bug");
+    }
+
+    [Fact]
+    public async Task DoesNotReportFailuresTheWebViewRecoversFrom()
+    {
+        var (native, raised, errors) = await Fail([WebViewFailure.GpuExited]);
+        Assert.Equal(WebViewRecovery.None, Assert.Single(raised).Recovery);
+        Assert.Equal((0, 0), (native.Reloads, native.Recreations));
+        Assert.Empty(errors);
+    }
+
     [Fact]
     public void RefusesToBindWhatIsNotAService()
     {

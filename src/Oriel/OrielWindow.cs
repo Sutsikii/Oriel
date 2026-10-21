@@ -15,6 +15,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
     private IPlatformWindow? _native;
     private volatile string _title;
     private volatile bool _closed;
+    private readonly RecoveryPolicy _recovery;
 
     internal OrielWindow(OrielApp app, WindowOptions options, Uri url)
     {
@@ -23,6 +24,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
         Url = url;
         _titleFollowsPage = options.Title is null;
         _title = options.Title ?? app.Options.Name;
+        _recovery = new RecoveryPolicy(app.Time);
         Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
     }
@@ -50,6 +52,16 @@ public sealed class OrielWindow : IPlatformWindowEvents
 
     /// <summary>Raised on the UI thread once the window is closed.</summary>
     public event EventHandler? Closed;
+
+    /// <summary>
+    /// Raised on the UI thread when a process of the webview fails. Oriel
+    /// recovers by itself: it reloads the page when its renderer failed,
+    /// recreates the webview when the browser process did, and shows an error
+    /// page when the page failed three times in a minute. Handlers can log the
+    /// failure, or set <see cref="WebViewFailedEventArgs.Recovery"/> to do
+    /// otherwise.
+    /// </summary>
+    public event EventHandler<WebViewFailedEventArgs>? WebViewFailed;
 
     internal PageConnection Connection { get; }
 
@@ -94,4 +106,33 @@ public sealed class OrielWindow : IPlatformWindowEvents
     }
 
     void IPlatformWindowEvents.Failed(Exception error) => _app.ReportError(error);
+
+    void IPlatformWindowEvents.WebViewFailed(WebViewFailure failure)
+    {
+        var args = new WebViewFailedEventArgs(failure, _recovery.Decide(failure));
+        try
+        {
+            WebViewFailed?.Invoke(this, args);
+        }
+        catch (Exception e)
+        {
+            _app.ReportError(e); // the recovery happens all the same
+        }
+
+        if (failure is not (WebViewFailure.GpuExited or WebViewFailure.Other))
+            _app.ReportError(new InvalidOperationException($"The webview of the window \"{Title}\" failed ({failure}); recovery: {args.Recovery}."));
+
+        switch (args.Recovery)
+        {
+            case WebViewRecovery.Reload:
+                _native?.Reload();
+                break;
+            case WebViewRecovery.Recreate:
+                _native?.Recreate();
+                break;
+            case WebViewRecovery.ErrorPage:
+                _native?.ShowErrorPage(OrielApp.FailedPage(Url));
+                break;
+        }
+    }
 }

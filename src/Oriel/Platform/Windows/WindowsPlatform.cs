@@ -158,6 +158,21 @@ internal sealed unsafe class WindowsPlatform : IPlatform
         }
     }
 
+    /// <summary>
+    /// Drops <paramref name="environment"/>, whose browser process exited, so
+    /// that the next window asking for one creates it anew. Windows that
+    /// recover one after the other drop only the one they used.
+    /// </summary>
+    internal void ForgetEnvironment(nint environment)
+    {
+        if (environment == 0 || environment != _environment)
+            return;
+        Com.Release(_environment);
+        _environment = 0;
+        _environmentError = null;
+        _creatingEnvironment = false;
+    }
+
     private void Drain()
     {
         while (_queue.TryDequeue(out var action))

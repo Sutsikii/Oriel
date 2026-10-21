@@ -36,13 +36,14 @@ public sealed class OrielApp : IEventSink
     {
     }
 
-    internal OrielApp(AppOptions options, IPlatform platform, string? devUrl)
+    internal OrielApp(AppOptions options, IPlatform platform, string? devUrl, TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         if (string.IsNullOrWhiteSpace(options.Name) || options.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             throw new ArgumentException($"The app's name '{options.Name}' cannot name a folder.", nameof(options));
         Options = options;
         _platform = platform;
+        Time = time ?? TimeProvider.System;
         Frontend = new Frontend(devUrl, options.AssetsDirectory ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"));
     }
 
@@ -87,6 +88,9 @@ public sealed class OrielApp : IEventSink
     internal Frontend Frontend { get; }
 
     internal ServiceTable Services { get; } = new();
+
+    /// <summary>The clock windows count failures with; tests give their own.</summary>
+    internal TimeProvider Time { get; }
 
     /// <summary>
     /// Lets pages call the methods of <paramref name="service"/>, an instance of
@@ -250,6 +254,26 @@ public sealed class OrielApp : IEventSink
                 <li>In a Debug build, build the frontend first (<code>npm run build</code>), then the app, so that <code>wwwroot</code> is copied beside it.</li>
                 <li>While developing, use <code>npm run dev</code>: pages then come from the dev server.</li>
               </ul>
+            </body></html>
+            """;
+    }
+
+    /// <summary>What a window shows when its page keeps failing.</summary>
+    internal static string FailedPage(Uri url)
+    {
+        static string e(string text) => System.Net.WebUtility.HtmlEncode(text);
+        return $$"""
+            <!doctype html>
+            <html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>This window stopped working</title>
+            <style>
+              body { font: 15px/1.5 "Segoe UI", system-ui, sans-serif; margin: 0; padding: 40px; }
+              h1 { font-size: 20px; margin: 0 0 12px; }
+              a { display: inline-block; margin-top: 8px; padding: 6px 14px; border-radius: 6px; background: #3b5bdb; color: white; text-decoration: none; }
+            </style></head>
+            <body>
+              <h1>This window stopped working</h1>
+              <p>Its page failed several times in a row, so it was not loaded again.</p>
+              <a href="{{e(url.ToString())}}">Try again</a>
             </body></html>
             """;
     }
