@@ -151,6 +151,125 @@ public static class Json
     /// <summary>Writes a JSON value as it is.</summary>
     public static void Write(Utf8JsonWriter w, JsonElement value) => value.WriteTo(w);
 
+    /// <summary>Reads an array, each item with <paramref name="read"/>.</summary>
+    public static T[] ReadArray<T>(JsonElement e, Func<JsonElement, T> read)
+    {
+        if (e.ValueKind != JsonValueKind.Array)
+            throw Expected("an array", e);
+        var items = new T[e.GetArrayLength()];
+        var i = 0;
+        foreach (var item in e.EnumerateArray())
+        {
+            items[i] = ReadItem(item, i, read);
+            i++;
+        }
+        return items;
+    }
+
+    /// <summary>Reads an array into a list, each item with <paramref name="read"/>.</summary>
+    public static List<T> ReadList<T>(JsonElement e, Func<JsonElement, T> read)
+    {
+        if (e.ValueKind != JsonValueKind.Array)
+            throw Expected("an array", e);
+        var items = new List<T>(e.GetArrayLength());
+        foreach (var item in e.EnumerateArray())
+            items.Add(ReadItem(item, items.Count, read));
+        return items;
+    }
+
+    /// <summary>Reads an object into a dictionary, each value with <paramref name="read"/>.</summary>
+    public static Dictionary<string, T> ReadDictionary<T>(JsonElement e, Func<JsonElement, T> read)
+    {
+        if (e.ValueKind != JsonValueKind.Object)
+            throw Expected("an object", e);
+        var items = new Dictionary<string, T>(StringComparer.Ordinal);
+        foreach (var property in e.EnumerateObject())
+            items[property.Name] = ReadValue(property.Value, property.Name, read);
+        return items;
+    }
+
+    /// <summary>
+    /// Reads the property <paramref name="name"/> of an object when it is there,
+    /// <see langword="undefined"/> counting as missing.
+    /// </summary>
+    public static bool TryReadProperty<T>(JsonElement obj, string name, Func<JsonElement, T> read, out T value)
+    {
+        if (obj.TryGetProperty(name, out var e) && e.ValueKind != JsonValueKind.Undefined)
+        {
+            value = ReadValue(e, name, read);
+            return true;
+        }
+        value = default!;
+        return false;
+    }
+
+    /// <summary>Checks <paramref name="e"/> is an object, the JSON of a C# class or struct.</summary>
+    public static void ExpectObject(JsonElement e)
+    {
+        if (e.ValueKind != JsonValueKind.Object)
+            throw Expected("an object", e);
+    }
+
+    /// <summary>The error for a property an object must have.</summary>
+    public static CodecException Missing(string name) => new($"missing property '{name}'");
+
+    /// <summary>Writes the items of a collection as an array.</summary>
+    public static void WriteArray<T>(Utf8JsonWriter w, IEnumerable<T> items, Action<Utf8JsonWriter, T> write)
+    {
+        w.WriteStartArray();
+        foreach (var item in items)
+            write(w, item);
+        w.WriteEndArray();
+    }
+
+    /// <summary>Writes a dictionary with string keys as an object.</summary>
+    public static void WriteDictionary<T>(Utf8JsonWriter w, IEnumerable<KeyValuePair<string, T>> items, Action<Utf8JsonWriter, T> write)
+    {
+        w.WriteStartObject();
+        foreach (var item in items)
+        {
+            w.WritePropertyName(item.Key);
+            write(w, item.Value);
+        }
+        w.WriteEndObject();
+    }
+
+    private static T ReadItem<T>(JsonElement e, int index, Func<JsonElement, T> read)
+    {
+        try
+        {
+            return read(e);
+        }
+        catch (CodecException err)
+        {
+            throw err.Under(Index(index));
+        }
+    }
+
+    private static T ReadValue<T>(JsonElement e, string name, Func<JsonElement, T> read)
+    {
+        try
+        {
+            return read(e);
+        }
+        catch (CodecException err)
+        {
+            throw err.Under(IsIdentifier(name) ? "." + name : "[" + JsonSerializer.Serialize(name, JsonContext.Default.String) + "]");
+        }
+    }
+
+    private static bool IsIdentifier(string name)
+    {
+        if (name.Length == 0 || char.IsDigit(name[0]))
+            return false;
+        foreach (var c in name)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_' && c != '$')
+                return false;
+        }
+        return true;
+    }
+
     /// <summary>Whether <paramref name="e"/> is JSON null, or missing (<c>undefined</c> in the page).</summary>
     public static bool IsNull(JsonElement e) => e.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined;
 

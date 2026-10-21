@@ -57,10 +57,19 @@ internal static class Protocol
             value(w);
         });
 
+    /// <summary>
+    /// How messages are written. Messages reach pages through postMessage,
+    /// never through HTML, so only what JSON itself requires is escaped.
+    /// </summary>
+    public static readonly JsonWriterOptions WriterOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     private static string Write(Action<Utf8JsonWriter> properties)
     {
         var buffer = new ArrayBufferWriter<byte>(256);
-        using (var w = new Utf8JsonWriter(buffer))
+        using (var w = new Utf8JsonWriter(buffer, WriterOptions))
         {
             w.WriteStartObject();
             properties(w);
