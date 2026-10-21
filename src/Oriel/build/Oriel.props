@@ -15,6 +15,8 @@
 
     <!-- Builds an installer after dotnet publish, with Inno Setup 6. docs/build.md#installers describes it. -->
     <OrielInstaller Condition="'$(OrielInstaller)' == ''">false</OrielInstaller>
+    <!-- Desktop apps have no use for the XML documentation of their references: keep it out of what ships. -->
+    <PublishReferencesDocumentationFiles Condition="'$(PublishReferencesDocumentationFiles)' == ''">false</PublishReferencesDocumentationFiles>
     <!-- The wizard's languages, by the names of Inno Setup's message files: english;french;german… -->
     <OrielInstallerLanguages Condition="'$(OrielInstallerLanguages)' == ''">english</OrielInstallerLanguages>
     <!-- The tasks Oriel's targets use, shipped in the package. -->
