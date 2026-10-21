@@ -1,0 +1,187 @@
+using System.Collections.Concurrent;
+using System.Text.Json;
+using Oriel.Generated;
+using Oriel.Ipc;
+
+namespace Oriel.Tests.Ipc;
+
+public class PageConnectionTests
+{
+    /// <summary>A dispatcher written by hand, as the generator would write it.</summary>
+    private sealed class Calculator : ServiceDispatcher
+    {
+        public TaskCompletionSource<int> Pending { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationToken LastCancellation { get; private set; }
+
+        public Calculator()
+            : base("Calc")
+        {
+        }
+
+        public override async ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context)
+        {
+            LastCancellation = context.Cancellation;
+            switch (method)
+            {
+                case "Add":
+                    Arguments.Count(args, "Calc.Add", 2, 2);
+                    var sum = Arguments.Read(args, 0, "a", Json.ReadInt32) + Arguments.Read(args, 1, "b", Json.ReadInt32);
+                    return w => Json.Write(w, sum);
+                case "Reset":
+                    return null;
+                case "Fail":
+                    throw new InvalidOperationException("no luck");
+                case "Wait":
+                    var value = await Pending.Task.WaitAsync(context.Cancellation);
+                    return w => Json.Write(w, value);
+                default:
+                    throw new MethodNotFoundException(Name, method);
+            }
+        }
+    }
+
+    private readonly ConcurrentQueue<string> _posted = new();
+    private readonly Calculator _calc = new();
+    private readonly PageConnection _page;
+
+    public PageConnectionTests()
+    {
+        var services = new ServiceTable();
+        services.Add(_calc);
+        _page = new PageConnection(services, _posted.Enqueue);
+    }
+
+    private static string Call(long id, string method, string args, string token = "page1") =>
+        $$"""{"t":"call","id":{{id}},"k":"{{token}}","m":"{{method}}","a":{{args}}}""";
+
+    private string Single()
+    {
+        Assert.True(_posted.TryDequeue(out var message));
+        Assert.Empty(_posted);
+        return message;
+    }
+
+    [Fact]
+    public async Task RepliesWithTheResult()
+    {
+        await _page.ReceiveAsync(Call(1, "Calc.Add", "[2,3]"));
+        Assert.Equal("""{"t":"result","id":1,"k":"page1","v":5}""", Single());
+    }
+
+    [Fact]
+    public async Task RepliesWithoutAValueToMethodsReturningNothing()
+    {
+        await _page.ReceiveAsync(Call(7, "Calc.Reset", "[]"));
+        Assert.Equal("""{"t":"result","id":7,"k":"page1"}""", Single());
+    }
+
+    [Theory]
+    [InlineData("Calc.Fail", "[]", "no luck")]
+    [InlineData("Calc.Nope", "[]", "Calc has no method Nope")]
+    [InlineData("Other.Add", "[]", "No service named Other is bound")]
+    [InlineData("Add", "[]", "'Add' does not name a method as Service.Method")]
+    [InlineData("Calc.Add", "[1,\"2\"]", "argument 'b': expected a number, got a string")]
+    public async Task RepliesWithTheErrorOfAFailedCall(string method, string args, string error)
+    {
+        await _page.ReceiveAsync(Call(2, method, args));
+        using var reply = JsonDocument.Parse(Single());
+        Assert.Equal("error", reply.RootElement.GetProperty("t").GetString());
+        Assert.Equal(2, reply.RootElement.GetProperty("id").GetInt64());
+        Assert.Equal(error, reply.RootElement.GetProperty("e").GetString());
+    }
+
+    [Fact]
+    public async Task ReportsFailedCalls()
+    {
+        var failures = new List<string>();
+        _page.CallFailed += (method, e) => failures.Add($"{method}: {e.Message}");
+        await _page.ReceiveAsync(Call(1, "Calc.Fail", "[]"));
+        Assert.Equal(["Calc.Fail: no luck"], failures);
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("[1]")]
+    [InlineData("""{"t":"call","id":1,"m":"Calc.Add","a":[1,2]}""")]
+    [InlineData("""{"t":"call","k":"p","m":"Calc.Add","a":[1,2]}""")]
+    [InlineData("""{"t":"future","k":"p"}""")]
+    public async Task IgnoresMalformedMessages(string message)
+    {
+        await _page.ReceiveAsync(message);
+        Assert.Empty(_posted);
+    }
+
+    [Fact]
+    public async Task CancelsTheCallsOfAPageThatWentAway()
+    {
+        var waiting = _page.ReceiveAsync(Call(1, "Calc.Wait", "[]"));
+        await WaitUntil(() => _calc.LastCancellation.CanBeCanceled);
+        var first = _calc.LastCancellation;
+
+        await _page.ReceiveAsync("""{"t":"hello","k":"page2"}""");
+        await waiting;
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.Empty(_posted);
+    }
+
+    [Fact]
+    public async Task DropsResultsAddressedToAPreviousPage()
+    {
+        // The call ignores its cancellation and finishes after the reload.
+        var services = new ServiceTable();
+        var slow = new Slow();
+        services.Add(slow);
+        using var page = new PageConnection(services, _posted.Enqueue);
+
+        var call = page.ReceiveAsync(Call(1, "Slow.Run", "[]"));
+        await page.ReceiveAsync("""{"t":"hello","k":"page2"}""");
+        slow.Release.SetResult();
+        await call;
+
+        Assert.Empty(_posted);
+    }
+
+    [Fact]
+    public async Task SendsNothingOnceDisposed()
+    {
+        await _page.ReceiveAsync("""{"t":"hello","k":"page1"}""");
+        _page.Dispose();
+        _page.Send("x");
+        await _page.ReceiveAsync(Call(1, "Calc.Add", "[1,2]"));
+        Assert.Empty(_posted);
+    }
+
+    [Fact]
+    public async Task SendsOnlyOnceAPageSaidHello()
+    {
+        _page.Send("early");
+        await _page.ReceiveAsync("""{"t":"hello","k":"page1"}""");
+        _page.Send("late");
+        Assert.Equal("late", Single());
+    }
+
+    private sealed class Slow : ServiceDispatcher
+    {
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Slow()
+            : base("Slow")
+        {
+        }
+
+        public override async ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context)
+        {
+            await Release.Task;
+            return w => Json.Write(w, 1);
+        }
+    }
+
+    private static async Task WaitUntil(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++)
+            await Task.Delay(5);
+        Assert.True(condition());
+    }
+}

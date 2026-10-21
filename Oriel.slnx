@@ -1,2 +1,8 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Oriel/Oriel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Oriel.Tests/Oriel.Tests.csproj" />
+  </Folder>
 </Solution>
