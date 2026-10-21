@@ -281,7 +281,9 @@ internal static class CSharpEmitter
         TypeKind.Primitive => $"{Json}.Write({w}, {v});",
         TypeKind.Enum or TypeKind.Object => $"Codecs.Write_{t.Name}({w}, {v});",
         TypeKind.NullableValue or TypeKind.NullableReference =>
-            $"if ({v} is {{ }} n{depth}) {{ {WriteStatement(t.Element!, w, "n" + depth, depth + 1)} }} else {w}.WriteNullValue();",
+            // In a block: the pattern's variable would otherwise be in scope of the statements after it,
+            // and the next nullable property of an object would declare it again.
+            $"{{ if ({v} is {{ }} n{depth}) {{ {WriteStatement(t.Element!, w, "n" + depth, depth + 1)} }} else {w}.WriteNullValue(); }}",
         TypeKind.Array or TypeKind.List =>
             $"{Json}.WriteArray<{t.Element!.CSharp}>({w}, {v}, {WriteFunction(t.Element!, depth)});",
         TypeKind.Dictionary =>
