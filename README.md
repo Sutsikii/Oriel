@@ -45,6 +45,8 @@ Greeter.onGreeted((name) => console.log(`greeted ${name}`));
 - **Safe by default.** Only the app's own pages can call services; calls of a
   page that navigated away are canceled, and their results never reach the
   next page.
+- **A real install.** `dotnet publish` can end with a setup wizard: per-user
+  install, Start menu shortcut, uninstaller, and a check for WebView2.
 - **Errors at compile time.** A type that cannot cross to pages is reported
   where it is used, with the reason, instead of failing at run time.
 
@@ -71,9 +73,9 @@ most of an app's footprint, as in every webview-based framework.
 ## Status
 
 Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
-Runtime; Linux and macOS are planned. The calls, events, generator and
-Windows backend are done and tested; dialogs, menus, a CLI and installers are
-next. See the [roadmap](docs/roadmap.md).
+Runtime; Linux and macOS are planned. The calls, events, generator, Windows
+backend and installers are done and tested; dialogs, menus, signing and a CLI
+are next. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 

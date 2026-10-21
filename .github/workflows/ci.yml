@@ -27,10 +27,14 @@ jobs:
         with:
           node-version: 22
 
+      # For the test that compiles an installer.
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
       - name: Build
         run: dotnet build -c Release
 
-      - name: Test the library and the generator
+      - name: Test the library, the generator and the build tasks
         run: dotnet test -c Release --no-build
 
       - name: Test the page runtime
@@ -48,7 +52,7 @@ jobs:
         run: dotnet test tests/Oriel.EndToEnd.Tests -c Release --no-build
 
   example:
-    name: Publish the example with NativeAOT
+    name: Publish the example and its installer
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,20 +65,23 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
       - name: Install the frontend's tools
         working-directory: examples/hello/frontend
         run: npm ci
 
-      - name: Publish
-        run: dotnet publish examples/hello -c Release -r win-x64 -o artifacts/hello
+      - name: Publish with NativeAOT, then build the installer
+        run: dotnet publish examples/hello -c Release -r win-x64
 
       - name: Check the client in the repository is up to date
         run: git diff --exit-code examples/hello/frontend/src/oriel.ts
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hello-win-x64
-          path: artifacts/hello
+          name: hello-installer
+          path: examples/hello/bin/installer
 
   package:
     name: Pack

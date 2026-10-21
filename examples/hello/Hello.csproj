@@ -14,6 +14,15 @@
 
     <!-- dotnet publish -c Release gives a single native executable. -->
     <PublishAot>true</PublishAot>
+
+    <!-- What Windows shows, and the installer dotnet publish -c Release builds (docs/build.md#installers). -->
+    <Product>Oriel Hello</Product>
+    <Version>0.1.0</Version>
+    <Company>Oriel contributors</Company>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <OrielInstaller>true</OrielInstaller>
+    <OrielAppId>B13EF445-3A27-45B7-82B4-62BA76E87C5B</OrielAppId>
+    <OrielInstallerLanguages>english;french</OrielInstallerLanguages>
   </PropertyGroup>
 
 </Project>

@@ -105,7 +105,21 @@ dotnet publish -c Release -r win-x64
 ```
 
 In Release, the frontend is built (`npm run build`) and copied to `wwwroot`
-beside a native executable of about 2 MB. Ship the folder.
+beside a native executable of about 2 MB.
+
+To ship it as a real Windows install, with a setup wizard, shortcuts and an
+uninstaller, install [Inno Setup](https://jrsoftware.org/isinfo.php) once
+(`winget install JRSoftware.InnoSetup`) and add to the project:
+
+```xml
+<Product>My App</Product>
+<Version>1.0.0</Version>
+<ApplicationIcon>app.ico</ApplicationIcon>
+<OrielInstaller>true</OrielInstaller>
+```
+
+The same `dotnet publish` then writes `bin/installer/My-App-Setup-1.0.0.exe`.
+[build.md](build.md#installers) has the details.
 
 ## When something goes wrong
 
