@@ -20,6 +20,13 @@ internal static unsafe class WebView2
     public static readonly Guid IID_DocumentTitleChangedEventHandler = new("f5f2b923-953e-4042-9f95-f3a118e1afd4");
     public static readonly Guid IID_AddScriptCompletedHandler = new("b99369f3-9b11-47b5-bc6f-8e7895fcea17");
     public static readonly Guid IID_ProcessFailedEventHandler = new("79e0aea4-990b-42d9-aa1d-0fcc2e5bc7f1");
+    public static readonly Guid IID_NavigationStartingEventHandler = new("9adbe429-f36d-432b-9ddc-f8881fbd76e3");
+    public static readonly Guid IID_NewWindowRequestedEventHandler = new("d4c185fe-c81c-4989-97af-2d3fa7ab5651");
+    public static readonly Guid IID_PermissionRequestedEventHandler = new("15e1c6a3-c72a-4df3-91d7-d097fbec6bfd");
+
+    /// <summary>COREWEBVIEW2_PERMISSION_STATE_ALLOW and _DENY.</summary>
+    public const int PermissionAllow = 1;
+    public const int PermissionDeny = 2;
 
     /// <summary>COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.</summary>
     public const int HostResourceAccessAllow = 1;
@@ -102,6 +109,22 @@ internal static unsafe class WebView2
         {
             fixed (char* p = html)
                 Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, int>)Com.Slot(w, 6))(w, p), "NavigateToString");
+        }
+
+        // 7: add_NavigationStarting(handler, EventRegistrationToken*)
+        public static void AddNavigationStarting(nint w, nint handler) => Add(w, 7, handler, "add_NavigationStarting");
+
+        // 23: add_PermissionRequested(handler, EventRegistrationToken*)
+        public static void AddPermissionRequested(nint w, nint handler) => Add(w, 23, handler, "add_PermissionRequested");
+
+        // 44: add_NewWindowRequested(handler, EventRegistrationToken*)
+        public static void AddNewWindowRequested(nint w, nint handler) => Add(w, 44, handler, "add_NewWindowRequested");
+
+        /// <summary>Calls the add_ method of an event in <paramref name="slot"/>; Oriel never removes its handlers, which go with the webview.</summary>
+        private static void Add(nint w, int slot, nint handler, string name)
+        {
+            long token;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, long*, int>)Com.Slot(w, slot))(w, handler, &token), name);
         }
 
         // 25: add_ProcessFailed(handler, EventRegistrationToken*)
@@ -188,6 +211,87 @@ internal static unsafe class WebView2
         // 14: put_AreDefaultContextMenusEnabled(BOOL)
         public static void SetDefaultContextMenusEnabled(nint s, bool value) =>
             Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(s, 14))(s, value ? 1 : 0), "put_AreDefaultContextMenusEnabled");
+    }
+
+    /// <summary>Getters shared by event arguments: a string or a BOOL in a slot.</summary>
+    private static string GetString(nint a, int slot, string name)
+    {
+        nint value;
+        Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(a, slot))(a, &value), name);
+        return Com.TakeString(value) ?? "";
+    }
+
+    private static bool GetBool(nint a, int slot, string name)
+    {
+        int value;
+        Com.Check(((delegate* unmanaged[Stdcall]<nint, int*, int>)Com.Slot(a, slot))(a, &value), name);
+        return value != 0;
+    }
+
+    private static void SetInt(nint a, int slot, int value, string name) =>
+        Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(a, slot))(a, value), name);
+
+    /// <summary>ICoreWebView2NavigationStartingEventArgs.</summary>
+    public static class NavigationStartingEventArgs
+    {
+        // 3: get_Uri(LPWSTR*)
+        public static string GetUri(nint a) => GetString(a, 3, "get_Uri");
+
+        // 4: get_IsUserInitiated(BOOL*)
+        public static bool IsUserInitiated(nint a) => GetBool(a, 4, "get_IsUserInitiated");
+
+        // 8: put_Cancel(BOOL)
+        public static void Cancel(nint a) => SetInt(a, 8, 1, "put_Cancel");
+    }
+
+    /// <summary>ICoreWebView2NewWindowRequestedEventArgs.</summary>
+    public static class NewWindowRequestedEventArgs
+    {
+        // 3: get_Uri(LPWSTR*)
+        public static string GetUri(nint a) => GetString(a, 3, "get_Uri");
+
+        // 6: put_Handled(BOOL): no window of WebView2's own
+        public static void SetHandled(nint a) => SetInt(a, 6, 1, "put_Handled");
+
+        // 8: get_IsUserInitiated(BOOL*)
+        public static bool IsUserInitiated(nint a) => GetBool(a, 8, "get_IsUserInitiated");
+    }
+
+    /// <summary>ICoreWebView2PermissionRequestedEventArgs.</summary>
+    public static class PermissionRequestedEventArgs
+    {
+        // 3: get_Uri(LPWSTR*)
+        public static string GetUri(nint a) => GetString(a, 3, "get_Uri");
+
+        // 4: get_PermissionKind(COREWEBVIEW2_PERMISSION_KIND*)
+        public static WebPermissions GetPermission(nint a)
+        {
+            int kind;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, int*, int>)Com.Slot(a, 4))(a, &kind), "get_PermissionKind");
+            return Permission(kind);
+        }
+
+        // 7: put_State(COREWEBVIEW2_PERMISSION_STATE)
+        public static void SetState(nint a, bool allow) => SetInt(a, 7, allow ? PermissionAllow : PermissionDeny, "put_State");
+
+        /// <summary>The permission of a COREWEBVIEW2_PERMISSION_KIND; None for kinds Oriel does not know.</summary>
+        public static WebPermissions Permission(int kind) => kind switch
+        {
+            1 => WebPermissions.Microphone,
+            2 => WebPermissions.Camera,
+            3 => WebPermissions.Geolocation,
+            4 => WebPermissions.Notifications,
+            5 => WebPermissions.OtherSensors,
+            6 => WebPermissions.ClipboardRead,
+            7 => WebPermissions.MultipleDownloads,
+            8 => WebPermissions.FileSystem,
+            9 => WebPermissions.Autoplay,
+            10 => WebPermissions.LocalFonts,
+            11 => WebPermissions.MidiSystemExclusive,
+            12 => WebPermissions.WindowManagement,
+            13 => WebPermissions.PersistentStorage,
+            _ => WebPermissions.None,
+        };
     }
 
     /// <summary>ICoreWebView2ProcessFailedEventArgs.</summary>

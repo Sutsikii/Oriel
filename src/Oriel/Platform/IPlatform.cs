@@ -22,6 +22,9 @@ internal interface IPlatform
     /// <summary>Ends the event loop. UI thread only.</summary>
     void Quit();
 
+    /// <summary>Opens <paramref name="uri"/>, an http(s) or mailto URL, with the system's default app. UI thread only.</summary>
+    void OpenExternally(Uri uri);
+
     /// <summary>Opens a window showing a page. UI thread only.</summary>
     IPlatformWindow OpenWindow(PlatformWindowOptions options, IPlatformWindowEvents events);
 }
@@ -66,6 +69,21 @@ internal interface IPlatformWindowEvents
 
     /// <summary>A process of the webview failed. Oriel answers with one of the window's recovery methods.</summary>
     void WebViewFailed(WebViewFailure failure);
+
+    /// <summary>
+    /// The page's top document is about to navigate to <paramref name="uri"/>.
+    /// The backend cancels the navigation unless this returns <see cref="NavigationAction.Allow"/>.
+    /// </summary>
+    NavigationAction NavigationStarting(string uri, bool isUserInitiated);
+
+    /// <summary>
+    /// The page asks for a window. The backend opens none itself: Oriel opens
+    /// an <see cref="OrielWindow"/>, the system's browser, or nothing.
+    /// </summary>
+    void NewWindowRequested(string uri, bool isUserInitiated);
+
+    /// <summary>A document at <paramref name="uri"/> asks for <paramref name="permission"/>; true grants it.</summary>
+    bool PermissionRequested(string uri, WebPermissions permission);
 }
 
 /// <summary>

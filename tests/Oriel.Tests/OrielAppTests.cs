@@ -383,6 +383,114 @@ public class OrielAppTests
         Assert.Empty(errors);
     }
 
+    /// <summary>Runs <paramref name="act"/> on the UI thread of an app with one window, and returns what it returned.</summary>
+    private async Task<T> OnWindow<T>(Func<FakeWindow, OrielWindow, T> act, WindowOptions? options = null, Action<OrielWindow>? setUp = null)
+    {
+        var app = App();
+        OrielWindow? window = null;
+        var run = RunAsync(app, () =>
+        {
+            window = app.OpenWindow(options);
+            setUp?.Invoke(window);
+        });
+        await WaitUntil(() => _platform.Windows.Count == 1);
+        var result = new TaskCompletionSource<T>();
+        app.Dispatch(() => result.SetResult(act(OnlyWindow(), window!)));
+        var value = await result.Task;
+        await Task.Delay(20); // windows opened by act
+        app.Quit();
+        await run;
+        return value;
+    }
+
+    [Fact]
+    public async Task KeepsTheAppsPagesInTheWindowAndOpensOthersOutside()
+    {
+        var (own, other) = await OnWindow((native, _) => (
+            native.Events.NavigationStarting("https://app.oriel/settings.html", true),
+            native.Events.NavigationStarting("https://example.com/docs", true)));
+
+        Assert.Equal(NavigationAction.Allow, own);
+        Assert.Equal(NavigationAction.Deny, other); // canceled in the window...
+        Assert.Equal([new Uri("https://example.com/docs")], _platform.OpenedExternally); // ...opened outside
+    }
+
+    [Fact]
+    public async Task LetsTheAppDecideWhereNavigationsGo()
+    {
+        var raised = new List<NavigationRequestedEventArgs>();
+        var action = await OnWindow(
+            (native, _) => native.Events.NavigationStarting("https://example.com/", false),
+            setUp: window => window.NavigationRequested += (_, e) =>
+            {
+                raised.Add(e);
+                e.Action = NavigationAction.Allow;
+            });
+
+        Assert.Equal(NavigationAction.Allow, action);
+        var args = Assert.Single(raised);
+        Assert.Equal((new Uri("https://example.com/"), false, false), (args.Uri, args.IsNewWindow, args.IsUserInitiated));
+        Assert.Empty(_platform.OpenedExternally);
+    }
+
+    [Fact]
+    public async Task NeverOpensDangerousSchemesOutsideWhateverHandlersSay()
+    {
+        var action = await OnWindow(
+            (native, _) => native.Events.NavigationStarting("file:///C:/Windows/System32/cmd.exe", true),
+            setUp: window => window.NavigationRequested += (_, e) => e.Action = NavigationAction.OpenExternally);
+
+        Assert.Equal(NavigationAction.Deny, action);
+        Assert.Empty(_platform.OpenedExternally);
+    }
+
+    [Fact]
+    public async Task RefusesNavigationsWhenAHandlerThrows()
+    {
+        var action = await OnWindow(
+            (native, _) => native.Events.NavigationStarting("https://app.oriel/x.html", true),
+            setUp: window => window.NavigationRequested += (_, _) => throw new InvalidOperationException("handler bug"));
+
+        Assert.Equal(NavigationAction.Deny, action);
+    }
+
+    [Fact]
+    public async Task OpensTheAppsPagesInWindowsOfTheirOwn()
+    {
+        await OnWindow((native, _) =>
+        {
+            native.Events.NewWindowRequested("https://app.oriel/detail.html", true);
+            native.Events.NewWindowRequested("https://example.com/", true);
+            native.Events.NewWindowRequested("about:blank", false);
+            return 0;
+        }, new WindowOptions { Width = 500, Height = 400 });
+
+        Assert.Equal(2, _platform.Windows.Count);
+        var opened = _platform.Windows.ToArray()[1].Options;
+        Assert.Equal((new Uri("https://app.oriel/detail.html"), 500, 400), (opened.Url, opened.Width, opened.Height));
+        Assert.Equal([new Uri("https://example.com/")], _platform.OpenedExternally);
+    }
+
+    [Fact]
+    public async Task GrantsTheAppsPagesOnlyThePermissionsGiven()
+    {
+        var answers = await OnWindow((native, _) => new[]
+        {
+            native.Events.PermissionRequested("https://app.oriel/index.html", WebPermissions.Camera),
+            native.Events.PermissionRequested("https://app.oriel/index.html", WebPermissions.Microphone),
+            native.Events.PermissionRequested("https://example.com/", WebPermissions.Camera),
+            native.Events.PermissionRequested("https://app.oriel/index.html", WebPermissions.None),
+        }, new WindowOptions { Permissions = WebPermissions.Camera | WebPermissions.Notifications });
+
+        Assert.Equal([true, false, false, false], answers);
+    }
+
+    [Fact]
+    public async Task DeniesEveryPermissionByDefault()
+    {
+        Assert.False(await OnWindow((native, _) => native.Events.PermissionRequested("https://app.oriel/", WebPermissions.Notifications)));
+    }
+
     [Fact]
     public void RefusesToBindWhatIsNotAService()
     {

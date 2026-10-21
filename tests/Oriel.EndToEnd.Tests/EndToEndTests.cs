@@ -92,7 +92,7 @@ public sealed class EndToEndTests : IDisposable
     }
 
     /// <summary>Runs an app showing a page of <paramref name="script"/>, until the page reports; then closes it.</summary>
-    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script)
+    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null)
     {
         File.WriteAllText(Path.Combine(_assets, "index.html"), $$"""
             <!doctype html>
@@ -113,13 +113,18 @@ public sealed class EndToEndTests : IDisposable
         var errors = new List<Exception>();
         app.Error += errors.Add;
         OrielWindow? window = null;
-        var run = Task.Run(() => app.Run(() => window = app.OpenWindow(new WindowOptions { Width = 400, Height = 300 })));
+        var run = Task.Run(() => app.Run(() =>
+        {
+            window = app.OpenWindow(new WindowOptions { Width = 400, Height = 300 });
+            setUp?.Invoke(window);
+        }));
 
         var report = await probe.Reported.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Empty(errors);
-        window!.Close();
+        foreach (var open in app.Windows)
+            open.Close();
         Assert.Equal(0, await run.WaitAsync(TimeSpan.FromSeconds(10)));
-        return (report, app, window, probe);
+        return (report, app, window!, probe);
     }
 
     [EndToEndFact]
@@ -217,6 +222,38 @@ public sealed class EndToEndTests : IDisposable
         var output = ps.StandardOutput.ReadToEnd();
         ps.WaitForExit();
         return int.TryParse(output.Trim(), out var n) ? n : 0;
+    }
+
+    [EndToEndFact]
+    public async Task KeepsTheWindowOnTheAppAndPagesWithoutPermissions()
+    {
+        File.WriteAllText(Path.Combine(_assets, "second.html"), "<!doctype html><title>Second</title>");
+        var navigations = new List<(Uri Uri, bool NewWindow, NavigationAction Action)>();
+        var (report, app, _, _) = await RunPage("""
+            const results = {};
+            const link = document.createElement("a");
+            link.href = "https://example.com/";
+            document.body.append(link);
+            link.click();
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            results.stayed = location.href;
+            window.open("/second.html");
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            results.notifications = await Notification.requestPermission();
+            await oriel.call("E2E.Report", [JSON.stringify(results)]);
+            """,
+            window => window.NavigationRequested += (_, e) =>
+            {
+                navigations.Add((e.Uri, e.IsNewWindow, e.Action));
+                if (e.Action == NavigationAction.OpenExternally)
+                    e.Action = NavigationAction.Deny; // no browser opened by the tests
+            });
+
+        using var results = System.Text.Json.JsonDocument.Parse(report);
+        Assert.Equal("https://app.oriel/index.html", results.RootElement.GetProperty("stayed").GetString());
+        Assert.Equal("denied", results.RootElement.GetProperty("notifications").GetString());
+        Assert.Contains((new Uri("https://example.com/"), false, NavigationAction.OpenExternally), navigations);
+        Assert.Contains((new Uri("https://app.oriel/second.html"), true, NavigationAction.Allow), navigations);
     }
 
     [EndToEndFact]

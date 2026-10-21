@@ -80,6 +80,27 @@ Only the app's own pages may call services: documents of
 other origin, such as a page the window navigated to, are ignored. The
 runtime only starts in the top document of a window, not in frames.
 
+## Where pages may go
+
+A window stays on the app. When its page navigates or opens a window,
+Oriel decides:
+
+| The page goes to | Navigation | New window (`window.open`, `target="_blank"`) |
+|---|---|---|
+| A page of the app (or of the dev server) | Allowed | Opens an `OrielWindow` of that page |
+| Another web page (`http`, `https`) | Opened in the system's browser; the window stays | Same |
+| A `mailto:` link | Opened in the mail app | Same |
+| `about:`, `data:`, `blob:` | Allowed | Refused |
+| Anything else (`file:`, other apps' schemes…) | Refused | Refused |
+
+Only `http`, `https` and `mailto` ever reach the system: other schemes could
+start programs. `OrielWindow.NavigationRequested` is raised first, and
+handlers may change the decision.
+
+Permission requests (camera, microphone, notifications, geolocation…) are
+denied, unless `WindowOptions.Permissions` grants them, and only to the app's
+own pages.
+
 ## Compatibility
 
 Messages of an unknown `t` are ignored on both sides, so that the protocol can

@@ -226,6 +226,19 @@ public sealed class OrielApp : IEventSink
 
     internal void ReportCallFailure(string method, Exception error) => CallFailed?.Invoke(method, error);
 
+    /// <summary>Opens <paramref name="uri"/> with the system's default app. UI thread only.</summary>
+    internal void OpenExternally(Uri uri)
+    {
+        try
+        {
+            _platform.OpenExternally(uri);
+        }
+        catch (Exception e)
+        {
+            ReportError(e);
+        }
+    }
+
     private string DataFolder(Environment.SpecialFolder root)
     {
         var dir = Path.Combine(Environment.GetFolderPath(root), IsDev ? Options.Name + " Dev" : Options.Name);
