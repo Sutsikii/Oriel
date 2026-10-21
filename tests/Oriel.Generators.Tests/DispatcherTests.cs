@@ -73,6 +73,27 @@ public class DispatcherTests
     }
 
     [Fact]
+    public async Task TakesANullForAnOptionalArgumentThatCannotBeNull()
+    {
+        // f(1, undefined, 3) in a page is sent as [1, null, 3].
+        var service = Harness.Compile("""
+            [Service]
+            public class Calc
+            {
+                public int Add(int a, int b = 10, int c = 100) => a + b + c;
+                public string Label(string? text = "none") => text ?? "null";
+                public int Count(params int[] values) => values.Length;
+            }
+            """).Bind("Calc");
+
+        Assert.Equal("14", await service.Call("Add", "[1,null,3]"));
+        Assert.Equal("\"null\"", await service.Call("Label", "[null]"));
+        Assert.Equal("\"none\"", await service.Call("Label", "[]"));
+        Assert.Equal("0", await service.Call("Count", "[]"));
+        Assert.Equal("2", await service.Call("Count", "[[4,5]]"));
+    }
+
+    [Fact]
     public async Task PassesTheCallsCancellation()
     {
         var service = Harness.Compile("""

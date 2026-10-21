@@ -27,6 +27,21 @@ public static class Arguments
         return n;
     }
 
+    /// <summary>
+    /// Reads the optional argument at <paramref name="index"/>, or returns
+    /// <paramref name="fallback"/>, its default value, when the page left it
+    /// out. A null stands for a left-out argument too where the parameter
+    /// cannot be null: pages write <c>f(a, undefined, c)</c> as <c>[a, null, c]</c>.
+    /// </summary>
+    public static T ReadOptional<T>(JsonElement args, int index, string name, Func<JsonElement, T> read, T fallback, bool nullable)
+    {
+        if (index >= args.GetArrayLength())
+            return fallback;
+        if (!nullable && Json.IsNull(args[index]))
+            return fallback;
+        return Read(args, index, name, read);
+    }
+
     /// <summary>Reads the argument at <paramref name="index"/>, naming it in errors.</summary>
     public static T Read<T>(JsonElement args, int index, string name, Func<JsonElement, T> read)
     {

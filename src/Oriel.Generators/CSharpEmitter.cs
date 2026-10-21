@@ -80,59 +80,18 @@ internal static class CSharpEmitter
     {
         var page = method.Params.Where(p => p.Type is not null).ToList();
         var min = page.TakeWhile(p => !p.IsOptional).Count();
-        w.Line($"var count = global::Oriel.Generated.Arguments.Count(args, {Names.Literal(service.Name + "." + method.CSharp)}, {min}, {page.Count});");
+        w.Line($"global::Oriel.Generated.Arguments.Count(args, {Names.Literal(service.Name + "." + method.CSharp)}, {min}, {page.Count});");
         for (var i = 0; i < page.Count; i++)
         {
             var p = page[i];
-            var read = $"global::Oriel.Generated.Arguments.Read<{p.Type!.CSharp}>(args, {i}, {Names.Literal(p.Name)}, {ReadFunction(p.Type, 0)})";
-            w.Line(i < min ? $"var a{i} = {read};" : $"var a{i} = count > {i} ? {read} : default!;");
+            var read = ReadFunction(p.Type!, 0);
+            w.Line(p.Default is null
+                ? $"var a{i} = global::Oriel.Generated.Arguments.Read<{p.Type!.CSharp}>(args, {i}, {Names.Literal(p.Name)}, {read});"
+                : $"var a{i} = global::Oriel.Generated.Arguments.ReadOptional<{p.Type!.CSharp}>(args, {i}, {Names.Literal(p.Name)}, {read}, {p.Default}, nullable: {(IsNullable(p.Type) ? "true" : "false")});");
         }
 
-        // Optional parameters the page left out are left out of the call too,
-        // so that C# gives them their default values.
-        for (var given = page.Count; given >= min; given--)
-        {
-            if (given == min)
-            {
-                if (page.Count > min)
-                    w.Line("else");
-                CallAndReturn(w, method, page, given, page.Count > min);
-            }
-            else
-            {
-                w.Line($"{(given == page.Count ? "if" : "else if")} (count == {given})");
-                CallAndReturn(w, method, page, given, braces: true);
-            }
-        }
-    }
-
-    private static void CallAndReturn(SourceWriter w, MethodDef method, List<ParamDef> page, int given, bool braces)
-    {
-        var arguments = new List<string>();
-        foreach (var p in method.Params)
-        {
-            if (p.Injected is not null)
-            {
-                arguments.Add($"@{p.Name}: {p.Injected}");
-                continue;
-            }
-            var index = page.IndexOf(p);
-            if (index < given)
-                arguments.Add($"@{p.Name}: a{index}");
-        }
-        var call = $"_service.@{method.CSharp}({string.Join(", ", arguments)})";
-
-        if (braces)
-        {
-            w.Line("{");
-            using (w.Indent())
-                Return(w, method, call);
-            w.Line("}");
-        }
-        else
-        {
-            Return(w, method, call);
-        }
+        var arguments = method.Params.Select(p => $"@{p.Name}: {p.Injected ?? "a" + page.IndexOf(p)}");
+        Return(w, method, $"_service.@{method.CSharp}({string.Join(", ", arguments)})");
     }
 
     private static void Return(SourceWriter w, MethodDef method, string call)

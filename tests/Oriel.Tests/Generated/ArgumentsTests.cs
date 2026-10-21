@@ -25,6 +25,21 @@ public class ArgumentsTests
         Assert.Equal(message, e.Message);
     }
 
+    [Theory]
+    [InlineData("[]", false, 7)]
+    [InlineData("[null]", false, 7)]
+    [InlineData("[3]", false, 3)]
+    public void ReadsOptionalArguments(string args, bool nullable, int expected)
+    {
+        Assert.Equal(expected, Arguments.ReadOptional(Parse(args), 0, "n", Json.ReadInt32, 7, nullable));
+    }
+
+    [Fact]
+    public void KeepsANullForANullableOptionalArgument()
+    {
+        Assert.Null(Arguments.ReadOptional<string?>(Parse("[null]"), 0, "s", e => Json.IsNull(e) ? null : Json.ReadString(e), "default", nullable: true));
+    }
+
     [Fact]
     public void NamesTheArgumentInErrors()
     {

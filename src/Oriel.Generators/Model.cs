@@ -116,8 +116,14 @@ internal sealed record ObjectDef(
 /// <summary>A parameter of a service method.</summary>
 /// <param name="Type">Its type, or null when Oriel supplies it rather than the page.</param>
 /// <param name="Injected">What Oriel supplies: the C# expression, from the call's context.</param>
-/// <param name="IsOptional">Whether the page may leave it out: it has a default value.</param>
-internal sealed record ParamDef(string Name, TypeRef? Type, string? Injected, bool IsOptional);
+/// <param name="Default">
+/// The C# expression of the value it takes when the page leaves it out, or
+/// null when the page must pass it.
+/// </param>
+internal sealed record ParamDef(string Name, TypeRef? Type, string? Injected, string? Default)
+{
+    public bool IsOptional => Default is not null;
+}
 
 /// <summary>How a method returns.</summary>
 internal enum Returns

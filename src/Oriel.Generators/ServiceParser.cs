@@ -101,14 +101,19 @@ internal static class ServiceParser
             var injected = Injected(parameter.Type);
             if (injected is not null)
             {
-                parameters.Add(new ParamDef(parameter.Name, null, injected, parameter.HasExplicitDefaultValue));
+                parameters.Add(new ParamDef(parameter.Name, null, injected, null));
                 continue;
             }
             var type = mapper.Map(parameter.Type, parameter, $"parameter '{parameter.Name}' of {service}.{method.Name}");
             if (type is null)
+            {
                 ok = false;
-            else
-                parameters.Add(new ParamDef(parameter.Name, type, null, parameter.HasExplicitDefaultValue || parameter.IsParams));
+                continue;
+            }
+            var defaultValue = parameter.HasExplicitDefaultValue ? TypeMapper.DefaultValue(parameter)
+                : parameter.IsParams ? "[]"
+                : null;
+            parameters.Add(new ParamDef(parameter.Name, type, null, defaultValue));
         }
 
         var (returns, result) = Result(method, mapper, $"the result of {service}.{method.Name}", ref ok);

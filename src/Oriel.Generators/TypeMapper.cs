@@ -372,7 +372,7 @@ internal sealed class TypeMapper
     }
 
     /// <summary>The C# expression of a parameter's default value.</summary>
-    private static string DefaultValue(IParameterSymbol parameter)
+    internal static string DefaultValue(IParameterSymbol parameter)
     {
         var value = parameter.ExplicitDefaultValue;
         if (value is null)
