@@ -9,6 +9,8 @@
     <Description>Desktop apps in C#, with a web frontend calling C# through a generated TypeScript client.</Description>
     <PackageTags>desktop;webview;webview2;typescript;source-generator;nativeaot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- The build tasks are loaded by MSBuild from tasks/, not referenced from lib/. -->
+    <NoWarn>$(NoWarn);NU5100</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,13 +20,15 @@
   </ItemGroup>
 
   <!--
-    The package carries the source generator and the build steps, so that an
+    The package carries the source generator, the build steps and their tasks, so that an
     app needs one PackageReference. Apps in this repository import them
     themselves: see examples/Directory.Build.targets.
   -->
   <ItemGroup>
     <ProjectReference Include="../Oriel.Generators/Oriel.Generators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
     <None Include="../Oriel.Generators/bin/$(Configuration)/netstandard2.0/Oriel.Generators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="../Oriel.Build/Oriel.Build.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="../Oriel.Build/bin/$(Configuration)/netstandard2.0/Oriel.Build.dll" Pack="true" PackagePath="tasks/netstandard2.0" Visible="false" />
     <None Include="build/Oriel.props;build/Oriel.targets" Pack="true" PackagePath="build;buildTransitive" />
     <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>

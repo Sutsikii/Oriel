@@ -12,5 +12,12 @@
     <OrielFrontendDirectory Condition="'$(OrielFrontendDirectory)' == ''">frontend</OrielFrontendDirectory>
     <!-- Builds the frontend before it is copied, in Release builds: for instance "npm run build". -->
     <OrielFrontendBuildCommand Condition="'$(OrielFrontendBuildCommand)' == ''"></OrielFrontendBuildCommand>
+
+    <!-- Builds an installer after dotnet publish, with Inno Setup 6. docs/build.md#installers describes it. -->
+    <OrielInstaller Condition="'$(OrielInstaller)' == ''">false</OrielInstaller>
+    <!-- The wizard's languages, by the names of Inno Setup's message files: english;french;german… -->
+    <OrielInstallerLanguages Condition="'$(OrielInstallerLanguages)' == ''">english</OrielInstallerLanguages>
+    <!-- The tasks Oriel's targets use, shipped in the package. -->
+    <OrielBuildTasksAssembly Condition="'$(OrielBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)../tasks/netstandard2.0/Oriel.Build.dll</OrielBuildTasksAssembly>
   </PropertyGroup>
 </Project>

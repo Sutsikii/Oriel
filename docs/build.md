@@ -53,6 +53,67 @@ Oriel itself has no native dependency: it finds the WebView2 Runtime as the
 official loader does, so there is no `WebView2Loader.dll` to ship. Users need
 the runtime, which Windows 11 has; installers can bootstrap it on Windows 10.
 
+## Installers
+
+Set `OrielInstaller` and publish: after the app, Oriel builds its installer
+with [Inno Setup 6](https://jrsoftware.org/isinfo.php).
+
+```xml
+<PropertyGroup>
+  <Product>My App</Product>
+  <Version>1.2.0</Version>
+  <Company>Me</Company>
+  <ApplicationIcon>app.ico</ApplicationIcon>
+  <OrielInstaller>true</OrielInstaller>
+</PropertyGroup>
+```
+
+```sh
+winget install JRSoftware.InnoSetup    # once
+dotnet publish -c Release -r win-x64
+```
+
+This gives `bin/installer/My-App-Setup-1.2.0.exe`, a wizard that:
+
+- installs for the current user, without administrator rights, in
+  `%LOCALAPPDATA%\Programs\My App`;
+- adds a Start menu shortcut, a desktop one if the user asks, and the app to
+  Windows' list of installed apps, with an uninstaller;
+- offers to start the app at the end;
+- checks for the WebView2 Runtime first, and offers its download when it is
+  missing (on some Windows 10 machines);
+- on uninstall, removes the webview's data but keeps the app's own data
+  (`OrielApp.DataDirectory`), which is the user's.
+
+The installer holds what `dotnet publish` produced. Publish with
+`PublishAot` (or `--self-contained`): an app that depends on an installed
+.NET runtime needs one on the user's machine, and the installer does not
+install it.
+
+Installing a new version over an old one replaces it: the two share an
+**AppId**. Oriel derives it from the app's name, so set `OrielAppId` to a
+GUID of your own once the app ships, and keep it: renaming the app would
+otherwise make the next version a different app.
+
+| Property | Default | What it does |
+|---|---|---|
+| `OrielInstaller` | `false` | Builds the installer after `dotnet publish`. |
+| `OrielAppName` | `$(Product)`, else the assembly's name | The name users see. Make it the `AppOptions.Name` of the app, whose webview data the uninstaller removes. |
+| `OrielAppVersion` | `$(Version)` | The installed version. |
+| `OrielPublisher` | `$(Company)` | Shown in the list of installed apps. |
+| `OrielAppId` | derived from the name | Identifies the app across versions. |
+| `OrielInstallerIcon` | `$(ApplicationIcon)` | The icon of the installer. |
+| `OrielInstallerLanguages` | `english` | The wizard's languages, by Inno Setup's message files: `english;french;german`… The wizard picks the user's. |
+| `OrielInstallerOutput` | `bin/installer` | Where the installer is written. |
+| `OrielInnoSetupCompiler` | found | The path of `ISCC.exe`, when Inno Setup is not installed where it usually is. |
+
+The script Oriel generates is in `obj/` (`oriel-installer.iss`), for a look
+at what the installer does.
+
+Installers that are not signed make Windows SmartScreen warn the people who
+download them. Signing needs a code signing certificate; Oriel does not sign
+yet (see the [roadmap](roadmap.md)).
+
 ## Environment variables
 
 | Variable | Effect |

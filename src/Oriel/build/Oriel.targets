@@ -23,6 +23,55 @@
     <Message Importance="normal" Text="Oriel: TypeScript client at $(_OrielTypeScriptPath)" />
   </Target>
 
+  <!--
+    Builds an installer of the published app with Inno Setup: a per-user
+    install, shortcuts, an uninstaller and a check for WebView2. The task
+    runs in a process of its own, so that rebuilding it is never blocked by
+    a build that loaded it.
+  -->
+  <UsingTask TaskName="Oriel.Build.WriteInnoSetupScript" AssemblyFile="$(OrielBuildTasksAssembly)" TaskFactory="TaskHostFactory" />
+
+  <Target Name="OrielBuildInstaller"
+          AfterTargets="Publish"
+          Condition="'$(OrielInstaller)' == 'true'">
+    <PropertyGroup>
+      <_OrielAppName>$(OrielAppName)</_OrielAppName>
+      <_OrielAppName Condition="'$(_OrielAppName)' == ''">$(Product)</_OrielAppName>
+      <_OrielAppName Condition="'$(_OrielAppName)' == ''">$(AssemblyName)</_OrielAppName>
+      <_OrielAppVersion>$(OrielAppVersion)</_OrielAppVersion>
+      <_OrielAppVersion Condition="'$(_OrielAppVersion)' == ''">$(Version)</_OrielAppVersion>
+      <_OrielPublisher>$(OrielPublisher)</_OrielPublisher>
+      <_OrielPublisher Condition="'$(_OrielPublisher)' == ''">$(Company)</_OrielPublisher>
+      <_OrielInstallerIcon>$(OrielInstallerIcon)</_OrielInstallerIcon>
+      <_OrielInstallerIcon Condition="'$(_OrielInstallerIcon)' == '' and '$(ApplicationIcon)' != ''">$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(ApplicationIcon)'))</_OrielInstallerIcon>
+      <_OrielInstallerOutput>$(OrielInstallerOutput)</_OrielInstallerOutput>
+      <_OrielInstallerOutput Condition="'$(_OrielInstallerOutput)' == ''">$(BaseOutputPath)installer</_OrielInstallerOutput>
+      <_OrielInstallerOutput>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(_OrielInstallerOutput)'))</_OrielInstallerOutput>
+      <_OrielInstallerScript>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'oriel-installer.iss'))</_OrielInstallerScript>
+      <_OrielIscc>$(OrielInnoSetupCompiler)</_OrielIscc>
+      <_OrielIscc Condition="'$(_OrielIscc)' == '' and Exists('$(LOCALAPPDATA)\Programs\Inno Setup 6\ISCC.exe')">$(LOCALAPPDATA)\Programs\Inno Setup 6\ISCC.exe</_OrielIscc>
+      <_OrielIscc Condition="'$(_OrielIscc)' == '' and Exists('$(MSBuildProgramFiles32)\Inno Setup 6\ISCC.exe')">$(MSBuildProgramFiles32)\Inno Setup 6\ISCC.exe</_OrielIscc>
+      <_OrielIscc Condition="'$(_OrielIscc)' == '' and Exists('$(ProgramW6432)\Inno Setup 6\ISCC.exe')">$(ProgramW6432)\Inno Setup 6\ISCC.exe</_OrielIscc>
+    </PropertyGroup>
+
+    <Error Condition="'$(OS)' != 'Windows_NT'" Text="Oriel: installers are built on Windows." />
+    <Error Condition="'$(_OrielIscc)' == ''"
+           Text="Oriel: OrielInstaller needs Inno Setup 6, which was not found. Install it (winget install JRSoftware.InnoSetup), or set OrielInnoSetupCompiler to the path of ISCC.exe." />
+
+    <WriteInnoSetupScript AppName="$(_OrielAppName)"
+                          AppVersion="$(_OrielAppVersion)"
+                          AppId="$(OrielAppId)"
+                          Publisher="$(_OrielPublisher)"
+                          Executable="$(AssemblyName).exe"
+                          PublishDirectory="$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)'))"
+                          OutputDirectory="$(_OrielInstallerOutput)"
+                          Icon="$(_OrielInstallerIcon)"
+                          Languages="$(OrielInstallerLanguages)"
+                          ScriptPath="$(_OrielInstallerScript)" />
+    <Exec Command="&quot;$(_OrielIscc)&quot; /Q &quot;$(_OrielInstallerScript)&quot;" />
+    <Message Importance="high" Text="Oriel: installer of $(_OrielAppName) $(_OrielAppVersion) in $(_OrielInstallerOutput)" />
+  </Target>
+
   <!-- Builds the frontend in Release builds, when a command is set. -->
   <Target Name="OrielBuildFrontend"
           BeforeTargets="OrielCollectFrontend"

@@ -28,7 +28,7 @@ the [roadmap](docs/roadmap.md).
 
 | What | Command |
 |---|---|
-| Library and generator | `dotnet test` |
+| Library, generator and build tasks | `dotnet test` (the installer test runs when Inno Setup 6 is installed) |
 | Page runtime (`bridge.js`) | `node --test "tests/bridge/*.test.cjs"` |
 | Generated TypeScript (type-checked with `tsc --strict`, then run) | `cd tests/typescript && npm ci && npm test` |
 | Real windows | `ORIEL_E2E=1 dotnet test tests/Oriel.EndToEnd.Tests` |

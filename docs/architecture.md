@@ -34,9 +34,11 @@ src/
       Windows/              Win32 and WebView2
     build/                  MSBuild props and targets, shipped in the package
   Oriel.Generators/         the source generator (netstandard2.0)
+  Oriel.Build/              the MSBuild tasks of apps: the installer script (netstandard2.0)
 tests/
   Oriel.Tests/              the library, with a fake backend
   Oriel.Generators.Tests/   the generator: compiles code, calls what it generated
+  Oriel.Build.Tests/        the build tasks, and an installer compiled when Inno Setup is there
   Oriel.EndToEnd.Tests/     real windows (ORIEL_E2E=1)
   bridge/                   bridge.js, with node --test
   typescript/               the generated client, type-checked and run

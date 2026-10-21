@@ -14,6 +14,8 @@ self-contained piece of work.
   dark title bar, per-monitor DPI, app files served at `https://app.oriel/`.
 - Build integration: the client written on build, the frontend copied on
   publish, NativeAOT.
+- Installers: `OrielInstaller` builds a per-user Inno Setup installer on
+  publish, with shortcuts, an uninstaller and a WebView2 check.
 
 ## Next
 
@@ -40,7 +42,9 @@ self-contained piece of work.
 
 - **`oriel` CLI**: `oriel new` from templates (vanilla, React, Vue,
   Svelte), `oriel dev` and `oriel build` without per-project scripts.
-- **Installers**: MSIX and an Inno Setup or WiX recipe, with code signing.
+- **Signing** of the app and its installer, from a certificate or a
+  signing service.
+- **MSIX** packages, for the Microsoft Store.
 - **Auto-updates**, signed.
 
 ### Platforms
