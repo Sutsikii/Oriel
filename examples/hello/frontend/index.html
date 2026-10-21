@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Oriel Hello</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Oriel <span>Hello</span></h1>
+        <time id="clock" aria-live="off">--:--:--</time>
+      </header>
+
+      <form id="greet">
+        <label for="name">Your name</label>
+        <div class="row">
+          <input id="name" name="name" autocomplete="off" placeholder="Ada" autofocus />
+          <select id="tone" name="tone" aria-label="Tone">
+            <option value="friendly">Friendly</option>
+            <option value="formal">Formal</option>
+            <option value="pirate">Pirate</option>
+          </select>
+          <button type="submit">Greet</button>
+        </div>
+      </form>
+
+      <output id="greeting" role="status"></output>
+
+      <dl id="machine"></dl>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
