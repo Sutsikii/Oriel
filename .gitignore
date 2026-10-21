@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+artifacts/
+*.user
+.vs/
+.idea/
+*.swp
+
+# Test output
+TestResults/
+*.received.*
+
+# Frontend
+node_modules/
+dist/
