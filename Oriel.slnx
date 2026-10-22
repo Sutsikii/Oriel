@@ -8,6 +8,7 @@
     <Project Path="tests/Oriel.Build.Tests/Oriel.Build.Tests.csproj" />
     <Project Path="tests/Oriel.EndToEnd.Tests/Oriel.EndToEnd.Tests.csproj" />
     <Project Path="tests/Oriel.Generators.Tests/Oriel.Generators.Tests.csproj" />
+    <Project Path="tests/Oriel.Stress.Tests/Oriel.Stress.Tests.csproj" />
     <Project Path="tests/Oriel.Tests/Oriel.Tests.csproj" />
   </Folder>
 </Solution>

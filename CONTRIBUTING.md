@@ -32,6 +32,7 @@ the [roadmap](docs/roadmap.md).
 | Page runtime (`bridge.js`) | `node --test "tests/bridge/*.test.cjs"` |
 | Generated TypeScript (type-checked with `tsc --strict`, then run) | `cd tests/typescript && npm ci && npm test` |
 | Real windows | `ORIEL_E2E=1 dotnet test tests/Oriel.EndToEnd.Tests` |
+| Load and leaks, in real windows, for minutes | `ORIEL_STRESS=1 dotnet test tests/Oriel.Stress.Tests` (every night in CI) |
 
 All of them run in CI. The end-to-end tests open windows for a few seconds
 each, so they are skipped unless `ORIEL_E2E=1`.
@@ -47,6 +48,16 @@ After changing what the generator writes, update it and review the diff:
 ORIEL_UPDATE_SNAPSHOTS=1 dotnet test tests/Oriel.Generators.Tests
 git diff tests/typescript/generated
 ```
+
+### Stress and leak tests
+
+`tests/Oriel.Stress.Tests` opens and closes 500 windows, makes 10 000
+calls at once and sends events at 120 Hz for a minute. It checks that the
+live COM callbacks of the Windows backend (`ComCallback.Live`) come back
+to what they were, and that handles and private memory do not grow with
+the load. The stress workflow runs it every night, and on demand from the
+Actions tab. For a quick run, lower `ORIEL_STRESS_WINDOWS`,
+`ORIEL_STRESS_CALLS` or `ORIEL_STRESS_EVENT_SECONDS`.
 
 ### How the generator is tested
 
