@@ -17,6 +17,24 @@ public sealed class AppOptions
 
     /// <summary>Whether <see cref="OrielApp.Run"/> returns once the last window closed. Defaults to true.</summary>
     public bool QuitWhenLastWindowCloses { get; init; } = true;
+
+    /// <summary>
+    /// The longest message a page may send, in characters. Longer ones are
+    /// refused before they are parsed. Defaults to 16 Mi characters.
+    /// </summary>
+    public int MaxMessageLength { get; init; } = 16 * 1024 * 1024;
+
+    /// <summary>
+    /// How deeply the JSON of a page's message may nest. Deeper messages are
+    /// refused. Defaults to 64.
+    /// </summary>
+    public int MaxMessageDepth { get; init; } = 64;
+
+    /// <summary>
+    /// How many calls of a window's pages may run at once. Calls beyond it fail
+    /// at once with a <c>CallError</c>. Defaults to 1000.
+    /// </summary>
+    public int MaxCallsInFlight { get; init; } = 1000;
 }
 
 /// <summary>How an <see cref="OrielWindow"/> opens.</summary>

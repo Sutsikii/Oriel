@@ -41,6 +41,8 @@ public sealed class OrielApp : IEventSink
         ArgumentNullException.ThrowIfNull(options);
         if (string.IsNullOrWhiteSpace(options.Name) || options.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             throw new ArgumentException($"The app's name '{options.Name}' cannot name a folder.", nameof(options));
+        if (options.MaxMessageLength <= 0 || options.MaxMessageDepth <= 0 || options.MaxCallsInFlight <= 0)
+            throw new ArgumentException("The limits of pages' messages must be positive.", nameof(options));
         Options = options;
         _platform = platform;
         Time = time ?? TimeProvider.System;

@@ -113,6 +113,83 @@ public class PageConnectionTests
     }
 
     [Fact]
+    public async Task RefusesMessagesThatAreNotJson()
+    {
+        var refused = new List<string>();
+        _page.MessageRefused += refused.Add;
+        await _page.ReceiveAsync("not json");
+        Assert.StartsWith("a message that is not JSON", Assert.Single(refused));
+    }
+
+    [Fact]
+    public async Task RefusesMessagesLongerThanTheLimit()
+    {
+        var refused = new List<string>();
+        using var page = new PageConnection(Services(), _posted.Enqueue, limits: new PageLimits(64, 64, 10));
+        page.MessageRefused += refused.Add;
+
+        var tooLong = Call(2, "Calc.Add", $"[1,2,\"{new string('x', 20)}\"]");
+        await page.ReceiveAsync(Call(1, "Calc.Add", "[1,2]")); // 56 characters
+        await page.ReceiveAsync(tooLong);
+
+        Assert.Contains("\"v\":3", Single());
+        Assert.Equal($"a message of {tooLong.Length} characters, more than the 64 allowed", Assert.Single(refused));
+    }
+
+    [Fact]
+    public async Task RefusesMessagesNestedDeeperThanTheLimit()
+    {
+        var refused = new List<string>();
+        using var page = new PageConnection(Services(), _posted.Enqueue, limits: new PageLimits(1 << 20, 8, 10));
+        page.MessageRefused += refused.Add;
+
+        await page.ReceiveAsync(Call(1, "Calc.Add", "[[[[[[[[1]]]]]]]],2]"));
+        await page.ReceiveAsync(Call(2, "Calc.Add", new string('[', 10_000) + new string(']', 10_000)));
+
+        Assert.Equal(2, refused.Count);
+        Assert.All(refused, r => Assert.Contains("at most 8 levels", r));
+        Assert.Empty(_posted);
+    }
+
+    [Fact]
+    public async Task FailsCallsBeyondTheLimitOfCallsInFlight()
+    {
+        var refused = new List<string>();
+        var services = new ServiceTable();
+        var calc = new Calculator();
+        services.Add(calc);
+        using var page = new PageConnection(services, _posted.Enqueue, limits: new PageLimits(1 << 20, 64, 2));
+        page.MessageRefused += refused.Add;
+
+        var first = page.ReceiveAsync(Call(1, "Calc.Wait", "[]"));
+        var second = page.ReceiveAsync(Call(2, "Calc.Wait", "[]"));
+        await page.ReceiveAsync(Call(3, "Calc.Add", "[1,2]"));
+
+        using (var reply = JsonDocument.Parse(Single()))
+        {
+            Assert.Equal("error", reply.RootElement.GetProperty("t").GetString());
+            Assert.Equal(3, reply.RootElement.GetProperty("id").GetInt64());
+            Assert.Equal("Too many calls at once: 2 are running", reply.RootElement.GetProperty("e").GetString());
+        }
+        Assert.Equal("a call of Calc.Add beyond the 2 calls allowed to run at once", Assert.Single(refused));
+
+        // Once the calls return, there is room again.
+        calc.Pending.SetResult(4);
+        await Task.WhenAll(first, second);
+        Assert.Equal(2, _posted.Count);
+        _posted.Clear();
+        await page.ReceiveAsync(Call(4, "Calc.Add", "[1,2]"));
+        Assert.Contains("\"v\":3", Single());
+    }
+
+    private ServiceTable Services()
+    {
+        var services = new ServiceTable();
+        services.Add(new Calculator());
+        return services;
+    }
+
+    [Fact]
     public async Task CancelsTheCallsOfAPageThatWentAway()
     {
         var waiting = _page.ReceiveAsync(Call(1, "Calc.Wait", "[]"));

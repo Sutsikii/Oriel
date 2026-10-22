@@ -80,6 +80,21 @@ Only the app's own pages may call services: documents of
 other origin, such as a page the window navigated to, are ignored. The
 runtime only starts in the top document of a window, not in frames.
 
+## Limits
+
+A page with a bug, or made to misbehave, could send messages that take the
+app's memory or threads. So messages are refused when they are:
+
+| Refused when | Limit (`AppOptions`) | Default |
+|---|---|---|
+| longer than the limit, before they are parsed | `MaxMessageLength`, in characters | 16 Mi |
+| nested deeper, or not JSON | `MaxMessageDepth` | 64 |
+| a call while the window's pages run as many calls | `MaxCallsInFlight` | 1000 |
+
+A refused call fails at once: its promise rejects with a `CallError`. Other
+refused messages get no answer. Each refusal goes to `OrielApp.Error`, and
+to the trace with `ORIEL_TRACE=1`.
+
 ## Where pages may go
 
 A window stays on the app. When its page navigates or opens a window,

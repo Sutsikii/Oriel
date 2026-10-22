@@ -19,10 +19,12 @@ internal sealed class PageConnection : IDisposable
     private readonly ServiceTable _services;
     private readonly Action<string> _post;
     private readonly OrielWindow? _window;
+    private readonly PageLimits _limits;
     private readonly Lock _lock = new();
     private string? _token;
     private CancellationTokenSource _page = new();
     private bool _disposed;
+    private int _callsInFlight;
 
     /// <param name="services">The services pages may call.</param>
     /// <param name="post">
@@ -30,29 +32,48 @@ internal sealed class PageConnection : IDisposable
     /// be safe to call after the page is gone.
     /// </param>
     /// <param name="window">The window the page is in, passed to the methods that ask for it.</param>
-    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null)
+    /// <param name="limits">What pages may send. Defaults to the defaults of <see cref="AppOptions"/>.</param>
+    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null, PageLimits? limits = null)
     {
         _services = services;
         _post = post;
         _window = window;
+        _limits = limits ?? PageLimits.Default;
     }
 
     /// <summary>Raised when a call fails, with the method and the exception, before the page gets the error.</summary>
     public event Action<string, Exception>? CallFailed;
 
     /// <summary>
+    /// Raised when a message breaks a limit or is not JSON, with the reason.
+    /// A page of the app never sends such messages: it has a bug, or was made
+    /// to send them.
+    /// </summary>
+    public event Action<string>? MessageRefused;
+
+    /// <summary>
     /// Handles a message from the page. Calls run on the thread pool; the task
-    /// completes once the reply, if any, is posted. Malformed messages are ignored.
+    /// completes once the reply, if any, is posted. Messages that are not JSON
+    /// or break a limit are refused, other malformed ones ignored.
     /// </summary>
     public Task ReceiveAsync(string message)
     {
+        if (message.Length > _limits.MaxMessageLength)
+        {
+            Refuse($"a message of {message.Length} characters, more than the {_limits.MaxMessageLength} allowed");
+            return Task.CompletedTask;
+        }
+
         JsonDocument doc;
         try
         {
-            doc = JsonDocument.Parse(message);
+            doc = JsonDocument.Parse(message, new JsonDocumentOptions { MaxDepth = _limits.MaxMessageDepth });
         }
-        catch (JsonException)
+        catch (JsonException e)
         {
+            // Parsing stops at the first level too deep, so a deep message is
+            // never read whole either.
+            Refuse($"a message that is not JSON of at most {_limits.MaxMessageDepth} levels: {e.Message}");
             return Task.CompletedTask;
         }
 
@@ -71,7 +92,25 @@ internal sealed class PageConnection : IDisposable
             && TryGetString(root, "m", out var method)
             && root.TryGetProperty("a", out var args))
         {
-            return Task.Run(() => CallAsync(doc, id, token, method, args, cancellation));
+            if (Interlocked.Increment(ref _callsInFlight) > _limits.MaxCallsInFlight)
+            {
+                Interlocked.Decrement(ref _callsInFlight);
+                doc.Dispose();
+                Refuse($"a call of {method} beyond the {_limits.MaxCallsInFlight} calls allowed to run at once");
+                _post(Protocol.ErrorMessage(id, token, $"Too many calls at once: {_limits.MaxCallsInFlight} are running"));
+                return Task.CompletedTask;
+            }
+            return Task.Run(async () =>
+            {
+                try
+                {
+                    await CallAsync(doc, id, token, method, args, cancellation).ConfigureAwait(false);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _callsInFlight);
+                }
+            });
         }
 
         doc.Dispose(); // a hello, or a message of a later protocol
@@ -164,6 +203,12 @@ internal sealed class PageConnection : IDisposable
                 return; // the reply belongs to a page that went away
         }
         _post(reply);
+    }
+
+    private void Refuse(string reason)
+    {
+        Tracing.Write($"refused {reason}");
+        MessageRefused?.Invoke(reason);
     }
 
     private static bool TryGetString(JsonElement obj, string name, out string value)
