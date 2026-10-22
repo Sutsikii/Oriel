@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node dev.mjs",
     "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.ts\""
   },
   "dependencies": {
     "chess.js": "~1.4.0"

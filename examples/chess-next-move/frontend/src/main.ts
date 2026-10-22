@@ -2,6 +2,8 @@ import "./style.css";
 import { Chess, validateFen } from "chess.js";
 import { CallError, Engine, type Analysis, type Line } from "./oriel";
 import { EMPTY, KINGS, PIECES, START, format, parse, possibleCastling, squareIndex, squareName, type Piece, type Position } from "./position";
+import { recentGames, result, type ArchivedGame } from "./chesscom";
+import { accuracy, finalLine, judge, positions, readPgn, symbols, whiteChances, type Game, type Verdict } from "./review";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -18,9 +20,11 @@ interface Settings {
   /** Whether each new position is searched at once, without pressing Play. */
   auto: boolean;
   flipped: boolean;
+  /** The chess.com player whose games are listed. */
+  username: string;
 }
 
-const defaults: Settings = { depth: "18", customDepth: 30, time: 5000, lines: 3, pieces: "cburnett", theme: "system", coords: true, auto: true, flipped: false };
+const defaults: Settings = { depth: "18", customDepth: 30, time: 5000, lines: 3, pieces: "cburnett", theme: "system", coords: true, auto: true, flipped: false, username: "" };
 
 function loadSettings(): Settings {
   try {
@@ -112,6 +116,9 @@ function squareAt(x: number, y: number): number | null {
 function renderBoard() {
   const p = current();
   const best = bestMove();
+  // The move of the game that led to the position shown.
+  const at = gameIndex();
+  const last = at > 0 ? game!.plies[at - 1].uci : null;
   squares.forEach((square, d) => {
     const i = shown(d);
     const file = i % 8;
@@ -119,6 +126,7 @@ function renderBoard() {
     square.classList.toggle("dark", (file + rank) % 2 === 1); // a1 is dark
     square.classList.toggle("from", best?.slice(0, 2) === squareName(i));
     square.classList.toggle("to", best?.slice(2, 4) === squareName(i));
+    square.classList.toggle("last", last?.slice(0, 2) === squareName(i) || last?.slice(2, 4) === squareName(i));
     square.querySelector(".file")!.textContent = settings.coords && d >= 56 ? "abcdefgh"[file] : "";
     square.querySelector(".rank")!.textContent = settings.coords && d % 8 === 0 ? String(rank) : "";
     const piece = p.board[i];
@@ -264,9 +272,11 @@ function selectTool(next: Piece | "erase") {
 let search = 0;
 let running = false;
 let analysis: Analysis | null = null;
+/** The finished searches, by position: going back to one shows what was found at once. */
+const analyses = new Map<string, Analysis>();
 
-/** The analysis of the position shown, when there is one. */
-const shownAnalysis = () => (analysis && analysis.fen === currentFen() ? analysis : null);
+/** The analysis of the position shown, when there is one: the search going on, else the last one done. */
+const shownAnalysis = () => (analysis && analysis.fen === currentFen() ? analysis : (analyses.get(currentFen()) ?? null));
 const bestMove = () => {
   const a = shownAnalysis();
   return a?.bestMove ?? a?.lines[0]?.moves[0] ?? null;
@@ -302,6 +312,7 @@ async function analyse() {
     const result = await Engine.analyse(id, fen, searchDepth(), settings.time, settings.lines);
     if (id !== search) return;
     analysis = result;
+    analyses.set(fen, result);
     running = false;
     renderAnalysis();
   } catch (err) {
@@ -371,6 +382,7 @@ function renderAnalysis(message?: string) {
   const status = $("status");
   status.classList.toggle("error", !!message);
   if (message) status.textContent = message;
+  else if (reviewing) status.textContent = `Reviewing the game · ${reviewed.filter(Boolean).length}/${gamePositions.length} positions`;
   else if (running)
     status.textContent = a ? `Analysing · depth ${a.depth}/${searchDepth()} · ${compact(a.nps)} nodes/s` : "Analysing…";
   else if (a) {
@@ -485,15 +497,16 @@ function renderPosition() {
   $<HTMLButtonElement>("back").disabled = cursor === 0;
   $<HTMLButtonElement>("forward").disabled = cursor === history.length - 1;
   window.history.replaceState(null, "", `?fen=${encodeURIComponent(currentFen())}`);
+  renderGame();
 }
 
-/** The position shown changed: the search of the one before is of no use. */
+/** The position shown changed: the search of the one before is of no use, unless it is the review's. */
 function changed() {
-  stop();
+  if (!reviewing) stop();
   analysis = null;
   renderPosition();
   renderAnalysis();
-  if (settings.auto) soon();
+  if (settings.auto && !reviewing) soon();
 }
 
 let pending: ReturnType<typeof setTimeout> | undefined;
@@ -554,6 +567,10 @@ $("copy").addEventListener("click", async () => {
 });
 
 $("analyse").addEventListener("click", () => {
+  if (reviewing) {
+    stopReview();
+    return;
+  }
   if (running) {
     Engine.stop(); // the search returns what it found so far
     return;
@@ -575,15 +592,346 @@ function step(by: number) {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
   if (e.key === "ArrowLeft") step(-1);
   else if (e.key === "ArrowRight") step(1);
+  else if (e.key === "Home") step(-cursor);
+  else if (e.key === "End") step(history.length);
   else if (e.key === " " || e.key === "Enter") {
     e.preventDefault();
     $("analyse").click();
   } else if (e.key === "m") $("move").click();
   else if (e.key === "Escape" && tool) selectTool(tool);
 });
+
+// The game: a finished game of chess.com, or a PGN, its moves and their review.
+
+interface Reviewed {
+  /** The best line of the position. */
+  line: Line;
+  best: string | null;
+}
+
+let game: Game | null = null;
+let gamePgn = "";
+let gamePositions: string[] = [];
+/** What the review found of each position of the game, as it goes. */
+let reviewed: (Reviewed | undefined)[] = [];
+/** The review going on, by number; 0 when none is. */
+let reviewing = 0;
+let reviews = 0;
+
+/** Reviews look less deep than the board: a game has a hundred positions. */
+const reviewDepth = () => Math.min(searchDepth(), 16);
+
+/** Where the position shown is in the game, or -1 when it is not one of its positions. */
+function gameIndex(): number {
+  if (!game || cursor >= gamePositions.length) return -1;
+  return history[0] === gamePositions[0] && history[cursor] === gamePositions[cursor] ? cursor : -1;
+}
+
+/** Shows `pgn`'s game from its start. Throws when the text is not a game. */
+function openGame(pgn: string, flip?: boolean, review: (Reviewed | undefined)[] = []) {
+  const next = readPgn(pgn);
+  stopReview();
+  game = next;
+  gamePgn = pgn;
+  gamePositions = positions(next);
+  reviewed = review.slice(0, gamePositions.length);
+  if (flip !== undefined && flip !== settings.flipped) {
+    settings.flipped = flip;
+    saveSettings();
+    renderPalettes();
+  }
+  saveGame();
+  goTo(0);
+}
+
+/** Shows the position `index` of the game: what was played after the position shown is the game again. */
+function goTo(index: number) {
+  history.splice(0, Infinity, ...gamePositions);
+  cursor = Math.min(Math.max(index, 0), gamePositions.length - 1);
+  changed();
+}
+
+function closeGame() {
+  stopReview();
+  game = null;
+  gamePositions = [];
+  reviewed = [];
+  saveGame();
+  renderGame();
+}
+
+/** Keeps the game and its review between runs. */
+function saveGame() {
+  try {
+    if (game) localStorage.setItem("game", JSON.stringify({ pgn: gamePgn, reviewed }));
+    else localStorage.removeItem("game");
+  } catch {
+    // The game then lasts only as long as the page.
+  }
+}
+
+function restoreGame() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("game") ?? "null") as { pgn: string; reviewed: (Reviewed | null)[] } | null;
+    if (!saved) return;
+    const at = currentFen();
+    openGame(saved.pgn, undefined, saved.reviewed.map((r) => r ?? undefined));
+    // Back where the page was, when it was in the game.
+    const index = gamePositions.indexOf(at);
+    if (index > 0) goTo(index);
+  } catch {
+    localStorage.removeItem("game");
+  }
+}
+
+async function review() {
+  if (!game || reviewing) return;
+  stop();
+  clearTimeout(pending);
+  const run = ++reviews;
+  reviewing = run;
+  const depth = reviewDepth();
+  renderGame();
+  renderAnalysis();
+  for (let i = 0; i < gamePositions.length; i++) {
+    if (reviewed[i]) continue;
+    const fen = gamePositions[i];
+    const final = finalLine(fen);
+    let found: Analysis | undefined;
+    if (!final) {
+      found = analyses.get(fen);
+      if (!found || found.depth < depth) {
+        const id = ++search;
+        running = true;
+        try {
+          found = await Engine.analyse(id, fen, depth, 3000, settings.lines);
+        } catch (err) {
+          if (reviewing !== run) return;
+          reviewing = 0;
+          running = false;
+          renderGame();
+          renderAnalysis(err instanceof CallError ? err.message : String(err));
+          return;
+        }
+        if (reviewing !== run) return; // stopped: what it found is not as deep as the rest
+        analyses.set(fen, found);
+      }
+    }
+    const line = final ?? found?.lines[0] ?? { rank: 1, cp: 0, mate: null, moves: [] };
+    reviewed[i] = { line, best: found ? (found.bestMove ?? line.moves[0] ?? null) : null };
+    renderGame();
+    renderAnalysis();
+  }
+  reviewing = 0;
+  running = false;
+  saveGame();
+  renderGame();
+  renderAnalysis();
+  if (settings.auto) soon();
+}
+
+function stopReview() {
+  if (!reviewing) return;
+  reviewing = 0;
+  stop();
+  saveGame(); // what was reviewed so far
+  renderGame();
+  renderAnalysis();
+}
+
+/** The verdict on each move of the game, once both positions around it are reviewed. */
+function verdicts(): (Verdict | undefined)[] {
+  return game!.plies.map((ply, i) => {
+    const before = reviewed[i];
+    const after = reviewed[i + 1];
+    return before && after ? judge(ply, before.line, after.line, before.best) : undefined;
+  });
+}
+
+const judgementNames = { best: "Best move", good: "Good move", inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder" };
+
+function renderGame() {
+  $("game").hidden = !game;
+  if (!game) return;
+  // PGN writes "?" for what it does not know.
+  const tag = (name: string) => (game!.headers[name] && game!.headers[name] !== "?" ? game!.headers[name] : null);
+  const elo = (name: string) => (tag(name) ? ` (${tag(name)})` : "");
+  $("players").textContent = `${tag("White") ?? "White"}${elo("WhiteElo")} – ${tag("Black") ?? "Black"}${elo("BlackElo")} · ${tag("Result") ?? "*"}`;
+
+  const judged = verdicts();
+  const at = gameIndex();
+  const list = $("move-list");
+  list.replaceChildren();
+  let current: HTMLElement | null = null;
+  game.plies.forEach((ply, i) => {
+    if (ply.color === "w" || i === 0) {
+      const number = document.createElement("li");
+      number.className = "number";
+      number.textContent = `${ply.number}.`;
+      list.append(number);
+      if (ply.color === "b") list.append(document.createElement("li")); // the game starts with Black
+    }
+    const item = document.createElement("li");
+    item.className = "move";
+    const verdict = judged[i];
+    item.textContent = ply.san;
+    if (verdict) {
+      item.classList.add(verdict.judgement);
+      if (symbols[verdict.judgement]) {
+        const nag = document.createElement("span");
+        nag.className = "nag";
+        nag.textContent = symbols[verdict.judgement];
+        item.append(nag);
+      }
+      const better = verdict.better ? ` · best was ${san(gamePositions[i], [verdict.better], 1).replace(/^\d+(\.|…) /, "")}` : "";
+      item.title = `${judgementNames[verdict.judgement]}${better}`;
+    }
+    if (i + 1 === at) {
+      item.classList.add("current");
+      current = item;
+    }
+    item.addEventListener("click", () => goTo(i + 1));
+    list.append(item);
+  });
+  const end = document.createElement("li");
+  end.className = "result";
+  end.textContent = game.headers.Result ?? "";
+  list.append(end);
+  (current as HTMLElement | null)?.scrollIntoView({ block: "nearest" });
+
+  const sides = (["w", "b"] as const).map((color) => accuracy(judged.filter((v, i): v is Verdict => !!v && game!.plies[i].color === color)));
+  $("accuracy").textContent = sides.some((a) => a !== null) ? `Accuracy · White ${sides[0]?.toFixed(1) ?? "–"} · Black ${sides[1]?.toFixed(1) ?? "–"}` : "";
+
+  const all = reviewed.filter(Boolean).length === gamePositions.length;
+  const button = $<HTMLButtonElement>("review");
+  button.textContent = reviewing ? "■ Stop the review" : all ? "Reviewed" : reviewed.some(Boolean) ? "Go on with the review" : "Review the game";
+  button.disabled = !reviewing && all;
+  renderGraph(judged, at);
+}
+
+/** White's chances through the game, the moves judged worst marked on it. */
+function renderGraph(judged: (Verdict | undefined)[], at: number) {
+  const graph = $("graph") as unknown as SVGSVGElement;
+  const ns = "http://www.w3.org/2000/svg";
+  graph.replaceChildren();
+  graph.style.display = reviewed.some(Boolean) ? "" : "none"; // nothing to draw before the review
+  const last = Math.max(1, gamePositions.length - 1);
+  const x = (i: number) => (i / last) * 100;
+  const y = (i: number) => (1 - whiteChances(reviewed[i]!.line, gamePositions[i].split(" ")[1] as "w" | "b")) * 40;
+  const points = reviewed.flatMap((r, i) => (r ? [`${x(i)},${y(i)}`] : []));
+  if (points.length > 1) {
+    const area = document.createElementNS(ns, "polygon");
+    area.setAttribute("class", "white");
+    area.setAttribute("points", `0,40 ${points.join(" ")} ${x(reviewed.length - 1)},40`);
+    graph.append(area);
+  }
+  const middle = document.createElementNS(ns, "line");
+  middle.setAttribute("class", "middle");
+  middle.setAttribute("x1", "0");
+  middle.setAttribute("x2", "100");
+  middle.setAttribute("y1", "20");
+  middle.setAttribute("y2", "20");
+  graph.append(middle);
+  judged.forEach((verdict, i) => {
+    if (!verdict || !["inaccuracy", "mistake", "blunder"].includes(verdict.judgement)) return;
+    const dot = document.createElementNS(ns, "ellipse");
+    dot.setAttribute("class", verdict.judgement);
+    // The graph is stretched to its box: an ellipse in its units is a circle on screen.
+    dot.setAttribute("cx", String(x(i + 1)));
+    dot.setAttribute("cy", String(y(i + 1)));
+    dot.setAttribute("rx", "0.9");
+    dot.setAttribute("ry", "2.2");
+    graph.append(dot);
+  });
+  if (at >= 0) {
+    const mark = document.createElementNS(ns, "line");
+    mark.setAttribute("class", "cursor");
+    mark.setAttribute("x1", String(x(at)));
+    mark.setAttribute("x2", String(x(at)));
+    mark.setAttribute("y1", "0");
+    mark.setAttribute("y2", "40");
+    graph.append(mark);
+  }
+}
+
+$("graph").addEventListener("click", (e) => {
+  const box = $("graph").getBoundingClientRect();
+  goTo(Math.round(((e.clientX - box.left) / box.width) * (gamePositions.length - 1)));
+});
+$("review").addEventListener("click", () => (reviewing ? stopReview() : review()));
+$("close-game").addEventListener("click", closeGame);
+
+$("load-pgn").addEventListener("click", () => {
+  const error = $("pgn-error");
+  try {
+    openGame($<HTMLTextAreaElement>("pgn").value);
+    error.textContent = "";
+    $<HTMLDetailsElement>("pgn-box").open = false;
+  } catch (err) {
+    error.textContent = err instanceof Error ? err.message : String(err);
+  }
+});
+
+// chess.com's finished games of a player.
+
+const usernameInput = $<HTMLInputElement>("username");
+usernameInput.value = settings.username;
+let listing: AbortController | null = null;
+
+$("player").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = usernameInput.value.trim();
+  settings.username = username;
+  saveSettings();
+  listing?.abort();
+  const controller = (listing = new AbortController());
+  const status = $("games-status");
+  status.hidden = false;
+  status.classList.remove("error");
+  status.textContent = "Loading…";
+  try {
+    const games = await recentGames(username, 20, controller.signal);
+    renderGames(games, username);
+    status.textContent = games.length ? "" : "No finished game in the last three months.";
+    status.hidden = games.length > 0;
+  } catch (err) {
+    if (controller.signal.aborted) return;
+    status.classList.add("error");
+    status.textContent = err instanceof Error ? err.message : String(err);
+    $("games").hidden = true;
+  }
+});
+
+function renderGames(games: ArchivedGame[], username: string) {
+  const list = $("games");
+  list.replaceChildren();
+  list.hidden = games.length === 0;
+  const me = username.toLowerCase();
+  for (const archived of games) {
+    const black = archived.black.username.toLowerCase() === me;
+    const mine = black ? archived.black : archived.white;
+    const other = black ? archived.white : archived.black;
+    const li = document.createElement("li");
+    li.title = archived.url;
+    const who = document.createElement("span");
+    const outcome = document.createElement("span");
+    outcome.className = mine.result === "win" ? "won" : other.result === "win" ? "lost" : "";
+    outcome.textContent = result(archived);
+    who.append(outcome, ` vs ${other.username} (${other.rating}) · ${archived.timeClass}`);
+    const when = document.createElement("span");
+    when.className = "when";
+    when.textContent = archived.end.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    li.append(who, when);
+    li.addEventListener("click", () => {
+      openGame(archived.pgn, black);
+      list.querySelectorAll("li").forEach((item) => item.classList.toggle("selected", item === li));
+    });
+    list.append(li);
+  }
+}
 
 // The settings.
 
@@ -646,7 +994,8 @@ applyTheme();
 renderPalettes();
 renderPosition();
 renderAnalysis();
-if (settings.auto) analyse();
+restoreGame();
+if (settings.auto && !game) analyse();
 
 Engine.info()
   .then((info) => {
