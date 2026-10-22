@@ -189,6 +189,24 @@ main {
   top: 1px;
 }
 
+#board[hidden],
+#board3d[hidden] {
+  display: none;
+}
+
+/* The 3D board, in the 2D board's place. */
+#board3d {
+  width: var(--size);
+  height: var(--size);
+  touch-action: none;
+  cursor: grab;
+}
+#board3d canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 #arrows {
   position: absolute;
   top: 0;

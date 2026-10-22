@@ -29,6 +29,11 @@ the best move as you go. The page is TypeScript; the engine is the C# service `E
   does: inaccuracies (?!), mistakes (?) and blunders (??), with the move it
   preferred. A graph shows White's chances through the game, and each side gets
   an accuracy. The game and its review are kept until it is closed.
+- 3D: the **3D** button shows the board with three.js, loaded only then: the
+  same position, arrows and highlights, pieces turned on a lathe, and moves
+  that slide (knights jump). Drag a piece to move it, or drop pieces from the
+  palettes, as in 2D; drag elsewhere to turn the camera, right-drag to pan,
+  and scroll to zoom. Rotate turns the board.
 - Settings: depth (12, 18, 24 or custom), time (2 s, 5 s, unlimited), lines,
   piece set (cburnett, merida, kosal), theme, coordinates.
 
@@ -41,7 +46,8 @@ dotnet run
 ```
 
 `npm run dev` in `frontend` runs it with Vite: the page reloads as you edit it.
-`npm test` there tests reading games and judging moves, without the engine.
+`npm test` there tests reading games, judging moves and placing the 3D board's
+squares, without the engine or a window.
 `CHESS_ENGINE` points the app at another UCI engine.
 
 `dotnet publish -c Release -r win-x64` gives a native executable of 2.6 MB,
