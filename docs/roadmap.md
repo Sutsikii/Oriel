@@ -21,6 +21,7 @@ self-contained piece of work.
   publish, with shortcuts, an uninstaller and a WebView2 check.
 - Native dialogs, modal to a window: open one or several files, save,
   pick a folder, message boxes.
+- Printing: print dialogs, and pages to PDF files with their layout.
 
 ## Next
 

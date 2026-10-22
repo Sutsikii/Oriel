@@ -59,6 +59,18 @@ internal interface IPlatformWindow
 
     /// <summary>Shows a message box, modal to the window, and returns the button pressed.</summary>
     MessageResult ShowMessage(MessageRequest request);
+
+    /// <summary>Opens a print dialog for the page, and returns at once.</summary>
+    void ShowPrintDialog(PrintDialog dialog);
+
+    /// <summary>
+    /// Starts printing the page to a PDF at <paramref name="path"/>, a full
+    /// path, laid out by <paramref name="options"/> (validated), or as the
+    /// webview does by default when null. Calls <paramref name="done"/> on the
+    /// UI thread with whether the file was written; at once with false when
+    /// there is no page.
+    /// </summary>
+    void PrintToPdf(string path, PdfOptions? options, Action<bool> done);
 }
 
 internal enum FileDialogKind

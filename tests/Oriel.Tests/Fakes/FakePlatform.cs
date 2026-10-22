@@ -97,6 +97,15 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
         return FileDialogAnswer(request);
     }
 
+    public ConcurrentQueue<PrintDialog> PrintDialogs { get; } = new();
+
+    /// <summary>The PDFs asked for, with how to complete them.</summary>
+    public ConcurrentQueue<(string Path, PdfOptions? Options, Action<bool> Done)> Pdfs { get; } = new();
+
+    public void ShowPrintDialog(PrintDialog dialog) => PrintDialogs.Enqueue(dialog);
+
+    public void PrintToPdf(string path, PdfOptions? options, Action<bool> done) => Pdfs.Enqueue((path, options, done));
+
     public MessageResult ShowMessage(MessageRequest request)
     {
         DialogThread = Environment.CurrentManagedThreadId;

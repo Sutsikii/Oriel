@@ -85,6 +85,7 @@ are next. See the [roadmap](docs/roadmap.md).
   call, and how types map.
 - [Dialogs](docs/dialogs.md): files to open, where to save, folders and
   messages, modal to a window.
+- [Printing](docs/printing.md): print dialogs, and pages to PDF files.
 - [Building and shipping](docs/build.md): build properties, development
   loop, publishing.
 - [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL006, and

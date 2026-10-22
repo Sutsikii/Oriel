@@ -43,6 +43,9 @@ public sealed class Probe
 
     public string WindowUrl(OrielWindow window) => window.Url.AbsolutePath;
 
+    public Task<bool> SavePdf(OrielWindow window, string path, bool landscape) =>
+        window.PrintToPdfAsync(path, landscape ? new PdfOptions { Landscape = true } : null);
+
     public async Task Hang(CancellationToken cancellation)
     {
         try
@@ -371,6 +374,34 @@ public sealed class EndToEndTests : IDisposable
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool PostMessageW(nint hwnd, uint msg, nint wParam, nint lParam);
+    }
+
+    [EndToEndFact]
+    public async Task PrintsThePageToPdfThroughAService()
+    {
+        var portrait = Path.Combine(_assets, "portrait.pdf");
+        var landscape = Path.Combine(_assets, "landscape.pdf");
+        var missing = Path.Combine(_assets, "no such folder", "a.pdf");
+        var (report, _, _, _) = await RunPage($$"""
+            document.body.innerHTML = "<h1>Invoice 42</h1>";
+            const results = [
+              await oriel.call("E2E.SavePdf", [{{JsonSerializer.Serialize(portrait)}}, false]),
+              await oriel.call("E2E.SavePdf", [{{JsonSerializer.Serialize(landscape)}}, true]),
+              await oriel.call("E2E.SavePdf", [{{JsonSerializer.Serialize(missing)}}, false]),
+            ];
+            await oriel.call("E2E.Report", [JSON.stringify(results)]);
+            """);
+
+        Assert.Equal("[true,true,false]", report);
+        var pages = new[] { portrait, landscape }.Select(path =>
+        {
+            var text = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(path));
+            Assert.StartsWith("%PDF-", text);
+            return System.Text.RegularExpressions.Regex.Match(text, @"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)").Groups;
+        }).ToArray();
+        // US Letter, 612 by 792 points, then turned.
+        Assert.Equal(("612", "792"), (pages[0][1].Value, pages[0][2].Value));
+        Assert.Equal(("792", "612"), (pages[1][1].Value, pages[1][2].Value));
     }
 
     [EndToEndFact]
