@@ -95,4 +95,25 @@
                CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
+
+  <!--
+    Deletes the files of the published wwwroot this publish did not copy
+    there. The SDK cleans up after a publish with the same options only:
+    publishing with -r win-x64, then without, or after another publish to
+    the same folder, leaves the frontend's earlier files, which bundlers name
+    after their content. The installer takes the whole publish folder, so
+    they would be installed.
+  -->
+  <Target Name="OrielDeleteStaleFrontendFiles"
+          AfterTargets="CopyFilesToPublishDirectory"
+          Condition="'$(OrielFrontendDist)' != ''">
+    <ItemGroup>
+      <_OrielPublishedFile Include="@(ResolvedFileToPublish->'$(PublishDir)%(RelativePath)')" />
+      <_OrielFoundFile Include="$(PublishDir)wwwroot\**\*" />
+      <!-- Full paths on both sides: Exclude compares paths as they are written. -->
+      <_OrielStaleFile Include="@(_OrielFoundFile->'%(FullPath)')" Exclude="@(_OrielPublishedFile->'%(FullPath)')" />
+    </ItemGroup>
+    <Delete Files="@(_OrielStaleFile)" />
+    <Message Condition="'@(_OrielStaleFile)' != ''" Importance="normal" Text="Oriel: deleted files of an earlier publish from wwwroot: @(_OrielStaleFile, ', ')" />
+  </Target>
 </Project>

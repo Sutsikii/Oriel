@@ -8,7 +8,7 @@ are set with properties of the app's project.
 | Property | Default | What it does |
 |---|---|---|
 | `OrielTypeScriptOutput` | empty | After each build, the TypeScript client is written to this path, relative to the project. Empty: not written. |
-| `OrielFrontendDist` | empty | The folder of the built frontend, copied to `wwwroot` beside the executable on build and publish. |
+| `OrielFrontendDist` | empty | The folder of the built frontend, copied to `wwwroot` beside the executable on build and publish. Files an earlier publish left in the published `wwwroot` are deleted. |
 | `OrielFrontendDirectory` | `frontend` | The folder of the frontend's sources, where `OrielFrontendBuildCommand` runs. |
 | `OrielFrontendBuildCommand` | empty | Run before the frontend is copied, in Release builds only: for instance `npm run build`. |
 
@@ -45,7 +45,9 @@ dotnet publish -c Release -r win-x64
 ```
 
 With `PublishAot`, this gives a native executable of about 2 MB, plus
-`wwwroot`. NativeAOT needs Visual Studio or its Build Tools with the
+`wwwroot`. The published `wwwroot` holds the frontend of this publish only:
+the SDK removes what its earlier publishes with the same options wrote, and
+Oriel removes the rest, such as the bundles of a publish with other options. NativeAOT needs Visual Studio or its Build Tools with the
 "Desktop development with C++" workload. Without `PublishAot`, the app runs
 on the .NET runtime, installed or bundled (`--self-contained`).
 
