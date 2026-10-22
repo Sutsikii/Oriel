@@ -24,6 +24,7 @@ Oriel.Dialogs.SaveFileAsync(Oriel.SaveFileOptions? options = null) -> System.Thr
 Oriel.Event<T>
 Oriel.Event<T>.Attach(string! name, System.Action<System.Text.Json.Utf8JsonWriter!, T>! write, Oriel.Generated.IEventSink! sink) -> void
 Oriel.Event<T>.Emit(T payload) -> void
+Oriel.Event<T>.EmitTo(Oriel.OrielWindow! window, T payload) -> void
 Oriel.Event<T>.Event() -> void
 Oriel.FileFilter
 Oriel.FileFilter.FileFilter(string! name, params string![]! patterns) -> void
@@ -102,6 +103,7 @@ Oriel.OrielApp.Bind(object! service) -> void
 Oriel.OrielApp.DataDirectory.get -> string!
 Oriel.OrielApp.Dispatch(System.Action! action) -> void
 Oriel.OrielApp.Error -> System.Action<System.Exception!>?
+Oriel.OrielApp.FindWindow(string! name) -> Oriel.OrielWindow?
 Oriel.OrielApp.IsDev.get -> bool
 Oriel.OrielApp.OpenWindow(Oriel.WindowOptions? options = null) -> Oriel.OrielWindow!
 Oriel.OrielApp.Options.get -> Oriel.AppOptions!
@@ -113,7 +115,9 @@ Oriel.OrielWindow
 Oriel.OrielWindow.Close() -> void
 Oriel.OrielWindow.Closed -> System.EventHandler?
 Oriel.OrielWindow.Dialogs.get -> Oriel.Dialogs!
+Oriel.OrielWindow.Id.get -> int
 Oriel.OrielWindow.IsClosed.get -> bool
+Oriel.OrielWindow.Name.get -> string?
 Oriel.OrielWindow.NavigationRequested -> System.EventHandler<Oriel.NavigationRequestedEventArgs!>?
 Oriel.OrielWindow.OpenDevTools() -> void
 Oriel.OrielWindow.Options.get -> Oriel.WindowOptions!
@@ -190,6 +194,8 @@ Oriel.WindowOptions.MinHeight.get -> int
 Oriel.WindowOptions.MinHeight.init -> void
 Oriel.WindowOptions.MinWidth.get -> int
 Oriel.WindowOptions.MinWidth.init -> void
+Oriel.WindowOptions.Name.get -> string?
+Oriel.WindowOptions.Name.init -> void
 Oriel.WindowOptions.Permissions.get -> Oriel.WebPermissions
 Oriel.WindowOptions.Permissions.init -> void
 Oriel.WindowOptions.Title.get -> string?

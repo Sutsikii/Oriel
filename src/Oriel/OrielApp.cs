@@ -28,6 +28,7 @@ public sealed class OrielApp : IEventSink
 
     private readonly IPlatform _platform;
     private readonly List<OrielWindow> _windows = [];
+    private int _lastWindowId;
     private readonly Lock _lock = new();
     private int _running;
 
@@ -67,6 +68,14 @@ public sealed class OrielApp : IEventSink
     /// or <c>%APPDATA%\Name Dev</c> in development so the two never mix.
     /// </summary>
     public string DataDirectory => DataFolder(Environment.SpecialFolder.ApplicationData);
+
+    /// <summary>The open window named <paramref name="name"/> (see <see cref="WindowOptions.Name"/>), or null.</summary>
+    public OrielWindow? FindWindow(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        lock (_lock)
+            return _windows.Find(w => w.Name == name);
+    }
 
     /// <summary>The windows that are open.</summary>
     public IReadOnlyList<OrielWindow> Windows
@@ -157,12 +166,20 @@ public sealed class OrielApp : IEventSink
     }
 
     /// <summary>Opens a window. Any thread may call it; the window opens on the UI thread.</summary>
+    /// <exception cref="InvalidOperationException">A window of <see cref="WindowOptions.Name"/> is open already.</exception>
     public OrielWindow OpenWindow(WindowOptions? options = null)
     {
         options ??= new WindowOptions();
-        var window = new OrielWindow(this, options, Frontend.Resolve(options.Url));
+        var url = Frontend.Resolve(options.Url);
+        OrielWindow window;
         lock (_lock)
+        {
+            // Checked and numbered together: a window refused takes no id.
+            if (options.Name is not null && _windows.Exists(w => w.Name == options.Name))
+                throw new InvalidOperationException($"A window named \"{options.Name}\" is open already: find it with FindWindow.");
+            window = new OrielWindow(this, options, url, ++_lastWindowId);
             _windows.Add(window);
+        }
         // A page missing from the app's files would show as a blank window:
         // say what is missing instead, in the window and to Error.
         var missing = Frontend.MissingFile(window.Url);

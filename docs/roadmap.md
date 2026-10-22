@@ -7,7 +7,8 @@ self-contained piece of work.
 
 - Services: typed calls from pages, run on the thread pool, with
   cancellation when the page goes away and the calling window.
-- Events from services to pages.
+- Events from services to pages, to every window or to one; windows have
+  ids, and names to find them by.
 - The source generator: dispatchers, JSON codecs and the TypeScript client,
   without reflection; diagnostics for what it cannot generate.
 - Windows backend: Win32 windows with WebView2 through COM, no loader DLL;
@@ -27,7 +28,6 @@ self-contained piece of work.
 
 - **Streams**: `IAsyncEnumerable<T>` results as async iterables in pages, with
   back-pressure.
-- **Events to one window**: `Event<T>.EmitTo(OrielWindow)`.
 - **Polymorphism**: `[JsonDerivedType]` hierarchies as TypeScript unions.
 - **Generic records** of the app's own.
 

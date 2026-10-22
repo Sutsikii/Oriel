@@ -17,9 +17,10 @@ public sealed class OrielWindow : IPlatformWindowEvents
     private volatile bool _closed;
     private readonly RecoveryPolicy _recovery;
 
-    internal OrielWindow(OrielApp app, WindowOptions options, Uri url)
+    internal OrielWindow(OrielApp app, WindowOptions options, Uri url, int id)
     {
         _app = app;
+        Id = id;
         Options = options;
         Url = url;
         _titleFollowsPage = options.Title is null;
@@ -31,6 +32,14 @@ public sealed class OrielWindow : IPlatformWindowEvents
         Connection.MessageRefused += reason =>
             app.ReportError(new InvalidDataException($"The page of the window \"{Title}\" sent {reason}."));
     }
+
+    /// <summary>A number for the window, unique in its app: 1 for the first one opened, then 2, and so on.</summary>
+    public int Id { get; }
+
+    /// <summary>The name the window opened with, <see cref="WindowOptions.Name"/>, which finds it with <see cref="OrielApp.FindWindow"/>.</summary>
+    public string? Name => Options.Name;
+
+    internal OrielApp App => _app;
 
     /// <summary>The options the window opened with.</summary>
     public WindowOptions Options { get; }

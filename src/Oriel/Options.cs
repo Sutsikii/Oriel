@@ -53,6 +53,13 @@ public sealed class WindowOptions
     /// </summary>
     public string? Title { get; init; }
 
+    /// <summary>
+    /// A name to find the window by, with <see cref="OrielApp.FindWindow"/>,
+    /// such as <c>"settings"</c>. Two open windows cannot share a name, so an
+    /// app can keep one window of a kind. Defaults to none.
+    /// </summary>
+    public string? Name { get; init; }
+
     /// <summary>The width of the window, in device-independent pixels.</summary>
     public int Width { get; init; } = 1024;
 
