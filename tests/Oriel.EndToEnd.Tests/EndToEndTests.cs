@@ -16,6 +16,13 @@ public sealed class EndToEndFactAttribute : FactAttribute
     }
 }
 
+/// <summary>An error the test pages tell apart.</summary>
+[ServiceError("refused")]
+public sealed class RefusedException(int attempts) : Exception("refused on purpose")
+{
+    public int Attempts { get; } = attempts;
+}
+
 /// <summary>The services the test pages call.</summary>
 [Service(Name = "E2E")]
 public sealed class Probe
@@ -29,6 +36,8 @@ public sealed class Probe
     public string Greet(string name) => "Hello, " + name;
 
     public void Fail() => throw new InvalidOperationException("failed on purpose");
+
+    public void Refuse() => throw new RefusedException(3);
 
     public void Ping(string payload) => Pinged.Emit(payload);
 
@@ -138,6 +147,11 @@ public sealed class EndToEndTests : IDisposable
             } catch (err) {
               results.error = err.name + ": " + err.message;
             }
+            try {
+              await oriel.call("E2E.Refuse", []);
+            } catch (err) {
+              results.refused = err.code + " " + err.message + " " + JSON.stringify(err.data);
+            }
             results.event = await new Promise((resolve) => {
               const stop = oriel.on("E2E.Pinged", (payload) => { stop(); resolve(payload); });
               oriel.call("E2E.Ping", ["pong"]);
@@ -152,7 +166,9 @@ public sealed class EndToEndTests : IDisposable
         using var results = JsonDocument.Parse(report);
         var root = results.RootElement;
         Assert.Equal("Hello, Ada", root.GetProperty("greet").GetString());
-        Assert.Equal("CallError: failed on purpose", root.GetProperty("error").GetString());
+        // Outside development, pages do not get the messages of unexpected exceptions.
+        Assert.Equal("CallError: E2E.Fail failed", root.GetProperty("error").GetString());
+        Assert.Equal("refused refused on purpose {\"attempts\":3}", root.GetProperty("refused").GetString());
         Assert.Equal("pong", root.GetProperty("event").GetString());
         Assert.Equal("/index.html", root.GetProperty("url").GetString());
         Assert.Equal("https://app.oriel", root.GetProperty("origin").GetString());

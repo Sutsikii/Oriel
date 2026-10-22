@@ -40,3 +40,8 @@ overloads.
 
 A public method is generic, or has `ref`, `out` or `in` parameters. Change
 it, or hide it with `[ServiceIgnore]`.
+
+## ORIEL006: Class cannot be a service error
+
+A `[ServiceError]` class does not derive from `System.Exception`, is
+generic, is not accessible to generated code, or its code is empty.

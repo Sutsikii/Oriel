@@ -24,6 +24,14 @@ export async function usage(): Promise<void> {
   } catch (err) {
     if (err instanceof CallError) {
       const method: string = err.method;
+      // The code tells the type of the data.
+      if (err.code === "conflict") {
+        const version: number = err.data.version;
+        void version;
+      } else {
+        const none: null = err.data;
+        void none;
+      }
       void method;
     }
   }
@@ -32,7 +40,11 @@ export async function usage(): Promise<void> {
   void [greeting, all];
 }
 
-export function errors(deck: Deck): void {
+export function errors(deck: Deck, err: CallError): void {
+  // @ts-expect-error the data is not known before the code is checked
+  void err.data.version;
+  // @ts-expect-error codes are those of the app's errors
+  if (err.code === "nope") void err;
   // @ts-expect-error an enum is a union of its names
   const theme: Theme = "Dark";
   // @ts-expect-error a property without a setter is read-only

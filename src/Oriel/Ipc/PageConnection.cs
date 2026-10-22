@@ -21,6 +21,7 @@ internal sealed class PageConnection : IDisposable
     private readonly OrielWindow? _window;
     private readonly PageLimits _limits;
     private readonly Action<Action>? _dispatch;
+    private readonly bool _showExceptionMessages;
     private readonly Lock _lock = new();
     private string? _token;
     private CancellationTokenSource _page = new();
@@ -38,13 +39,19 @@ internal sealed class PageConnection : IDisposable
     /// Runs an action on the UI thread, for the calls of
     /// <see cref="ServiceConcurrency.UiThread"/> services.
     /// </param>
-    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null, PageLimits? limits = null, Action<Action>? dispatch = null)
+    /// <param name="showExceptionMessages">
+    /// Whether pages get the messages of unexpected exceptions, which may tell
+    /// about the app's internals. Only in development.
+    /// </param>
+    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null, PageLimits? limits = null,
+        Action<Action>? dispatch = null, bool showExceptionMessages = true)
     {
         _services = services;
         _post = post;
         _window = window;
         _limits = limits ?? PageLimits.Default;
         _dispatch = dispatch;
+        _showExceptionMessages = showExceptionMessages;
     }
 
     /// <summary>Raised when a call fails, with the method and the exception, before the page gets the error.</summary>
@@ -190,7 +197,7 @@ internal sealed class PageConnection : IDisposable
         else if (_services.TryGet(method[..dot], out var service))
             return service;
         else
-            problem = new InvalidOperationException($"No service named {method[..dot]} is bound");
+            problem = new ServiceNotFoundException(method[..dot]);
         return null;
     }
 
@@ -220,7 +227,7 @@ internal sealed class PageConnection : IDisposable
             catch (Exception e)
             {
                 CallFailed?.Invoke(method, e);
-                reply = Protocol.ErrorMessage(id, token, e.Message);
+                reply = ErrorReply(id, token, method, e);
             }
         }
 
@@ -276,6 +283,31 @@ internal sealed class PageConnection : IDisposable
                 done.TrySetException(e);
             }
         }
+    }
+
+    /// <summary>
+    /// The reply to a call that threw <paramref name="error"/>: with its code and
+    /// data when it is a service error, without its message when it is
+    /// unexpected and messages are hidden.
+    /// </summary>
+    private string ErrorReply(long id, string token, string method, Exception error)
+    {
+        if (ServiceRegistry.TryGetError(error, out var code, out var data))
+        {
+            try
+            {
+                return Protocol.ErrorMessage(id, token, error.Message, code, data);
+            }
+            catch (Exception e)
+            {
+                CallFailed?.Invoke(method, e); // a property of the error threw
+            }
+        }
+        else if (_showExceptionMessages || error is CodecException or MethodNotFoundException or ServiceNotFoundException)
+        {
+            return Protocol.ErrorMessage(id, token, error.Message);
+        }
+        return Protocol.ErrorMessage(id, token, $"{method} failed");
     }
 
     private static bool TryGetString(JsonElement obj, string name, out string value)

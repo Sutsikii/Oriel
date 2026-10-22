@@ -28,7 +28,7 @@ internal static class TypeScriptEmitter
         w.Line();
         Runtime(w, project);
 
-        if (project.Enums.Count + project.Objects.Count > 0)
+        if (project.Enums.Count + project.Objects.Count + project.Errors.Count > 0)
         {
             w.Line();
             w.Line("// ---- Types ----");
@@ -51,23 +51,45 @@ internal static class TypeScriptEmitter
 
     private static void Runtime(SourceWriter w, Project project)
     {
-        w.Line("/** The error a call rejects with: the C# method threw, or its arguments did not fit its parameters. */");
-        w.Line("export class CallError extends Error {");
+        w.Line("class CallErrorBase extends Error {");
         using (w.Indent())
         {
             w.Line("/** The method that failed, as \"Service.Method\". */");
             w.Line("readonly method: string;");
+            w.Line("/** The code of a [ServiceError] exception, or null. */");
+            w.Line("readonly code: string | null;");
+            w.Line("/** The public properties of a [ServiceError] exception, or null. */");
+            w.Line("readonly data: unknown;");
             w.Line();
-            w.Line("constructor(method: string, message: string) {");
+            w.Line("constructor(method: string, message: string, code: string | null = null, data: unknown = null) {");
             using (w.Indent())
             {
                 w.Line("super(message);");
                 w.Line("this.name = \"CallError\";");
                 w.Line("this.method = method;");
+                w.Line("this.code = code;");
+                w.Line("this.data = code === null ? null : data;");
             }
             w.Line("}");
         }
         w.Line("}");
+        w.Line();
+        // A union, so that checking err.code narrows err.data. A class cannot
+        // be one, so CallError is a type and a constructor of the same name.
+        var members = project.Errors.Select(e => $"{{ readonly code: \"{e.Code}\"; readonly data: {e.TypeScript} }}")
+            .Concat(["{ readonly code: null; readonly data: null }"]);
+        w.Line("/**");
+        w.Line(" * The error a call rejects with: the C# method threw, or its arguments did not fit its parameters.");
+        w.Line(" * Errors of [ServiceError] exceptions have their code, which tells their data's type.");
+        w.Line(" */");
+        w.Line($"export type CallError = CallErrorBase & ({string.Join(" | ", members)});");
+        w.Line("export const CallError = CallErrorBase as unknown as {");
+        using (w.Indent())
+        {
+            w.Line("new (method: string, message: string, code?: string | null, data?: unknown): CallError;");
+            w.Line("readonly prototype: CallError;");
+        }
+        w.Line("};");
         w.Line();
         w.Line("interface Bridge {");
         using (w.Indent())
@@ -115,7 +137,13 @@ internal static class TypeScriptEmitter
             w.Line("} catch (err) {");
             using (w.Indent())
             {
-                w.Line("if (err instanceof Error && err.name === \"CallError\") throw new CallError(method, err.message);");
+                w.Line("if (err instanceof Error && err.name === \"CallError\") {");
+                using (w.Indent())
+                {
+                    w.Line("const { code, data } = err as { code?: string | null; data?: unknown };");
+                    w.Line("throw new CallError(method, err.message, code ?? null, data);");
+                }
+                w.Line("}");
                 w.Line("throw err;");
             }
             w.Line("}");
@@ -127,8 +155,25 @@ internal static class TypeScriptEmitter
     private static IEnumerable<Action<SourceWriter, Dictionary<string, string>>> Definitions(Project project)
     {
         var all = project.Enums.Select(e => (Name: e.TypeScript, Write: (Action<SourceWriter, Dictionary<string, string>>)((w, _) => Enum(w, e))))
-            .Concat(project.Objects.Select(o => (Name: o.TypeScript, Write: (Action<SourceWriter, Dictionary<string, string>>)((w, n) => Interface(w, o, n)))));
+            .Concat(project.Objects.Select(o => (Name: o.TypeScript, Write: (Action<SourceWriter, Dictionary<string, string>>)((w, n) => Interface(w, o, n)))))
+            .Concat(project.Errors.Select(e => (Name: e.TypeScript, Write: (Action<SourceWriter, Dictionary<string, string>>)((w, n) => ErrorData(w, e, n)))));
         return all.OrderBy(d => d.Name, StringComparer.Ordinal).Select(d => d.Write);
+    }
+
+    /// <summary>The data of a service error: <c>err.data</c> once <c>err.code</c> is its code.</summary>
+    private static void ErrorData(SourceWriter w, ErrorDef e, Dictionary<string, string> names)
+    {
+        Doc(w, e.Doc.Summary);
+        w.Line($"export interface {e.TypeScript} {{");
+        using (w.Indent())
+        {
+            foreach (var p in e.Properties)
+            {
+                Doc(w, p.Doc.Summary);
+                w.Line($"readonly {PropertyName(p.Json)}: {Type(p.Type, names)};");
+            }
+        }
+        w.Line("}");
     }
 
     private static void Enum(SourceWriter w, EnumDef e)

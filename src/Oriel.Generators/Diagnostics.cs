@@ -50,6 +50,14 @@ internal static class Diagnostics
         Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor InvalidError = new(
+        "ORIEL006",
+        "Class cannot be a service error",
+        "{0} cannot be a service error: {1}",
+        Category,
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
 
 /// <summary>A diagnostic held by value, for the incremental pipeline.</summary>

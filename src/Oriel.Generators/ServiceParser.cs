@@ -186,7 +186,7 @@ internal static class ServiceParser
         _ => null,
     };
 
-    private static bool IsAccessible(INamedTypeSymbol type)
+    internal static bool IsAccessible(INamedTypeSymbol type)
     {
         for (ISymbol? s = type; s is INamedTypeSymbol; s = s.ContainingType)
         {

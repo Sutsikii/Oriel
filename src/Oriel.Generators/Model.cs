@@ -152,3 +152,14 @@ internal sealed record ServiceResult(
     EquatableArray<EnumDef> Enums,
     EquatableArray<ObjectDef> Objects,
     EquatableArray<DiagnosticInfo> Diagnostics);
+
+/// <summary>A <c>[ServiceError]</c> exception: its code and the properties that make its data.</summary>
+/// <param name="TypeScript">The name of the interface of its data.</param>
+internal sealed record ErrorDef(string Id, string CSharp, string Code, string TypeScript, Doc Doc, EquatableArray<PropertyDef> Properties);
+
+/// <summary>Everything one <c>[ServiceError]</c> exception brings: itself and the types of its properties.</summary>
+internal sealed record ErrorResult(
+    ErrorDef? Error,
+    EquatableArray<EnumDef> Enums,
+    EquatableArray<ObjectDef> Objects,
+    EquatableArray<DiagnosticInfo> Diagnostics);

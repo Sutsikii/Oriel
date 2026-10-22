@@ -66,7 +66,7 @@
           if (!p) return;
           pending.delete(message.id);
           if (message.t === "result") p.resolve(message.v);
-          else p.reject(callError(p.method, String(message.e)));
+          else p.reject(callError(p.method, String(message.e), message.c, message.d));
           return;
         }
         case "event": {
@@ -88,11 +88,16 @@
     return { runtime: Object.freeze({ call, on }), receive, token };
   }
 
-  /** The error a failed call rejects with; the generated client rethrows it as its CallError. */
-  function callError(method, message) {
+  /**
+   * The error a failed call rejects with; the generated client rethrows it as
+   * its CallError. Errors of [ServiceError] exceptions have a code and data.
+   */
+  function callError(method, message, code, data) {
     const err = new Error(message);
     err.name = "CallError";
     err.method = method;
+    err.code = typeof code === "string" ? code : null;
+    err.data = err.code === null ? null : data;
     return err;
   }
 

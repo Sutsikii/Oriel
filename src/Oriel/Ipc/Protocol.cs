@@ -20,7 +20,10 @@ internal static class Protocol
     /// <summary>A call returned: <c>{"t":"result","id":1,"k":token,"v":value}</c>, without <c>v</c> for nothing.</summary>
     public const string Result = "result";
 
-    /// <summary>A call failed: <c>{"t":"error","id":1,"k":token,"e":message}</c>.</summary>
+    /// <summary>
+    /// A call failed: <c>{"t":"error","id":1,"k":token,"e":message}</c>, with the
+    /// code <c>"c"</c> and data <c>"d"</c> of a <see cref="ServiceErrorAttribute"/> exception.
+    /// </summary>
     public const string Error = "error";
 
     /// <summary>The app emits an event: <c>{"t":"event","n":"Clock.Tick","v":value}</c>.</summary>
@@ -39,13 +42,22 @@ internal static class Protocol
             }
         });
 
-    public static string ErrorMessage(long id, string token, string message) =>
+    public static string ErrorMessage(long id, string token, string message, string? code = null, ValueWriter? data = null) =>
         Write(w =>
         {
             w.WriteString("t", Error);
             w.WriteNumber("id", id);
             w.WriteString("k", token);
             w.WriteString("e", message);
+            if (code is not null)
+            {
+                w.WriteString("c", code);
+                w.WritePropertyName("d");
+                if (data is null)
+                    w.WriteNullValue();
+                else
+                    data(w);
+            }
         });
 
     public static string EventMessage(string name, ValueWriter value) =>

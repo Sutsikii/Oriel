@@ -53,6 +53,19 @@ test("rejects a failed call with a CallError naming the method", async () => {
     assert.equal(err.name, "CallError");
     assert.equal(err.method, "Decks.Open");
     assert.equal(err.message, "not a deck");
+    assert.equal(err.code, null);
+    assert.equal(err.data, null);
+    return true;
+  });
+});
+
+test("gives a CallError the code and data of a service error", async () => {
+  const { runtime, receive, token } = setup();
+  const result = runtime.call("Decks.Save", ["x"]);
+  receive({ t: "error", id: 1, k: token, e: "x changed", c: "conflict", d: { version: 2 } });
+  await assert.rejects(result, (err) => {
+    assert.equal(err.code, "conflict");
+    assert.deepEqual(err.data, { version: 2 });
     return true;
   });
 });

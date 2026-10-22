@@ -47,6 +47,8 @@ internal static class CSharpEmitter
             {
                 foreach (var service in project.Services)
                     w.Line($"global::Oriel.Generated.ServiceRegistry.Register<{service.CSharp}>(static service => new {DispatcherName(service)}(service));");
+                foreach (var error in project.Errors)
+                    w.Line($"global::Oriel.Generated.ServiceRegistry.RegisterError<{error.CSharp}>({Names.Literal(error.Code)}, Codecs.WriteError_{error.Id});");
                 w.Line("global::Oriel.TypeScriptClient.Register(typeof(OrielModule).Assembly, TypeScript);");
             }
         }
@@ -151,6 +153,11 @@ internal static class CSharpEmitter
                 ObjectCodec(w, o);
                 w.Line();
             }
+            foreach (var error in project.Errors)
+            {
+                ErrorCodec(w, error);
+                w.Line();
+            }
         }
     }
 
@@ -172,6 +179,21 @@ internal static class CSharpEmitter
             foreach (var m in e.Members)
                 w.Line($"{Names.Literal(m.Json)} => {e.CSharp}.@{m.CSharp},");
             w.Line($"var other => throw new global::Oriel.Generated.CodecException(\"\\\"\" + other + {Names.Literal($"\" is not a {e.TypeScript}: expected one of {expected}")}),");
+        }
+    }
+
+    /// <summary>Writes the data of a service error: its properties, as an object.</summary>
+    private static void ErrorCodec(SourceWriter w, ErrorDef error)
+    {
+        using (w.Block($"public static void WriteError_{error.Id}({Writer} writer, {error.CSharp} value)"))
+        {
+            w.Line("writer.WriteStartObject();");
+            foreach (var p in error.Properties)
+            {
+                w.Line($"writer.WritePropertyName({Names.Literal(p.Json)});");
+                w.Line(WriteStatement(p.Type, "writer", $"value.@{p.CSharp}", 0));
+            }
+            w.Line("writer.WriteEndObject();");
         }
     }
 
