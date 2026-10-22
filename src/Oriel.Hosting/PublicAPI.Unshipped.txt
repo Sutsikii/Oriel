@@ -1,0 +1,27 @@
+#nullable enable
+Oriel.Hosting.OrielAppBuilder
+Oriel.Hosting.OrielAppBuilder.Build() -> Oriel.Hosting.OrielHost!
+Oriel.Hosting.OrielAppBuilder.Configuration.get -> Microsoft.Extensions.Configuration.ConfigurationManager!
+Oriel.Hosting.OrielAppBuilder.Environment.get -> Microsoft.Extensions.Hosting.IHostEnvironment!
+Oriel.Hosting.OrielAppBuilder.Logging.get -> Microsoft.Extensions.Logging.ILoggingBuilder!
+Oriel.Hosting.OrielAppBuilder.Options.get -> Oriel.AppOptions!
+Oriel.Hosting.OrielAppBuilder.Options.set -> void
+Oriel.Hosting.OrielAppBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Oriel.Hosting.OrielAppHosting
+Oriel.Hosting.OrielAppHosting.extension(Oriel.OrielApp!)
+Oriel.Hosting.OrielHost
+Oriel.Hosting.OrielHost.App.get -> Oriel.OrielApp!
+Oriel.Hosting.OrielHost.Dispose() -> void
+Oriel.Hosting.OrielHost.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Oriel.Hosting.OrielHost.OpenWindow(Oriel.WindowOptions? options = null) -> Oriel.OrielWindow!
+Oriel.Hosting.OrielHost.Run() -> int
+Oriel.Hosting.OrielHost.RunAsync(System.Threading.CancellationToken cancellation = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+Oriel.Hosting.OrielHost.Services.get -> System.IServiceProvider!
+Oriel.Hosting.OrielServiceCollectionExtensions
+Oriel.Hosting.OrielServiceScope
+Oriel.Hosting.OrielServiceScope.Call = 2 -> Oriel.Hosting.OrielServiceScope
+Oriel.Hosting.OrielServiceScope.Singleton = 0 -> Oriel.Hosting.OrielServiceScope
+Oriel.Hosting.OrielServiceScope.Window = 1 -> Oriel.Hosting.OrielServiceScope
+static Oriel.Hosting.OrielAppHosting.CreateBuilder(string![]? args = null) -> Oriel.Hosting.OrielAppBuilder!
+static Oriel.Hosting.OrielAppHosting.extension(Oriel.OrielApp!).CreateBuilder(string![]? args = null) -> Oriel.Hosting.OrielAppBuilder!
+static Oriel.Hosting.OrielServiceCollectionExtensions.AddOrielService<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Oriel.Hosting.OrielServiceScope scope = Oriel.Hosting.OrielServiceScope.Singleton) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

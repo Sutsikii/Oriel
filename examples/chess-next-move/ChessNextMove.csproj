@@ -28,6 +28,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- On the .NET Generic Host: the engine comes from the container, and errors go to ILogger. -->
+    <ProjectReference Include="../../src/Oriel.Hosting/Oriel.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Stockfish, which setup.ps1 downloads: it goes next to the executable. -->
     <None Update="engine/stockfish.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

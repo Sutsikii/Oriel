@@ -18,6 +18,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Oriel.Tests" />
     <InternalsVisibleTo Include="Oriel.Generators.Tests" />
+    <InternalsVisibleTo Include="Oriel.Hosting" />
     <EmbeddedResource Include="Bridge/bridge.js" LogicalName="Oriel.Bridge.bridge.js" />
   </ItemGroup>
 

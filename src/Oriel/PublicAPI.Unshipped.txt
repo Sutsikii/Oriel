@@ -100,6 +100,7 @@ Oriel.OpenFileOptions.Title.get -> string?
 Oriel.OpenFileOptions.Title.init -> void
 Oriel.OrielApp
 Oriel.OrielApp.Bind(object! service) -> void
+Oriel.OrielApp.Bind<T>(System.Func<Oriel.OrielWindow?, Oriel.ServiceLease<T!>>! lease) -> void
 Oriel.OrielApp.DataDirectory.get -> string!
 Oriel.OrielApp.Dispatch(System.Action! action) -> void
 Oriel.OrielApp.Error -> System.Action<System.Exception!>?
@@ -179,6 +180,11 @@ Oriel.ServiceErrorAttribute.Code.get -> string!
 Oriel.ServiceErrorAttribute.ServiceErrorAttribute(string! code) -> void
 Oriel.ServiceIgnoreAttribute
 Oriel.ServiceIgnoreAttribute.ServiceIgnoreAttribute() -> void
+Oriel.ServiceLease<T>
+Oriel.ServiceLease<T>.Release.get -> System.IAsyncDisposable?
+Oriel.ServiceLease<T>.Service.get -> T!
+Oriel.ServiceLease<T>.ServiceLease() -> void
+Oriel.ServiceLease<T>.ServiceLease(T! service, System.IAsyncDisposable? release = null) -> void
 Oriel.TypeScriptClient
 Oriel.WebPermissions
 Oriel.WebPermissions.Autoplay = 256 -> Oriel.WebPermissions

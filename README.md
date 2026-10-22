@@ -83,6 +83,8 @@ are next. See the [roadmap](docs/roadmap.md).
   native executable.
 - [Services and the TypeScript client](docs/bindings.md): what pages can
   call, and how types map.
+- [Hosting](docs/hosting.md): dependency injection, services per call or
+  per window, `ILogger` and hosted services, with `Oriel.Hosting`.
 - [Dialogs](docs/dialogs.md): files to open, where to save, folders and
   messages, modal to a window.
 - [Printing](docs/printing.md): print dialogs, and pages to PDF files.

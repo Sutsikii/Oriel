@@ -56,6 +56,18 @@ public static class ServiceRegistry
         return false;
     }
 
+    /// <summary>
+    /// Makes the dispatcher of services of <paramref name="type"/>, for
+    /// <paramref name="service"/>; null makes one that only tells the
+    /// service's name and concurrency, as the generated constructors just
+    /// keep the instance.
+    /// </summary>
+    internal static ServiceDispatcher Create(Type type, object? service) =>
+        s_factories.TryGetValue(type, out var factory)
+            ? factory(service!)
+            : throw new InvalidOperationException(
+                $"{type.FullName} cannot be bound: it is not a [Service] class, or its project does not run the Oriel source generator.");
+
     /// <summary>Makes the dispatcher of <paramref name="service"/>, by its exact type.</summary>
     internal static bool TryCreate(object service, out ServiceDispatcher dispatcher)
     {
