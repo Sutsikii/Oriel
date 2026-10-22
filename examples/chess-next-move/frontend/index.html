@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess Next Move</title>
+  </head>
+  <body>
+    <header>
+      <h1>Chess <span>Next Move</span></h1>
+      <p>Set up any position by dragging pieces, and the engine suggests the best move as you go.</p>
+      <small id="engine-name"></small>
+    </header>
+
+    <main>
+      <section id="play">
+        <div class="palette" id="palette-top"></div>
+        <div id="table">
+          <div id="eval-bar" title="Evaluation, from White's side"><div id="eval-fill"></div></div>
+          <div id="board-wrap">
+            <div id="eval-top" class="eval-chip">0.0</div>
+            <div id="board"></div>
+            <svg id="arrows" viewBox="0 0 8 8" aria-hidden="true"></svg>
+            <div id="eval-bottom" class="eval-chip">0.0</div>
+          </div>
+        </div>
+        <div class="palette" id="palette-bottom"></div>
+
+        <nav id="controls">
+          <button id="back" type="button" title="Back (←)">← Back</button>
+          <button id="analyse" type="button" class="primary">▶ Play</button>
+          <button id="move" type="button" title="Play the suggested move">Move</button>
+          <button id="forward" type="button" title="Forward (→)">Move →</button>
+        </nav>
+        <p id="status">Ready to analyse · Press Play</p>
+      </section>
+
+      <aside id="panel">
+        <section>
+          <h2>Best moves</h2>
+          <ol id="lines"><li class="empty">No analysis yet.</li></ol>
+        </section>
+
+        <section>
+          <h2>Position</h2>
+          <div class="row">
+            <span class="label">Side to move</span>
+            <div class="segmented" id="turn">
+              <button type="button" data-turn="w">White</button>
+              <button type="button" data-turn="b">Black</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="label">Castling</span>
+            <div class="checks" id="castling">
+              <label><input type="checkbox" data-castle="K" /> K</label>
+              <label><input type="checkbox" data-castle="Q" /> Q</label>
+              <label><input type="checkbox" data-castle="k" /> k</label>
+              <label><input type="checkbox" data-castle="q" /> q</label>
+            </div>
+          </div>
+          <div class="row buttons">
+            <button type="button" id="start">Start position</button>
+            <button type="button" id="kings">Kings only</button>
+            <button type="button" id="clear">Clear</button>
+            <button type="button" id="rotate">⟲ Rotate</button>
+          </div>
+          <label class="label" for="fen">FEN</label>
+          <div class="fen">
+            <input id="fen" spellcheck="false" autocomplete="off" />
+            <button type="button" id="copy">Copy</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Settings</h2>
+          <div class="row">
+            <label class="label" for="auto">Analyse as you edit</label>
+            <input id="auto" type="checkbox" checked />
+          </div>
+          <div class="row">
+            <label class="label" for="depth">Search depth</label>
+            <div class="inline">
+              <select id="depth">
+                <option value="12">Fast · depth 12</option>
+                <option value="18">Balanced · depth 18</option>
+                <option value="24">Deep · depth 24</option>
+                <option value="custom">Custom</option>
+              </select>
+              <input id="custom-depth" type="number" min="1" max="60" value="30" hidden />
+            </div>
+          </div>
+          <div class="row">
+            <label class="label" for="time">Search time</label>
+            <select id="time">
+              <option value="2000">2 s</option>
+              <option value="5000">5 s</option>
+              <option value="0">Unlimited</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="label" for="multipv">Lines on the board</label>
+            <select id="multipv">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="label" for="pieces">Piece set</label>
+            <select id="pieces">
+              <option value="cburnett">cburnett</option>
+              <option value="merida">merida</option>
+              <option value="kosal">kosal</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="label" for="theme">Theme</label>
+            <select id="theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="label" for="coords">Show coordinates</label>
+            <input id="coords" type="checkbox" checked />
+          </div>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

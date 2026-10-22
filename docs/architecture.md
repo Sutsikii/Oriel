@@ -43,6 +43,7 @@ tests/
   bridge/                   bridge.js, with node --test
   typescript/               the generated client, type-checked and run
 examples/hello/             an app, built from source
+examples/chess-next-move/   an app that runs a process: Stockfish, spoken to in UCI
 docs/                       this documentation
 ```
 
