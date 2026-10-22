@@ -54,6 +54,16 @@ public class CodecTests
     }
 
     [Fact]
+    public async Task RoundTripsRecordsWithSeveralNullableProperties()
+    {
+        var echo = Echo("public record Score(int? Cp, int? Mate, string? Note, double? Weight);",
+            "public Score Same(Score score) => score;");
+
+        const string Score = """{"cp":35,"mate":null,"note":null,"weight":0.5}""";
+        Assert.Equal(Score, await echo.Call("Same", $"[{Score}]"));
+    }
+
+    [Fact]
     public async Task RoundTripsTypesThatReferToThemselves()
     {
         var echo = Echo("public class Node { public string Name { get; set; } = \"\"; public List<Node> Children { get; set; } = new(); }",
