@@ -36,6 +36,24 @@ the [roadmap](docs/roadmap.md).
 All of them run in CI. The end-to-end tests open windows for a few seconds
 each, so they are skipped unless `ORIEL_E2E=1`.
 
+### Property and fuzz tests
+
+Some tests check a property over thousands of generated inputs, with a new
+seed each run: the codecs round-trip any value and read any JSON or say
+why not (`CodecPropertyTests`), and both ends of the protocol take any
+message without throwing, replying only to calls (`PageConnectionFuzzTests`,
+`tests/bridge/bridge.fuzz.test.cjs`). A failure prints its seed and the
+smallest input found; replay it, then add that input to a regular test
+with the fix:
+
+```sh
+dotnet test tests/Oriel.Tests -e CsCheck_Seed=<seed>      # C#, with CsCheck
+BRIDGE_FUZZ_SEED=<seed> node --test tests/bridge/bridge.fuzz.test.cjs
+```
+
+To search longer, set `CsCheck_Time=60` (seconds per property) or
+`BRIDGE_FUZZ_RUNS=100000`.
+
 ### Snapshot of the TypeScript client
 
 `tests/typescript/generated/client.ts` is the client of a sample covering
