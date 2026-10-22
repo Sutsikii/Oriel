@@ -89,9 +89,15 @@ internal sealed class PageConnection : IDisposable
             Refuse($"a message that is not JSON of at most {_limits.MaxMessageDepth} levels: {e.Message}");
             return Task.CompletedTask;
         }
+        catch (ArgumentException e)
+        {
+            Refuse($"a message that is not valid UTF-16: {e.Message}"); // a lone surrogate, not escaped
+            return Task.CompletedTask;
+        }
 
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object
+            || !HasValidNames(root)
             || !TryGetString(root, "t", out var type)
             || !TryGetString(root, "k", out var token))
         {
@@ -101,7 +107,7 @@ internal sealed class PageConnection : IDisposable
 
         var cancellation = Enter(token);
         if (type == Protocol.Call
-            && root.TryGetProperty("id", out var idElement) && idElement.TryGetInt64(out var id)
+            && root.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.Number && idElement.TryGetInt64(out var id)
             && TryGetString(root, "m", out var method)
             && root.TryGetProperty("a", out var args))
         {
@@ -310,14 +316,38 @@ internal sealed class PageConnection : IDisposable
         return Protocol.ErrorMessage(id, token, $"{method} failed");
     }
 
+    /// <summary>
+    /// Whether the names of <paramref name="obj"/> are valid UTF-16. Looking
+    /// up a property unescapes the names it passes, and throws on a lone
+    /// surrogate; checked first, the message is ignored wherever it is.
+    /// </summary>
+    private static bool HasValidNames(JsonElement obj)
+    {
+        try
+        {
+            foreach (var property in obj.EnumerateObject())
+                _ = property.Name;
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     private static bool TryGetString(JsonElement obj, string name, out string value)
     {
-        if (obj.TryGetProperty(name, out var e) && e.ValueKind == JsonValueKind.String)
+        value = "";
+        try
         {
+            if (!obj.TryGetProperty(name, out var e) || e.ValueKind != JsonValueKind.String)
+                return false;
             value = e.GetString()!;
             return true;
         }
-        value = "";
-        return false;
+        catch (InvalidOperationException)
+        {
+            return false; // an escaped lone surrogate
+        }
     }
 }

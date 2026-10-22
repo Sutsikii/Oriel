@@ -32,9 +32,29 @@ the [roadmap](docs/roadmap.md).
 | Page runtime (`bridge.js`) | `node --test "tests/bridge/*.test.cjs"` |
 | Generated TypeScript (type-checked with `tsc --strict`, then run) | `cd tests/typescript && npm ci && npm test` |
 | Real windows | `ORIEL_E2E=1 dotnet test tests/Oriel.EndToEnd.Tests` |
+| Load and leaks, in real windows, for minutes | `ORIEL_STRESS=1 dotnet test tests/Oriel.Stress.Tests` (every night in CI) |
+| What a call costs | see [benchmarks/README.md](benchmarks/README.md) (in CI too) |
 
 All of them run in CI. The end-to-end tests open windows for a few seconds
 each, so they are skipped unless `ORIEL_E2E=1`.
+
+### Property and fuzz tests
+
+Some tests check a property over thousands of generated inputs, with a new
+seed each run: the codecs round-trip any value and read any JSON or say
+why not (`CodecPropertyTests`), and both ends of the protocol take any
+message without throwing, replying only to calls (`PageConnectionFuzzTests`,
+`tests/bridge/bridge.fuzz.test.cjs`). A failure prints its seed and the
+smallest input found; replay it, then add that input to a regular test
+with the fix:
+
+```sh
+dotnet test tests/Oriel.Tests -e CsCheck_Seed=<seed>      # C#, with CsCheck
+BRIDGE_FUZZ_SEED=<seed> node --test tests/bridge/bridge.fuzz.test.cjs
+```
+
+To search longer, set `CsCheck_Time=60` (seconds per property) or
+`BRIDGE_FUZZ_RUNS=100000`.
 
 ### Snapshot of the TypeScript client
 
@@ -47,6 +67,16 @@ After changing what the generator writes, update it and review the diff:
 ORIEL_UPDATE_SNAPSHOTS=1 dotnet test tests/Oriel.Generators.Tests
 git diff tests/typescript/generated
 ```
+
+### Stress and leak tests
+
+`tests/Oriel.Stress.Tests` opens and closes 500 windows, makes 10 000
+calls at once and sends events at 120 Hz for a minute. It checks that the
+live COM callbacks of the Windows backend (`ComCallback.Live`) come back
+to what they were, and that handles and private memory do not grow with
+the load. The stress workflow runs it every night, and on demand from the
+Actions tab. For a quick run, lower `ORIEL_STRESS_WINDOWS`,
+`ORIEL_STRESS_CALLS` or `ORIEL_STRESS_EVENT_SECONDS`.
 
 ### How the generator is tested
 
