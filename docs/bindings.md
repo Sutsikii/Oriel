@@ -255,7 +255,8 @@ instead. In development, and for calls that did not fit (wrong arguments,
 unknown methods), they get the message.
 
 `OrielApp.CallFailed` is raised in C# for every failed call, with the whole
-exception, for logging.
+exception, for logging. It is experimental, ORIEL901: see
+[diagnostics.md](diagnostics.md#experimental-apis).
 
 ## The TypeScript client
 

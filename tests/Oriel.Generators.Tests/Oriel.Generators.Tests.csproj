@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- The tests cover Oriel's experimental APIs too. -->
+    <NoWarn>$(NoWarn);ORIEL901;ORIEL902</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

@@ -11,12 +11,24 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- The build tasks are loaded by MSBuild from tasks/, not referenced from lib/. -->
     <NoWarn>$(NoWarn);NU5100</NoWarn>
+    <!-- Oriel's experimental APIs, which it changes with their uses. -->
+    <NoWarn>$(NoWarn);ORIEL901;ORIEL902</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Oriel.Tests" />
     <InternalsVisibleTo Include="Oriel.Generators.Tests" />
     <EmbeddedResource Include="Bridge/bridge.js" LogicalName="Oriel.Bridge.bridge.js" />
+  </ItemGroup>
+
+  <!--
+    The public API is declared in PublicAPI.*.txt: a change to it fails the
+    build until it is declared there, so it shows in review. See
+    CONTRIBUTING.md, "Change the public API".
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt;PublicAPI.Unshipped.txt" />
   </ItemGroup>
 
   <!--

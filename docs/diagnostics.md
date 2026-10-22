@@ -45,3 +45,18 @@ it, or hide it with `[ServiceIgnore]`.
 
 A `[ServiceError]` class does not derive from `System.Exception`, is
 generic, is not accessible to generated code, or its code is empty.
+
+## Experimental APIs
+
+A few public APIs are expected to change before 1.0. Using one is a
+warning with the id of the change to watch, which an app that accepts it
+silences in its project:
+
+```xml
+<NoWarn>$(NoWarn);ORIEL901</NoWarn>
+```
+
+| Id | APIs | Why they may change |
+|---|---|---|
+| ORIEL901 | `OrielApp.CallFailed` | Logging through `ILogger`, with the .NET Generic Host, may replace it. |
+| ORIEL902 | `TypeScriptClient.For`, `TypeScriptClient.Write` | Clients will cover the services of several assemblies. |

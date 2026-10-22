@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Oriel.Bridge;
 using Oriel.Generated;
@@ -88,6 +89,7 @@ public sealed class OrielApp : IEventSink
     /// Raised when a service method throws, before the page that called it
     /// gets the error.
     /// </summary>
+    [Experimental(Experiments.CallFailed, UrlFormat = Experiments.Url)]
     public event Action<string, Exception>? CallFailed;
 
     internal Frontend Frontend { get; }
