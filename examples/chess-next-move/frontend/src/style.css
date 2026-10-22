@@ -14,6 +14,8 @@
   --arrow1: rgba(21, 120, 27, 0.85);
   --arrow2: rgba(0, 48, 136, 0.7);
   --arrow3: rgba(136, 32, 32, 0.6);
+  /* The opponent's expected reply to the best move. */
+  --reply: rgba(90, 90, 90, 0.6);
   color-scheme: light;
   font-family: system-ui, "Segoe UI", sans-serif;
 }
@@ -210,6 +212,8 @@ main {
 .rank2 line { stroke: var(--arrow2); }
 .rank2 polygon, .rank2 circle { fill: var(--arrow2); }
 .rank3 line { stroke: var(--arrow3); }
+.reply line { stroke: var(--reply); stroke-dasharray: 0.12 0.1; stroke-linecap: butt; }
+.reply polygon { fill: var(--reply); }
 .rank3 polygon, .rank3 circle { fill: var(--arrow3); }
 
 .eval-chip {

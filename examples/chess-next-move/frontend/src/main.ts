@@ -193,6 +193,7 @@ document.addEventListener("pointerup", (e) => {
   if (was.from !== null) {
     const from = was.from;
     if (target === from) return;
+    if (target !== null && playDrag(from, target)) return;
     edit((p) => {
       p.board[from] = null;
       if (target !== null) p.board[target] = was.piece; // dropped off the board: removed
@@ -201,6 +202,23 @@ document.addEventListener("pointerup", (e) => {
     edit((p) => (p.board[target] = was.piece));
   }
 });
+
+/**
+ * Plays a drag on the board as a move when it is a legal one: the turn passes, and castling
+ * rights and en passant follow. Any other drag edits the board, and the side to move stays.
+ */
+function playDrag(from: number, to: number): boolean {
+  const fen = currentFen();
+  if (problem(fen)) return false;
+  const game = new Chess(fen);
+  try {
+    game.move({ from: squareName(from), to: squareName(to), promotion: "q" });
+  } catch {
+    return false;
+  }
+  push(game.fen());
+  return true;
+}
 
 function renderPalettes() {
   const top = settings.flipped ? "w" : "b";
@@ -355,7 +373,12 @@ function renderAnalysis(message?: string) {
   if (message) status.textContent = message;
   else if (running)
     status.textContent = a ? `Analysing · depth ${a.depth}/${searchDepth()} · ${compact(a.nps)} nodes/s` : "Analysing…";
-  else if (a) status.textContent = `Done · depth ${a.depth} · ${compact(a.nodes)} nodes · best ${san(a.fen, [bestMove() ?? ""], 1) || "none"}`;
+  else if (a) {
+    const line = a.lines[0]?.moves ?? [];
+    const best = san(a.fen, line.slice(0, 1), 1) || "none";
+    const expected = line.length > 1 ? ` · then ${san(a.fen, line.slice(0, 2), 2).split(" ").slice(-1)[0]}` : "";
+    status.textContent = `Done · depth ${a.depth} · ${compact(a.nodes)} nodes · best ${best}${expected}`;
+  }
   else status.textContent = "Ready to analyse · Press Play";
 
   const list = $("lines");
@@ -394,11 +417,13 @@ function renderArrows(a: Analysis | null) {
     const d = settings.flipped ? 63 - i : i;
     return { x: (d % 8) + 0.5, y: Math.floor(d / 8) + 0.5 };
   };
-  // The worst line first, so that the best one is drawn on top.
-  const lines = (a?.lines ?? []).slice(0, settings.lines).reverse();
-  for (const line of lines) {
-    const move = line.moves[0];
-    if (!move) continue;
+  // The opponent's expected reply to the best move first, under the lines; then the worst line,
+  // so that the best one is drawn on top.
+  const reply = a?.lines[0]?.moves[1];
+  const arrows: { move: string; style: string; rank: number }[] = reply ? [{ move: reply, style: "reply", rank: 0 }] : [];
+  for (const line of (a?.lines ?? []).slice(0, settings.lines).reverse())
+    if (line.moves[0]) arrows.push({ move: line.moves[0], style: `rank${line.rank}`, rank: line.rank });
+  for (const { move, style, rank } of arrows) {
     const from = place(move.slice(0, 2));
     const to = place(move.slice(2, 4));
     const length = Math.hypot(to.x - from.x, to.y - from.y);
@@ -407,7 +432,7 @@ function renderArrows(a: Analysis | null) {
     const head = 0.32;
     const end = { x: to.x - ux * head, y: to.y - uy * head };
     const g = document.createElementNS(ns, "g");
-    g.setAttribute("class", `arrow rank${line.rank}`);
+    g.setAttribute("class", `arrow ${style}`);
     const shaft = document.createElementNS(ns, "line");
     shaft.setAttribute("x1", String(from.x));
     shaft.setAttribute("y1", String(from.y));
@@ -417,7 +442,7 @@ function renderArrows(a: Analysis | null) {
     const w = 0.24;
     tip.setAttribute("points", `${to.x},${to.y} ${end.x - uy * w},${end.y + ux * w} ${end.x + uy * w},${end.y - ux * w}`);
     g.append(shaft, tip);
-    if (settings.lines > 1) {
+    if (settings.lines > 1 && rank > 0) {
       const badge = document.createElementNS(ns, "circle");
       badge.setAttribute("cx", String(from.x));
       badge.setAttribute("cy", String(from.y));
@@ -425,7 +450,7 @@ function renderArrows(a: Analysis | null) {
       const label = document.createElementNS(ns, "text");
       label.setAttribute("x", String(from.x));
       label.setAttribute("y", String(from.y));
-      label.textContent = String(line.rank);
+      label.textContent = String(rank);
       g.append(badge, label);
     }
     arrowsEl.append(g);
