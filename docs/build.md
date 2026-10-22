@@ -38,6 +38,35 @@ is `%APPDATA%\Name Dev` in development, and the webview's own data goes to
 `%LOCALAPPDATA%\Name Dev`. Developer tools and the page's context menu are on
 in development, off otherwise; `WindowOptions.DevTools` overrides it.
 
+## Driving the app in tests
+
+Pages run in WebView2, which speaks the Chrome DevTools Protocol as Chrome
+does. Start the app with a debugging port, and a test tool drives its pages:
+clicks, typing, screenshots, and calls to services, which run for real.
+
+```sh
+WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 dotnet run
+```
+
+With [Playwright](https://playwright.dev) (`npm install playwright-core`, no
+browser to download):
+
+```js
+import { chromium } from "playwright-core";
+
+const browser = await chromium.connectOverCDP("http://localhost:9222");
+const page = browser.contexts()[0].pages()[0];
+await page.click("#start");
+console.log(await page.evaluate(() => document.title));
+await browser.close(); // disconnects; the app keeps running
+```
+
+- The port lets any program of the machine control the pages, and so call
+  the services: set it in tests only, never in what ships.
+- Each window is a page of the browser. They share the app's webview data,
+  in `%LOCALAPPDATA%\Name Dev` while developing: delete it for a test that
+  starts without `localStorage` or cookies.
+
 ## Publishing
 
 ```sh
@@ -123,4 +152,5 @@ yet (see the [roadmap](roadmap.md)).
 | `ORIEL_DEV_URL` | Pages come from this dev server, which is then the only origin allowed to call services. |
 | `ORIEL_GENERATE` | `OrielApp.Run` writes the TypeScript client to this path and returns. |
 | `ORIEL_TRACE=1` | Traces windows, webviews, navigations and messages to the standard error stream. |
+| `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` | Arguments for the webview's browser, such as `--remote-debugging-port=9222` to [drive the app in tests](#driving-the-app-in-tests). |
 | `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` | Uses the fixed version WebView2 Runtime in this folder, as for the official loader. |
