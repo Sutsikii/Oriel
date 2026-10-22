@@ -174,6 +174,12 @@ public class PageConnectionTests
     [InlineData("""{"t":"call","id":1,"m":"Calc.Add","a":[1,2]}""")]
     [InlineData("""{"t":"call","k":"p","m":"Calc.Add","a":[1,2]}""")]
     [InlineData("""{"t":"future","k":"p"}""")]
+    [InlineData("""{"t":"call","id":"1","k":"p","m":"Calc.Add","a":[1,2]}""")]
+    [InlineData("""{"t":"call","id":1,"k":"\ud800","m":"Calc.Add","a":[1,2]}""")]
+    [InlineData("""{"t":"call","id":1,"k":"p","m":"Calc.\udc00","a":[1,2]}""")]
+    [InlineData("""{"t":"call","id":1,"k":"p","m":"Calc.Add","a":[1,2],"\ud800":0}""")]
+    [InlineData("""{"id":1,"\ud800":0,"t":"call","k":"p","m":"Calc.Add","a":[1,2]}""")]
+    [InlineData("""{"\ud800":0,"t":"call","id":1,"k":"p","m":"Calc.Add","a":[1,2]}""")]
     public async Task IgnoresMalformedMessages(string message)
     {
         await _page.ReceiveAsync(message);
@@ -187,6 +193,16 @@ public class PageConnectionTests
         _page.MessageRefused += refused.Add;
         await _page.ReceiveAsync("not json");
         Assert.StartsWith("a message that is not JSON", Assert.Single(refused));
+    }
+
+    [Fact]
+    public async Task RefusesMessagesThatAreNotValidUtf16()
+    {
+        var refused = new List<string>();
+        _page.MessageRefused += refused.Add;
+        await _page.ReceiveAsync(Call(1, "Calc\uD800.Add", "[1,2]")); // a lone surrogate, not escaped
+        Assert.StartsWith("a message that is not valid UTF-16", Assert.Single(refused));
+        Assert.Empty(_posted);
     }
 
     [Fact]
