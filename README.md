@@ -85,7 +85,8 @@ are next. See the [roadmap](docs/roadmap.md).
   call, and how types map.
 - [Building and shipping](docs/build.md): build properties, development
   loop, publishing.
-- [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL005.
+- [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL006, and
+  the experimental APIs.
 - [The page protocol](docs/protocol.md): the messages under the client.
 - [Architecture](docs/architecture.md): how it works, for contributors.
 
