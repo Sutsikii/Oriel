@@ -214,7 +214,8 @@ public class HostingTests
         Assert.StartsWith("error:", await Reply(native));
         host.App.Dispatch(() => native.Events.Failed(new InvalidDataException("webview trouble")));
 
-        await WaitUntil(() => _logs.Entries.Count(e => e.Level == LogLevel.Error) >= 2);
+        // Waits for these two: the missing page of the test app is logged too.
+        await WaitUntil(() => _logs.Entries.Any(e => e.Error is InvalidOperationException) && _logs.Entries.Any(e => e.Error is InvalidDataException));
         Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message == "Counter.Fail failed: no luck" && e.Error is InvalidOperationException);
         Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Error is InvalidDataException);
         host.App.Quit();
