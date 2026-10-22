@@ -756,9 +756,10 @@ const judgementNames = { best: "Best move", good: "Good move", inaccuracy: "Inac
 function renderGame() {
   $("game").hidden = !game;
   if (!game) return;
-  const h = game.headers;
-  const elo = (rating?: string) => (rating && rating !== "?" ? ` (${rating})` : "");
-  $("players").textContent = `${h.White ?? "White"}${elo(h.WhiteElo)} – ${h.Black ?? "Black"}${elo(h.BlackElo)} · ${h.Result ?? "*"}`;
+  // PGN writes "?" for what it does not know.
+  const tag = (name: string) => (game!.headers[name] && game!.headers[name] !== "?" ? game!.headers[name] : null);
+  const elo = (name: string) => (tag(name) ? ` (${tag(name)})` : "");
+  $("players").textContent = `${tag("White") ?? "White"}${elo("WhiteElo")} – ${tag("Black") ?? "Black"}${elo("BlackElo")} · ${tag("Result") ?? "*"}`;
 
   const judged = verdicts();
   const at = gameIndex();
