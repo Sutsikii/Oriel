@@ -12,8 +12,21 @@ namespace Oriel.Generated;
 public static class Json
 {
     /// <summary>Reads a string.</summary>
-    public static string ReadString(JsonElement e) =>
-        e.ValueKind == JsonValueKind.String ? e.GetString()! : throw Expected("a string", e);
+    public static string ReadString(JsonElement e)
+    {
+        if (e.ValueKind != JsonValueKind.String)
+            throw Expected("a string", e);
+        try
+        {
+            return e.GetString()!;
+        }
+        catch (InvalidOperationException)
+        {
+            // An escaped lone surrogate, such as a page's text cut in the
+            // middle of an emoji: .NET will not read it as a string.
+            throw new CodecException("expected a string, got one with a lone surrogate, which is not valid UTF-16");
+        }
+    }
 
     /// <summary>Reads a boolean.</summary>
     public static bool ReadBoolean(JsonElement e) => e.ValueKind switch
@@ -69,15 +82,18 @@ public static class Json
 
     /// <summary>Reads a date and time from an ISO 8601 string.</summary>
     public static DateTime ReadDateTime(JsonElement e) =>
-        e.ValueKind == JsonValueKind.String && e.TryGetDateTime(out var v) ? v : throw Expected("an ISO 8601 date", e);
+        e.ValueKind == JsonValueKind.String && TryGet(e, static (JsonElement s, out DateTime v) => s.TryGetDateTime(out v), out var v)
+            ? v : throw Expected("an ISO 8601 date", e);
 
     /// <summary>Reads a date and time with its offset from an ISO 8601 string.</summary>
     public static DateTimeOffset ReadDateTimeOffset(JsonElement e) =>
-        e.ValueKind == JsonValueKind.String && e.TryGetDateTimeOffset(out var v) ? v : throw Expected("an ISO 8601 date", e);
+        e.ValueKind == JsonValueKind.String && TryGet(e, static (JsonElement s, out DateTimeOffset v) => s.TryGetDateTimeOffset(out v), out var v)
+            ? v : throw Expected("an ISO 8601 date", e);
 
     /// <summary>Reads bytes from a base64 string.</summary>
     public static byte[] ReadBytes(JsonElement e) =>
-        e.ValueKind == JsonValueKind.String && e.TryGetBytesFromBase64(out var v) ? v : throw Expected("a base64 string", e);
+        e.ValueKind == JsonValueKind.String && TryGet(e, static (JsonElement s, out byte[] v) => s.TryGetBytesFromBase64(out v!), out var v)
+            ? v : throw Expected("a base64 string", e);
 
     /// <summary>Keeps any JSON value as it is, beyond the life of its document.</summary>
     public static JsonElement ReadElement(JsonElement e) => e.Clone();
@@ -184,7 +200,10 @@ public static class Json
             throw Expected("an object", e);
         var items = new Dictionary<string, T>(StringComparer.Ordinal);
         foreach (var property in e.EnumerateObject())
-            items[property.Name] = ReadValue(property.Value, property.Name, read);
+        {
+            var name = Name(property);
+            items[name] = ReadValue(property.Value, name, read);
+        }
         return items;
     }
 
@@ -194,7 +213,18 @@ public static class Json
     /// </summary>
     public static bool TryReadProperty<T>(JsonElement obj, string name, Func<JsonElement, T> read, out T value)
     {
-        if (obj.TryGetProperty(name, out var e) && e.ValueKind != JsonValueKind.Undefined)
+        JsonElement e;
+        bool found;
+        try
+        {
+            found = obj.TryGetProperty(name, out e);
+        }
+        catch (InvalidOperationException)
+        {
+            // Looking for a name unescapes the others.
+            throw InvalidName();
+        }
+        if (found && e.ValueKind != JsonValueKind.Undefined)
         {
             value = ReadValue(e, name, read);
             return true;
@@ -233,6 +263,37 @@ public static class Json
         }
         w.WriteEndObject();
     }
+
+    private delegate bool Getter<T>(JsonElement e, out T value);
+
+    /// <summary>Runs a <c>TryGet</c> of <see cref="JsonElement"/>, a lone surrogate failing it as anything else would.</summary>
+    private static bool TryGet<T>(JsonElement e, Getter<T> get, out T value)
+    {
+        try
+        {
+            return get(e, out value);
+        }
+        catch (InvalidOperationException)
+        {
+            value = default!;
+            return false;
+        }
+    }
+
+    private static string Name(JsonProperty property)
+    {
+        try
+        {
+            return property.Name;
+        }
+        catch (InvalidOperationException)
+        {
+            throw InvalidName();
+        }
+    }
+
+    private static CodecException InvalidName() =>
+        new("a property name has a lone surrogate, which is not valid UTF-16");
 
     private static T ReadItem<T>(JsonElement e, int index, Func<JsonElement, T> read)
     {
