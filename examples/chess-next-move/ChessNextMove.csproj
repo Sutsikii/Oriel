@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DefaultItemExcludes>$(DefaultItemExcludes);frontend/**</DefaultItemExcludes>
+
+    <!-- Oriel: where the TypeScript client goes, and where the built frontend is. -->
+    <OrielTypeScriptOutput>frontend/src/oriel.ts</OrielTypeScriptOutput>
+    <OrielFrontendDist>frontend/dist</OrielFrontendDist>
+    <OrielFrontendBuildCommand>npm run build</OrielFrontendBuildCommand>
+
+    <!-- dotnet publish -c Release gives a single native executable. -->
+    <PublishAot>true</PublishAot>
+
+    <!-- What Windows shows, and the installer dotnet publish -c Release builds (docs/build.md#installers). -->
+    <Product>Chess Next Move</Product>
+    <Version>1.0.0</Version>
+    <Company>Oriel contributors</Company>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <OrielInstaller>true</OrielInstaller>
+    <OrielAppId>40CE192C-19D9-4610-8190-F2186238026E</OrielAppId>
+    <OrielInstallerLanguages>english;french</OrielInstallerLanguages>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Stockfish, which setup.ps1 downloads: it goes next to the executable. -->
+    <None Update="engine/stockfish.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
