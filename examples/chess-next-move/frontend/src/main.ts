@@ -817,6 +817,7 @@ function renderGraph(judged: (Verdict | undefined)[], at: number) {
   const graph = $("graph") as unknown as SVGSVGElement;
   const ns = "http://www.w3.org/2000/svg";
   graph.replaceChildren();
+  graph.style.display = reviewed.some(Boolean) ? "" : "none"; // nothing to draw before the review
   const last = Math.max(1, gamePositions.length - 1);
   const x = (i: number) => (i / last) * 100;
   const y = (i: number) => (1 - whiteChances(reviewed[i]!.line, gamePositions[i].split(" ")[1] as "w" | "b")) * 40;
