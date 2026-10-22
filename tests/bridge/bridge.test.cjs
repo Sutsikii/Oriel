@@ -70,6 +70,14 @@ test("gives a CallError the code and data of a service error", async () => {
   });
 });
 
+test("rejects a failed call whose error has no message with one of its own", async () => {
+  // Found by fuzzing: String({ toString: 0 }) threw, and the call stayed pending.
+  const { runtime, receive, token } = setup();
+  const result = runtime.call("Decks.Open", ["x"]);
+  assert.doesNotThrow(() => receive(JSON.stringify({ t: "error", id: 1, k: token, e: { toString: 0 } })));
+  await assert.rejects(result, { name: "CallError", message: "Decks.Open failed" });
+});
+
 test("ignores replies meant for another page", async () => {
   const { runtime, receive, token } = setup();
   const result = runtime.call("Greeter.Greet", ["Ada"]);
