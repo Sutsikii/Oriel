@@ -176,6 +176,10 @@ internal static unsafe partial class Win32
     [LibraryImport("ole32.dll")]
     public static partial void CoTaskMemFree(nint p);
 
+    /// <summary>An IStream over a copy of <paramref name="size"/> bytes; 0 when memory runs out.</summary>
+    [LibraryImport("shlwapi.dll")]
+    public static partial nint SHCreateMemStream(byte* init, uint size);
+
     [LibraryImport("dwmapi.dll")]
     public static partial int DwmSetWindowAttribute(nint hwnd, int attribute, void* value, int size);
 

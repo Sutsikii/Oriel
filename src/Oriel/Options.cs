@@ -11,9 +11,16 @@ public sealed class AppOptions
 
     /// <summary>
     /// The folder of the built frontend, served to pages at <c>https://app.oriel/</c>.
-    /// Defaults to <c>wwwroot</c> beside the executable.
+    /// Defaults to the frontend embedded in <see cref="AssetsAssembly"/> when
+    /// there is one, else to <c>wwwroot</c> beside the executable.
     /// </summary>
     public string? AssetsDirectory { get; init; }
+
+    /// <summary>
+    /// The assembly the built frontend is embedded in, with
+    /// <c>OrielEmbedFrontend</c>. Defaults to the app's executable.
+    /// </summary>
+    public System.Reflection.Assembly? AssetsAssembly { get; init; }
 
     /// <summary>Whether <see cref="OrielApp.Run"/> returns once the last window closed. Defaults to true.</summary>
     public bool QuitWhenLastWindowCloses { get; init; } = true;

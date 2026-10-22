@@ -80,9 +80,11 @@
   </Target>
 
   <!--
-    Copies the built frontend to wwwroot, which OrielApp serves pages from.
-    Collected when the target runs rather than when the project loads, so a
-    frontend built during the build is included.
+    Copies the built frontend to wwwroot, which OrielApp serves pages from,
+    or with OrielEmbedFrontend embeds it in the assembly, as resources named
+    oriel-frontend/ and the file's path (see EmbeddedFrontend.cs). Collected
+    when the target runs rather than when the project loads, so a frontend
+    built during the build is included.
   -->
   <Target Name="OrielCollectFrontend"
           BeforeTargets="AssignTargetPaths"
@@ -90,9 +92,15 @@
     <ItemGroup>
       <_OrielFrontendFile Include="$(MSBuildProjectDirectory)/$(OrielFrontendDist)/**/*" />
       <Content Include="@(_OrielFrontendFile)"
+               Condition="'$(OrielEmbedFrontend)' != 'true'"
                Link="wwwroot/%(RecursiveDir)%(Filename)%(Extension)"
                CopyToOutputDirectory="PreserveNewest"
                CopyToPublishDirectory="PreserveNewest" />
+      <EmbeddedResource Include="@(_OrielFrontendFile)"
+                        Condition="'$(OrielEmbedFrontend)' == 'true'"
+                        LogicalName="oriel-frontend/%(RecursiveDir)%(Filename)%(Extension)"
+                        WithCulture="false"
+                        Type="Non-Resx" />
     </ItemGroup>
   </Target>
 

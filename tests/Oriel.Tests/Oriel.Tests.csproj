@@ -20,4 +20,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- A frontend embedded as OrielEmbedFrontend embeds one, for EmbeddedFrontendTests. -->
+    <EmbeddedResource Include="Embedded/**" LogicalName="oriel-frontend/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
+  </ItemGroup>
+
 </Project>

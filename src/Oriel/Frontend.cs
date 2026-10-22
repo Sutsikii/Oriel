@@ -18,7 +18,7 @@ internal sealed class Frontend
 
     private readonly Uri? _devServer;
 
-    public Frontend(string? devUrl, string assetsFolder)
+    public Frontend(string? devUrl, string assetsFolder, EmbeddedFrontend? embedded = null)
     {
         if (!string.IsNullOrEmpty(devUrl))
         {
@@ -27,6 +27,7 @@ internal sealed class Frontend
             _devServer = uri;
         }
         AssetsFolder = assetsFolder;
+        Embedded = embedded;
     }
 
     /// <summary>Whether pages come from a dev server.</summary>
@@ -34,6 +35,9 @@ internal sealed class Frontend
 
     /// <summary>The folder of the app's built frontend.</summary>
     public string AssetsFolder { get; }
+
+    /// <summary>The frontend embedded in the app, served instead of <see cref="AssetsFolder"/> when there is one.</summary>
+    public EmbeddedFrontend? Embedded { get; }
 
     /// <summary>
     /// The URL a window opens: <paramref name="url"/> as is when absolute,
@@ -61,6 +65,8 @@ internal sealed class Frontend
     {
         if (IsDev || url.Scheme != "https" || !string.Equals(url.Host, AppHost, StringComparison.OrdinalIgnoreCase))
             return null;
+        if (Embedded is not null)
+            return Embedded.Contains(url.AbsolutePath) ? null : "the embedded resource " + EmbeddedFrontend.ResourceName(url.AbsolutePath);
         var relative = Uri.UnescapeDataString(url.AbsolutePath).TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
         var path = Path.GetFullPath(Path.Combine(AssetsFolder, relative));
         return File.Exists(path) ? null : path;
