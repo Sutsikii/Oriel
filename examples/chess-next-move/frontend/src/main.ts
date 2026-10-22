@@ -15,10 +15,12 @@ interface Settings {
   pieces: string;
   theme: "system" | "light" | "dark";
   coords: boolean;
+  /** Whether each new position is searched at once, without pressing Play. */
+  auto: boolean;
   flipped: boolean;
 }
 
-const defaults: Settings = { depth: "18", customDepth: 30, time: 5000, lines: 3, pieces: "cburnett", theme: "system", coords: true, flipped: false };
+const defaults: Settings = { depth: "18", customDepth: 30, time: 5000, lines: 3, pieces: "cburnett", theme: "system", coords: true, auto: true, flipped: false };
 
 function loadSettings(): Settings {
   try {
@@ -466,6 +468,15 @@ function changed() {
   analysis = null;
   renderPosition();
   renderAnalysis();
+  if (settings.auto) soon();
+}
+
+let pending: ReturnType<typeof setTimeout> | undefined;
+
+/** Searches the position shown in a moment: edits in quick succession start one search, not one each. */
+function soon() {
+  clearTimeout(pending);
+  pending = setTimeout(analyse, 80);
 }
 
 document.querySelectorAll<HTMLButtonElement>("#turn button").forEach((b) =>
@@ -558,6 +569,7 @@ const linesSelect = $<HTMLSelectElement>("multipv");
 const piecesSelect = $<HTMLSelectElement>("pieces");
 const themeSelect = $<HTMLSelectElement>("theme");
 const coordsBox = $<HTMLInputElement>("coords");
+const autoBox = $<HTMLInputElement>("auto");
 
 depthSelect.value = settings.depth;
 customDepth.value = String(settings.customDepth);
@@ -567,33 +579,41 @@ linesSelect.value = String(settings.lines);
 piecesSelect.value = settings.pieces;
 themeSelect.value = settings.theme;
 coordsBox.checked = settings.coords;
+autoBox.checked = settings.auto;
 
 function applyTheme() {
   if (settings.theme === "system") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = settings.theme;
 }
 
-const onSetting = (el: HTMLElement, apply: () => void) =>
+/** `search`: whether the setting changes what a search finds, which then starts again. */
+const onSetting = (el: HTMLElement, apply: () => void, search = false) =>
   el.addEventListener("change", () => {
     apply();
     saveSettings();
     renderPalettes();
     renderAnalysis();
+    if (search && settings.auto) soon();
   });
 
-onSetting(depthSelect, () => {
-  settings.depth = depthSelect.value;
-  customDepth.hidden = settings.depth !== "custom";
-});
-onSetting(customDepth, () => (settings.customDepth = Math.min(Math.max(Number(customDepth.value) || 20, 1), 60)));
-onSetting(timeSelect, () => (settings.time = Number(timeSelect.value)));
-onSetting(linesSelect, () => (settings.lines = Number(linesSelect.value)));
+onSetting(
+  depthSelect,
+  () => {
+    settings.depth = depthSelect.value;
+    customDepth.hidden = settings.depth !== "custom";
+  },
+  true,
+);
+onSetting(customDepth, () => (settings.customDepth = Math.min(Math.max(Number(customDepth.value) || 20, 1), 60)), true);
+onSetting(timeSelect, () => (settings.time = Number(timeSelect.value)), true);
+onSetting(linesSelect, () => (settings.lines = Number(linesSelect.value)), true);
 onSetting(piecesSelect, () => (settings.pieces = piecesSelect.value));
 onSetting(themeSelect, () => {
   settings.theme = themeSelect.value as Settings["theme"];
   applyTheme();
 });
 onSetting(coordsBox, () => (settings.coords = coordsBox.checked));
+onSetting(autoBox, () => (settings.auto = autoBox.checked), true);
 
 // Start.
 
@@ -601,6 +621,7 @@ applyTheme();
 renderPalettes();
 renderPosition();
 renderAnalysis();
+if (settings.auto) analyse();
 
 Engine.info()
   .then((info) => {

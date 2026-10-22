@@ -1,8 +1,7 @@
 # Chess Next Move
 
 A local take on [chessnextmove.com](https://www.chessnextmove.com/): set up any
-position by dragging pieces, press **Play**, and Stockfish suggests the best
-move. The page is TypeScript; the engine is the C# service `Engine`
+position by dragging pieces, and Stockfish suggests the best move as you go. The page is TypeScript; the engine is the C# service `Engine`
 (`Engine.cs`), which runs Stockfish as a process and speaks UCI to it.
 
 - Board editor: drag pieces from the palettes or around the board, drop one
@@ -10,7 +9,8 @@ move. The page is TypeScript; the engine is the C# service `Engine`
   squares. Right-click empties a square.
 - Side to move, castling rights, FEN (edit it, copy it; the URL carries it as
   `?fen=`), Rotate, Start position, Kings only, Clear.
-- **Play** searches (Space), **Move** plays the suggested move (M),
+- Each new position is searched at once; "Analyse as you edit" turns that
+  off, and **Play** then searches (Space). **Move** plays the suggested move (M),
   **← Back** and **Move →** step through the positions (arrow keys).
 - Up to three lines, drawn as numbered arrows and written in SAN; an
   evaluation bar and each side's score.
