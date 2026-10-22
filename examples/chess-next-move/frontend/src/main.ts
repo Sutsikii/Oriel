@@ -4,6 +4,7 @@ import { CallError, Engine, type Analysis, type Line } from "./oriel";
 import { EMPTY, KINGS, PIECES, START, format, parse, possibleCastling, squareIndex, squareName, type Piece, type Position } from "./position";
 import { recentGames, result, type ArchivedGame } from "./chesscom";
 import { accuracy, finalLine, judge, positions, readPgn, symbols, whiteChances, type Game, type Verdict } from "./review";
+import type { Board3D, Squares } from "./board3d";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -22,9 +23,22 @@ interface Settings {
   flipped: boolean;
   /** The chess.com player whose games are listed. */
   username: string;
+  view: "2d" | "3d";
 }
 
-const defaults: Settings = { depth: "18", customDepth: 30, time: 5000, lines: 3, pieces: "cburnett", theme: "system", coords: true, auto: true, flipped: false, username: "" };
+const defaults: Settings = {
+  depth: "18",
+  customDepth: 30,
+  time: 5000,
+  lines: 3,
+  pieces: "cburnett",
+  theme: "system",
+  coords: true,
+  auto: true,
+  flipped: false,
+  username: "",
+  view: "2d",
+};
 
 function loadSettings(): Settings {
   try {
@@ -106,6 +120,7 @@ const shown = (d: number) => (settings.flipped ? 63 - d : d);
 const pieceUrl = (piece: Piece) => `pieces/${settings.pieces}/${piece}.svg`;
 
 function squareAt(x: number, y: number): number | null {
+  if (board3d) return board3d.squareAt(x, y);
   const r = boardEl.getBoundingClientRect();
   if (x < r.left || x >= r.right || y < r.top || y >= r.bottom) return null;
   const col = Math.floor(((x - r.left) / r.width) * 8);
@@ -144,6 +159,17 @@ function renderBoard() {
     if (img.getAttribute("src") !== pieceUrl(piece)) img.src = pieceUrl(piece);
     img.dataset.piece = piece;
   });
+  if (board3d) {
+    board3d.setPosition(p.board, settings.flipped, settings.coords);
+    // The arrows in the 2D board's colors: --arrow1… for the lines, --reply for the reply.
+    const css = getComputedStyle(document.documentElement);
+    const squaresOf = (uci: string): Squares => [squareIndex(uci.slice(0, 2)), squareIndex(uci.slice(2, 4))];
+    const arrows = arrowList(shownAnalysis()).map(({ move, style }) => ({
+      squares: squaresOf(move),
+      color: css.getPropertyValue(style === "reply" ? "--reply" : `--arrow${style.slice(4)}`),
+    }));
+    board3d.setMarks(arrows, { best: best ? squaresOf(best) : null, last: last ? squaresOf(last) : null });
+  }
 }
 
 // Dragging pieces, from the board or from the palettes.
@@ -160,7 +186,7 @@ function startDrag(e: PointerEvent, source: "board" | "palette", from: number | 
   const ghost = document.createElement("img");
   ghost.src = pieceUrl(piece);
   ghost.className = "ghost";
-  const size = boardEl.getBoundingClientRect().width / 8;
+  const size = (board3d ? $("board3d") : boardEl).getBoundingClientRect().width / 8;
   ghost.style.width = ghost.style.height = `${size}px`;
   drag = { piece, from: source === "board" ? from : null, ghost, x: e.clientX, y: e.clientY, moved: false };
   moveGhost(e.clientX, e.clientY);
@@ -168,6 +194,8 @@ function startDrag(e: PointerEvent, source: "board" | "palette", from: number | 
 
 function moveGhost(x: number, y: number) {
   if (!drag) return;
+  // On the 3D board, the piece itself follows the pointer.
+  if (board3d && drag.from !== null) return board3d.drag(x, y);
   const half = parseFloat(drag.ghost.style.width) / 2;
   drag.ghost.style.transform = `translate(${x - half}px, ${y - half}px)`;
 }
@@ -176,7 +204,8 @@ document.addEventListener("pointermove", (e) => {
   if (!drag) return;
   if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) {
     drag.moved = true;
-    document.body.append(drag.ghost);
+    if (board3d && drag.from !== null) board3d.lift(drag.from);
+    else document.body.append(drag.ghost);
     if (drag.from !== null) squares[settings.flipped ? 63 - drag.from : drag.from].classList.add("lifted");
   }
   moveGhost(e.clientX, e.clientY);
@@ -190,6 +219,8 @@ document.addEventListener("pointerup", (e) => {
   was?.ghost.remove();
   squares.forEach((s) => s.classList.remove("lifted"));
   if (!press) return;
+  // A piece lifted on the 3D board and dropped where nothing changes goes back to its square.
+  if (board3d && was?.moved) queueMicrotask(renderBoard);
   const target = squareAt(e.clientX, e.clientY);
 
   if (!was?.moved) {
@@ -421,6 +452,18 @@ function renderAnalysis(message?: string) {
   renderBoard();
 }
 
+/**
+ * The arrows of the lines: the opponent's expected reply to the best move first, under the lines;
+ * then the worst line, so that the best one is drawn on top.
+ */
+function arrowList(a: Analysis | null): { move: string; style: string; rank: number }[] {
+  const reply = a?.lines[0]?.moves[1];
+  const arrows = reply ? [{ move: reply, style: "reply", rank: 0 }] : [];
+  for (const line of (a?.lines ?? []).slice(0, settings.lines).reverse())
+    if (line.moves[0]) arrows.push({ move: line.moves[0], style: `rank${line.rank}`, rank: line.rank });
+  return arrows;
+}
+
 function renderArrows(a: Analysis | null) {
   arrowsEl.replaceChildren();
   const ns = "http://www.w3.org/2000/svg";
@@ -429,13 +472,7 @@ function renderArrows(a: Analysis | null) {
     const d = settings.flipped ? 63 - i : i;
     return { x: (d % 8) + 0.5, y: Math.floor(d / 8) + 0.5 };
   };
-  // The opponent's expected reply to the best move first, under the lines; then the worst line,
-  // so that the best one is drawn on top.
-  const reply = a?.lines[0]?.moves[1];
-  const arrows: { move: string; style: string; rank: number }[] = reply ? [{ move: reply, style: "reply", rank: 0 }] : [];
-  for (const line of (a?.lines ?? []).slice(0, settings.lines).reverse())
-    if (line.moves[0]) arrows.push({ move: line.moves[0], style: `rank${line.rank}`, rank: line.rank });
-  for (const { move, style, rank } of arrows) {
+  for (const { move, style, rank } of arrowList(a)) {
     const from = place(move.slice(0, 2));
     const to = place(move.slice(2, 4));
     const length = Math.hypot(to.x - from.x, to.y - from.y);
@@ -933,6 +970,56 @@ function renderGames(games: ArchivedGame[], username: string) {
   }
 }
 
+// The 3D view, loaded the first time it is shown.
+
+let board3d: Board3D | null = null;
+
+async function applyView() {
+  const three = settings.view === "3d";
+  $<HTMLButtonElement>("view").textContent = three ? "2D" : "3D";
+  $<HTMLButtonElement>("view").title = three ? "Show the board in 2D" : "Show the board in 3D";
+  boardEl.hidden = three;
+  (arrowsEl as unknown as HTMLElement).style.display = three ? "none" : "";
+  $("board3d").hidden = !three;
+  if (!three) {
+    board3d?.dispose();
+    board3d = null;
+    return;
+  }
+  if (board3d) return;
+  try {
+    const { Board3D } = await import("./board3d");
+    if (settings.view !== "3d" || board3d) return; // switched back while it loaded
+    board3d = new Board3D($("board3d"));
+  } catch (err) {
+    settings.view = "2d";
+    saveSettings();
+    await applyView();
+    renderAnalysis(`The 3D view is not available · ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+  renderBoard();
+}
+
+// Pieces are lifted, and tools used, on the 3D board as on the 2D one; any other drag turns the camera.
+$("board3d").addEventListener(
+  "pointerdown",
+  (e) => {
+    if (!board3d || e.button !== 0) return;
+    const at = tool ? board3d.squareAt(e.clientX, e.clientY) : board3d.pieceAt(e.clientX, e.clientY);
+    if (at === null) return;
+    e.stopPropagation(); // the camera's controls do not see it
+    startDrag(e, "board", at);
+  },
+  { capture: true },
+);
+
+$("view").addEventListener("click", () => {
+  settings.view = settings.view === "3d" ? "2d" : "3d";
+  saveSettings();
+  applyView();
+});
+
 // The settings.
 
 const depthSelect = $<HTMLSelectElement>("depth");
@@ -991,6 +1078,7 @@ onSetting(autoBox, () => (settings.auto = autoBox.checked), true);
 // Start.
 
 applyTheme();
+applyView();
 renderPalettes();
 renderPosition();
 renderAnalysis();
