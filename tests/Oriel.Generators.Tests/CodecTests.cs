@@ -174,6 +174,32 @@ public class CodecTests
         Assert.Equal(message, await echo.Fail("Count", args));
     }
 
+    /// <summary>
+    /// Pages send lone surrogates, escaped, when they cut a text in the middle
+    /// of an emoji. .NET reads no string from them; found by fuzzing, they
+    /// failed calls as unexpected exceptions.
+    /// </summary>
+    [Theory]
+    [InlineData("string", """["a\ud83d"]""", "argument 'value': expected a string, got one with a lone surrogate, which is not valid UTF-16")]
+    [InlineData("List<string>", """[["ok","\udc00"]]""", "argument 'value': $[1]: expected a string, got one with a lone surrogate, which is not valid UTF-16")]
+    [InlineData("Dictionary<string, int>", """[{"\ud800":1}]""", "argument 'value': a property name has a lone surrogate, which is not valid UTF-16")]
+    [InlineData("DateTime", """["\ud800"]""", "argument 'value': expected an ISO 8601 date, got a string")]
+    [InlineData("DateTimeOffset", """["\ud800"]""", "argument 'value': expected an ISO 8601 date, got a string")]
+    [InlineData("byte[]", """["\ud800"]""", "argument 'value': expected a base64 string, got a string")]
+    public async Task SaysALoneSurrogateDoesNotFit(string type, string args, string message)
+    {
+        var echo = Echo("", $"public {type} Same({type} value) => value;");
+        Assert.Equal(message, await echo.Fail("Same", args));
+    }
+
+    [Fact]
+    public async Task SaysAPropertyNameWithALoneSurrogateDoesNotFit()
+    {
+        var echo = Echo("public record Point(int X, int Y);", "public Point Same(Point p) => p;");
+        Assert.Equal("argument 'p': a property name has a lone surrogate, which is not valid UTF-16",
+            await echo.Fail("Same", """[{"x":1,"\ud800":0,"y":2}]"""));
+    }
+
     [Fact]
     public async Task RefusesNamesThatAreNotOfAnEnum()
     {

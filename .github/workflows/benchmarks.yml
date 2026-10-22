@@ -1,0 +1,54 @@
+name: Benchmarks
+
+# What a call costs (benchmarks/): codecs, dispatchers and the protocol in
+# process, and a round trip in a real window. Results go to the job summary
+# and an artifact; a measure past benchmarks/baseline.json times its factor
+# fails the job.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "src/**"
+      - "benchmarks/**"
+      - ".github/workflows/benchmarks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  benchmarks:
+    name: Benchmarks
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build benchmarks/Oriel.Benchmarks -c Release
+
+      # BenchmarkDotNet builds a project of its own beside this one, so it runs from its folder.
+      - name: Codecs, dispatchers and the protocol
+        working-directory: benchmarks/Oriel.Benchmarks
+        run: dotnet run -c Release --no-build -- --filter * --job short --artifacts ${{ github.workspace }}/benchmark-results
+
+      - name: A round trip in a real window
+        run: dotnet run --project benchmarks/Oriel.Benchmarks -c Release --no-build -- roundtrip benchmark-results/roundtrip.json
+
+      - name: Compare with the baseline
+        run: dotnet run --project benchmarks/Oriel.Benchmarks -c Release --no-build -- check benchmark-results benchmark-results/roundtrip.json benchmarks/baseline.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark-results

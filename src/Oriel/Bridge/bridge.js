@@ -66,7 +66,7 @@
           if (!p) return;
           pending.delete(message.id);
           if (message.t === "result") p.resolve(message.v);
-          else p.reject(callError(p.method, String(message.e), message.c, message.d));
+          else p.reject(callError(p.method, errorMessage(p.method, message.e), message.c, message.d));
           return;
         }
         case "event": {
@@ -99,6 +99,15 @@
     err.code = typeof code === "string" ? code : null;
     err.data = err.code === null ? null : data;
     return err;
+  }
+
+  /**
+   * The message of an error reply: a string from the app, else one of the
+   * runtime's. String() of any JSON would throw on {"toString":0}, leaving
+   * the call pending forever.
+   */
+  function errorMessage(method, e) {
+    return typeof e === "string" ? e : `${method} failed`;
   }
 
   /** Reports an error thrown by page code without stopping the runtime. */
