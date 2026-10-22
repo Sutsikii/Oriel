@@ -14,3 +14,7 @@ TestResults/
 # Frontend
 node_modules/
 dist/
+
+# Benchmark results
+BenchmarkDotNet.Artifacts/
+benchmark-results/
