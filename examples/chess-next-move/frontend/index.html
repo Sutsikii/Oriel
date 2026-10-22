@@ -8,7 +8,7 @@
   <body>
     <header>
       <h1>Chess <span>Next Move</span></h1>
-      <p>Set up any position by dragging pieces, and the engine suggests the best move as you go.</p>
+      <p>Set up any position by dragging pieces, or load a finished game, and the engine suggests the best move as you go.</p>
       <small id="engine-name"></small>
     </header>
 
@@ -39,6 +39,35 @@
         <section>
           <h2>Best moves</h2>
           <ol id="lines"><li class="empty">No analysis yet.</li></ol>
+        </section>
+
+        <section id="game-panel">
+          <h2>Game</h2>
+          <form id="player" class="fen">
+            <input id="username" placeholder="chess.com username" spellcheck="false" autocomplete="off" />
+            <button type="submit" id="load-games">Recent games</button>
+          </form>
+          <p id="games-status" class="hint" hidden></p>
+          <ul id="games" hidden></ul>
+          <details id="pgn-box">
+            <summary>Paste a PGN</summary>
+            <textarea id="pgn" spellcheck="false" placeholder="[Event &quot;…&quot;]&#10;1. e4 e5 2. Nf3 …"></textarea>
+            <div class="row buttons">
+              <button type="button" id="load-pgn">Load</button>
+              <span id="pgn-error" class="hint error"></span>
+            </div>
+          </details>
+
+          <div id="game" hidden>
+            <p id="players"></p>
+            <svg id="graph" viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Evaluation through the game"></svg>
+            <p id="accuracy" class="hint"></p>
+            <ol id="move-list"></ol>
+            <div class="row buttons">
+              <button type="button" id="review" class="primary">Review the game</button>
+              <button type="button" id="close-game">Close</button>
+            </div>
+          </div>
         </section>
 
         <section>

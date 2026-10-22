@@ -10,6 +10,8 @@
   --dark-square: #b58863;
   --from: rgba(155, 199, 0, 0.42);
   --to: rgba(155, 199, 0, 0.6);
+  /* The move of the game that led to the position shown. */
+  --last: rgba(255, 170, 0, 0.32);
   --error: #c0392b;
   --arrow1: rgba(21, 120, 27, 0.85);
   --arrow2: rgba(0, 48, 136, 0.7);
@@ -153,6 +155,9 @@ main {
 }
 .square.to::before {
   background: var(--to);
+}
+.square.last {
+  box-shadow: inset 0 0 0 100vmax var(--last);
 }
 .square img {
   position: absolute;
@@ -463,6 +468,161 @@ input[type="number"],
 }
 #fen.invalid {
   border-color: var(--error);
+}
+
+/* The game: chess.com's games, a PGN, its moves and their review. */
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+#username {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+#player button {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+#games {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+#games li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  padding: 5px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#games li:hover,
+#games li.selected {
+  background: var(--bg);
+}
+#games .when {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.won {
+  color: var(--accent);
+  font-weight: 600;
+}
+.lost {
+  color: var(--error);
+  font-weight: 600;
+}
+
+#pgn-box {
+  margin-top: 10px;
+  font-size: 13px;
+}
+#pgn-box summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+#pgn {
+  width: 100%;
+  height: 110px;
+  margin: 8px 0 6px;
+  resize: vertical;
+  font: 12px ui-monospace, Consolas, monospace;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  user-select: text;
+}
+#pgn-error {
+  margin: 0;
+}
+
+#game {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+#players {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* White's chances through the game: white below the line, dark above. */
+#graph {
+  display: block;
+  width: 100%;
+  height: 64px;
+  background: #3d3a36;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#graph .white {
+  fill: #f5f5f5;
+}
+#graph .middle {
+  stroke: rgba(128, 128, 128, 0.6);
+  stroke-width: 0.3;
+}
+#graph .cursor {
+  stroke: var(--accent);
+  stroke-width: 0.6;
+}
+#graph .blunder { fill: #d9363e; }
+#graph .mistake { fill: #e58f2a; }
+#graph .inaccuracy { fill: #56b4e9; }
+
+#move-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 34px 1fr 1fr;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+#move-list .number {
+  color: var(--muted);
+  padding: 3px 0;
+}
+#move-list .move {
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#move-list .move:hover {
+  background: var(--bg);
+}
+#move-list .move.current {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.move .nag {
+  margin-left: 2px;
+  font-weight: 700;
+}
+.move.blunder .nag { color: #d9363e; }
+.move.mistake .nag { color: #e58f2a; }
+.move.inaccuracy .nag { color: #3b9ad1; }
+.move.current .nag { color: inherit; }
+#move-list .result {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  padding-top: 4px;
 }
 
 @media (max-width: 900px) {

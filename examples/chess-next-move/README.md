@@ -1,7 +1,8 @@
 # Chess Next Move
 
 A local take on [chessnextmove.com](https://www.chessnextmove.com/): set up any
-position by dragging pieces, and Stockfish suggests the best move as you go. The page is TypeScript; the engine is the C# service `Engine`
+position by dragging pieces, or load a finished game, and Stockfish suggests
+the best move as you go. The page is TypeScript; the engine is the C# service `Engine`
 (`Engine.cs`), which runs Stockfish as a process and speaks UCI to it.
 
 - Board editor: drag pieces from the palettes or around the board. A legal
@@ -17,6 +18,17 @@ position by dragging pieces, and Stockfish suggests the best move as you go. The
 - Up to three lines, drawn as numbered arrows and written in SAN, with the
   expected reply to the best one as a dashed arrow; an evaluation bar and
   each side's score.
+- Games: enter a chess.com username for the player's last 20 finished games,
+  from chess.com's [published data](https://www.chess.com/news/view/published-data-api)
+  (games appear there once they are over), or paste a PGN. The moves are
+  listed; click one, or use the arrow keys, Home and End, to go through the
+  game. Moves played on the board start a variation; clicking a move of the
+  list goes back to the game.
+- Review: Stockfish looks at each position of the game (depth 16 at most, 3 s
+  each) and judges each move by the winning chances it gave away, as lichess
+  does: inaccuracies (?!), mistakes (?) and blunders (??), with the move it
+  preferred. A graph shows White's chances through the game, and each side gets
+  an accuracy. The game and its review are kept until it is closed.
 - Settings: depth (12, 18, 24 or custom), time (2 s, 5 s, unlimited), lines,
   piece set (cburnett, merida, kosal), theme, coordinates.
 
@@ -29,6 +41,7 @@ dotnet run
 ```
 
 `npm run dev` in `frontend` runs it with Vite: the page reloads as you edit it.
+`npm test` there tests reading games and judging moves, without the engine.
 `CHESS_ENGINE` points the app at another UCI engine.
 
 `dotnet publish -c Release -r win-x64` gives a native executable of 2.6 MB,
