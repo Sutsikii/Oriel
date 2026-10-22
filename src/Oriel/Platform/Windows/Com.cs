@@ -84,8 +84,16 @@ internal static unsafe class ComCallback
     private static readonly void** s_eventVtable = CreateVtable(
         (delegate* unmanaged[Stdcall]<Object*, nint, nint, int>)&InvokeEvent);
 
+    private static int s_live;
+
     /// <summary>Raised when a callback throws: COM must not see exceptions.</summary>
     public static event Action<Exception>? Failed;
+
+    /// <summary>
+    /// How many callbacks exist: made, and not yet released for the last
+    /// time. The stress tests check it comes back down as windows close.
+    /// </summary>
+    public static int Live => Volatile.Read(ref s_live);
 
     /// <summary>
     /// A completed handler, <c>Invoke(HRESULT, pointer)</c>: the pointer is the
@@ -103,6 +111,7 @@ internal static unsafe class ComCallback
         obj->References = 1;
         obj->Iid = iid;
         obj->Handle = GCHandle.ToIntPtr(GCHandle.Alloc(invoke));
+        Interlocked.Increment(ref s_live);
         return (nint)obj;
     }
 
@@ -142,6 +151,7 @@ internal static unsafe class ComCallback
         {
             GCHandle.FromIntPtr(self->Handle).Free();
             NativeMemory.Free(self);
+            Interlocked.Decrement(ref s_live);
         }
         return (uint)left;
     }

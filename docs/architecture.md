@@ -42,6 +42,7 @@ tests/
   Oriel.Generators.Tests/   the generator: compiles code, calls what it generated
   Oriel.Build.Tests/        the build tasks, and an installer compiled when Inno Setup is there
   Oriel.EndToEnd.Tests/     real windows (ORIEL_E2E=1)
+  Oriel.Stress.Tests/       load and leaks in real windows (ORIEL_STRESS=1, nightly)
   bridge/                   bridge.js, with node --test
   typescript/               the generated client, type-checked and run
 examples/hello/             an app, built from source
@@ -159,7 +160,9 @@ with Win32 and WebView2:
   (`CreateWebViewEnvironmentWithOptionsInternal`), so no loader is shipped.
 - **`Com`** calls COM objects through their vtables, by slot number, with
   function pointers. **`ComCallback`** makes the COM objects WebView2 calls
-  back (completed handlers, event handlers) in native memory.
+  back (completed handlers, event handlers) in native memory, and counts
+  those alive (`ComCallback.Live`): the stress tests check a closed window
+  leaves none behind.
 - **`WebView2`** names the slots Oriel uses. Each slot is the index of the
   method in its interface's vtable in `WebView2.h`, IUnknown's three methods
   first; the comment above each wrapper names the method.
