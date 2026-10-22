@@ -15,6 +15,9 @@ public sealed class PrintingTests : IDisposable
         var opened = new TaskCompletionSource<OrielWindow>();
         _run = Task.Run(() => _app.Run(() => opened.SetResult(_app.OpenWindow())));
         _window = opened.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+        // OpenWindow returns before the backend's window exists: it opens on the UI thread.
+        for (var i = 0; i < 1000 && _platform.Windows.IsEmpty; i++)
+            Thread.Sleep(5);
     }
 
     public void Dispose()
