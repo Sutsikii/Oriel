@@ -61,7 +61,8 @@ internal static class CSharpEmitter
         {
             w.Line($"private readonly {service.CSharp} _service;");
             w.Line();
-            using (w.Block($"public {name}({service.CSharp} service) : base({Names.Literal(service.Name)})"))
+            var concurrency = service.Concurrency == "Parallel" ? "" : $", global::Oriel.ServiceConcurrency.{service.Concurrency}";
+            using (w.Block($"public {name}({service.CSharp} service) : base({Names.Literal(service.Name)}{concurrency})"))
                 w.Line("_service = service;");
             w.Line();
             if (service.Events.Count > 0)

@@ -25,7 +25,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _titleFollowsPage = options.Title is null;
         _title = options.Title ?? app.Options.Name;
         _recovery = new RecoveryPolicy(app.Time);
-        Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options));
+        Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
         Connection.MessageRefused += reason =>
             app.ReportError(new InvalidDataException($"The page of the window \"{Title}\" sent {reason}."));

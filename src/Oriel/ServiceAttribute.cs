@@ -22,6 +22,12 @@ public sealed class ServiceAttribute : Attribute
     /// The name pages call the service by. Defaults to the name of the class.
     /// </summary>
     public string? Name { get; set; }
+
+    /// <summary>
+    /// How calls run: on the thread pool, several at once (the default), one
+    /// at a time, or on the UI thread.
+    /// </summary>
+    public ServiceConcurrency Concurrency { get; set; }
 }
 
 /// <summary>Keeps a public method of a <see cref="ServiceAttribute"/> class from pages.</summary>
