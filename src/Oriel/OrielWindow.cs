@@ -16,6 +16,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
     private volatile string _title;
     private volatile bool _closed;
     private readonly RecoveryPolicy _recovery;
+    private readonly List<TaskCompletionSource<bool>> _pendingPdfs = [];
 
     internal OrielWindow(OrielApp app, WindowOptions options, Uri url, int id)
     {
@@ -93,6 +94,69 @@ public sealed class OrielWindow : IPlatformWindowEvents
     public void Close() => _app.Dispatch(() => _native?.Close());
 
     /// <summary>
+    /// Opens a print dialog for the page, as Ctrl+P does. It returns at once;
+    /// the person prints, or not. Any thread may call it.
+    /// </summary>
+    public void ShowPrintDialog(PrintDialog dialog = PrintDialog.Browser) => _app.Dispatch(() =>
+    {
+        if (!_closed)
+            _native?.ShowPrintDialog(dialog);
+    });
+
+    /// <summary>
+    /// Prints the page to a PDF file, as the page's print styles (<c>@media print</c>)
+    /// lay it out, replacing a file that exists. Any thread may call it.
+    /// </summary>
+    /// <param name="path">Where to write it; a relative path is from the current directory.</param>
+    /// <param name="options">How pages are laid out. Defaults to US Letter, portrait, without backgrounds.</param>
+    /// <returns>
+    /// Whether the file was written: false when the page could not be printed,
+    /// the folder does not exist, or the window closed.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">A size, margin or scale of <paramref name="options"/> cannot be printed.</exception>
+    public Task<bool> PrintToPdfAsync(string path, PdfOptions? options = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        options?.Validate();
+        var full = Path.GetFullPath(path);
+        var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_pendingPdfs)
+        {
+            if (_closed)
+                return Task.FromResult(false);
+            _pendingPdfs.Add(done);
+        }
+        _app.Dispatch(() =>
+        {
+            try
+            {
+                if (_native is { } native && !_closed)
+                    native.PrintToPdf(full, options, written => done.TrySetResult(written));
+                else
+                    done.TrySetResult(false);
+            }
+            catch (Exception e)
+            {
+                done.TrySetException(e);
+            }
+        });
+        return Forget(done.Task);
+
+        async Task<bool> Forget(Task<bool> pending)
+        {
+            try
+            {
+                return await pending.ConfigureAwait(false);
+            }
+            finally
+            {
+                lock (_pendingPdfs)
+                    _pendingPdfs.Remove(done);
+            }
+        }
+    }
+
+    /// <summary>
     /// Shows a modal dialog with <paramref name="show"/> on the UI thread, and
     /// completes with what it returns; with <paramref name="whenClosed"/> when
     /// the window is closed, or closes before the dialog shows.
@@ -150,6 +214,12 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _closed = true;
         _native = null;
         Connection.Dispose();
+        // The webview went with the window: its PDFs will never be written.
+        TaskCompletionSource<bool>[] pdfs;
+        lock (_pendingPdfs)
+            pdfs = [.. _pendingPdfs];
+        foreach (var pdf in pdfs)
+            pdf.TrySetResult(false);
         _app.WindowClosed(this);
         Closed?.Invoke(this, EventArgs.Empty);
     }

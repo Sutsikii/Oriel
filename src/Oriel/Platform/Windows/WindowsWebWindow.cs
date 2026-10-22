@@ -85,6 +85,84 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
 
     public MessageResult ShowMessage(MessageRequest request) => ShellDialogs.Message(Hwnd, request);
 
+    public void ShowPrintDialog(PrintDialog dialog)
+    {
+        if (_webview == 0)
+            return;
+        var w16 = Query(_webview, WebView2.IID_ICoreWebView2_16, "print dialogs");
+        try
+        {
+            WebView2.Printing.ShowPrintUI(w16, dialog == PrintDialog.System ? 1 : 0);
+        }
+        finally
+        {
+            Com.Release(w16);
+        }
+    }
+
+    public void PrintToPdf(string path, PdfOptions? options, Action<bool> done)
+    {
+        if (_webview == 0)
+        {
+            done(false);
+            return;
+        }
+        var w7 = Query(_webview, WebView2.IID_ICoreWebView2_7, "printing to PDF");
+        nint settings = 0;
+        nint handler = 0;
+        try
+        {
+            settings = options is null ? 0 : PrintSettings(options);
+            // Invoke(HRESULT, BOOL): the BOOL is 32 bits, whatever is above it in the register.
+            handler = ComCallback.ForResult(WebView2.IID_PrintToPdfCompletedHandler, (hr, written) => done(hr >= 0 && (int)written != 0));
+            WebView2.Printing.PrintToPdf(w7, path, settings, handler);
+        }
+        finally
+        {
+            Com.Release(handler);
+            Com.Release(settings);
+            Com.Release(w7);
+        }
+    }
+
+    private nint PrintSettings(PdfOptions options)
+    {
+        var env6 = Query(_environment, WebView2.IID_ICoreWebView2Environment6, "print settings");
+        nint settings;
+        try
+        {
+            settings = WebView2.Environment6.CreatePrintSettings(env6);
+        }
+        finally
+        {
+            Com.Release(env6);
+        }
+        try
+        {
+            WebView2.PrintSettings.SetOrientation(settings, options.Landscape ? WebView2.PrintLandscape : 0);
+            WebView2.PrintSettings.SetScale(settings, options.Scale);
+            WebView2.PrintSettings.SetPageSize(settings, options.PageWidth, options.PageHeight);
+            WebView2.PrintSettings.SetMargins(settings, options.MarginTop, options.MarginBottom, options.MarginLeft, options.MarginRight);
+            WebView2.PrintSettings.SetBackgrounds(settings, options.Backgrounds);
+            WebView2.PrintSettings.SetHeaderAndFooter(settings, options.HeaderAndFooter);
+            if (options.HeaderTitle is not null)
+                WebView2.PrintSettings.SetHeaderTitle(settings, options.HeaderTitle);
+            return settings;
+        }
+        catch
+        {
+            Com.Release(settings);
+            throw;
+        }
+    }
+
+    /// <summary>The interface <paramref name="iid"/> of <paramref name="obj"/>, which an older runtime lacks.</summary>
+    private static nint Query(nint obj, in Guid iid, string what)
+    {
+        var result = Com.QueryInterface(obj, iid);
+        return result != 0 ? result : throw new NotSupportedException($"The WebView2 Runtime is too old for {what}: update it.");
+    }
+
     public void Fail(Exception error) => _events.Failed(error);
 
     /// <summary>Destroys the window at once, as the app quits.</summary>

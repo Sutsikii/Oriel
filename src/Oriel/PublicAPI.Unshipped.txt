@@ -121,10 +121,39 @@ Oriel.OrielWindow.Name.get -> string?
 Oriel.OrielWindow.NavigationRequested -> System.EventHandler<Oriel.NavigationRequestedEventArgs!>?
 Oriel.OrielWindow.OpenDevTools() -> void
 Oriel.OrielWindow.Options.get -> Oriel.WindowOptions!
+Oriel.OrielWindow.PrintToPdfAsync(string! path, Oriel.PdfOptions? options = null) -> System.Threading.Tasks.Task<bool>!
+Oriel.OrielWindow.ShowPrintDialog(Oriel.PrintDialog dialog = Oriel.PrintDialog.Browser) -> void
 Oriel.OrielWindow.Title.get -> string!
 Oriel.OrielWindow.Title.set -> void
 Oriel.OrielWindow.Url.get -> System.Uri!
 Oriel.OrielWindow.WebViewFailed -> System.EventHandler<Oriel.WebViewFailedEventArgs!>?
+Oriel.PdfOptions
+Oriel.PdfOptions.Backgrounds.get -> bool
+Oriel.PdfOptions.Backgrounds.init -> void
+Oriel.PdfOptions.HeaderAndFooter.get -> bool
+Oriel.PdfOptions.HeaderAndFooter.init -> void
+Oriel.PdfOptions.HeaderTitle.get -> string?
+Oriel.PdfOptions.HeaderTitle.init -> void
+Oriel.PdfOptions.Landscape.get -> bool
+Oriel.PdfOptions.Landscape.init -> void
+Oriel.PdfOptions.MarginBottom.get -> double
+Oriel.PdfOptions.MarginBottom.init -> void
+Oriel.PdfOptions.MarginLeft.get -> double
+Oriel.PdfOptions.MarginLeft.init -> void
+Oriel.PdfOptions.MarginRight.get -> double
+Oriel.PdfOptions.MarginRight.init -> void
+Oriel.PdfOptions.MarginTop.get -> double
+Oriel.PdfOptions.MarginTop.init -> void
+Oriel.PdfOptions.PageHeight.get -> double
+Oriel.PdfOptions.PageHeight.init -> void
+Oriel.PdfOptions.PageWidth.get -> double
+Oriel.PdfOptions.PageWidth.init -> void
+Oriel.PdfOptions.PdfOptions() -> void
+Oriel.PdfOptions.Scale.get -> double
+Oriel.PdfOptions.Scale.init -> void
+Oriel.PrintDialog
+Oriel.PrintDialog.Browser = 0 -> Oriel.PrintDialog
+Oriel.PrintDialog.System = 1 -> Oriel.PrintDialog
 Oriel.SaveFileOptions
 Oriel.SaveFileOptions.Directory.get -> string?
 Oriel.SaveFileOptions.Directory.init -> void

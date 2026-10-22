@@ -12,6 +12,9 @@ internal static unsafe class WebView2
 {
     // Interfaces Oriel queries for.
     public static readonly Guid IID_ICoreWebView2_3 = new("A0D6DF20-3B92-416D-AA0C-437A9C727857");
+    public static readonly Guid IID_ICoreWebView2_7 = new("79C24D83-09A3-45AE-9418-487F32A58740");
+    public static readonly Guid IID_ICoreWebView2_16 = new("0EB34DC9-9F91-41E1-8639-95CD5943906B");
+    public static readonly Guid IID_ICoreWebView2Environment6 = new("E59EE362-ACBD-4857-9A8E-D3644D9459A9");
 
     // Handlers Oriel implements.
     public static readonly Guid IID_EnvironmentCompletedHandler = new("4e8a3389-c9d8-4bd2-b6b5-124fee6cc14d");
@@ -24,6 +27,10 @@ internal static unsafe class WebView2
     public static readonly Guid IID_NewWindowRequestedEventHandler = new("d4c185fe-c81c-4989-97af-2d3fa7ab5651");
     public static readonly Guid IID_PermissionRequestedEventHandler = new("15e1c6a3-c72a-4df3-91d7-d097fbec6bfd");
     public static readonly Guid IID_WebResourceRequestedEventHandler = new("ab00b74c-15f1-4646-80e8-e76341d25d71");
+    public static readonly Guid IID_PrintToPdfCompletedHandler = new("ccf1ef04-fd8e-4d5f-b2de-0983e41b8c36");
+
+    /// <summary>COREWEBVIEW2_PRINT_ORIENTATION_LANDSCAPE.</summary>
+    public const int PrintLandscape = 1;
 
     /// <summary>COREWEBVIEW2_PERMISSION_STATE_ALLOW and _DENY.</summary>
     public const int PermissionAllow = 1;
@@ -66,6 +73,78 @@ internal static unsafe class WebView2
                 Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, int, char*, char*, nint*, int>)Com.Slot(env, 4))(env, content, status, r, h, &response), "CreateWebResourceResponse");
             return response;
         }
+    }
+
+    /// <summary>ICoreWebView2Environment6, for print settings.</summary>
+    public static class Environment6
+    {
+        // 14: CreatePrintSettings(ICoreWebView2PrintSettings**)
+        public static nint CreatePrintSettings(nint env6)
+        {
+            nint settings;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(env6, 14))(env6, &settings), "CreatePrintSettings");
+            return settings;
+        }
+    }
+
+    /// <summary>ICoreWebView2PrintSettings: its put_ methods, in slot order.</summary>
+    public static class PrintSettings
+    {
+        // 4: put_Orientation(COREWEBVIEW2_PRINT_ORIENTATION)
+        public static void SetOrientation(nint s, int orientation) => SetInt(s, 4, orientation, "put_Orientation");
+
+        // 6: put_ScaleFactor(double)
+        public static void SetScale(nint s, double value) => SetDouble(s, 6, value, "put_ScaleFactor");
+
+        // 8: put_PageWidth(double), 10: put_PageHeight(double), in inches
+        public static void SetPageSize(nint s, double width, double height)
+        {
+            SetDouble(s, 8, width, "put_PageWidth");
+            SetDouble(s, 10, height, "put_PageHeight");
+        }
+
+        // 12: put_MarginTop, 14: put_MarginBottom, 16: put_MarginLeft, 18: put_MarginRight (double, inches)
+        public static void SetMargins(nint s, double top, double bottom, double left, double right)
+        {
+            SetDouble(s, 12, top, "put_MarginTop");
+            SetDouble(s, 14, bottom, "put_MarginBottom");
+            SetDouble(s, 16, left, "put_MarginLeft");
+            SetDouble(s, 18, right, "put_MarginRight");
+        }
+
+        // 20: put_ShouldPrintBackgrounds(BOOL)
+        public static void SetBackgrounds(nint s, bool value) => SetInt(s, 20, value ? 1 : 0, "put_ShouldPrintBackgrounds");
+
+        // 24: put_ShouldPrintHeaderAndFooter(BOOL)
+        public static void SetHeaderAndFooter(nint s, bool value) => SetInt(s, 24, value ? 1 : 0, "put_ShouldPrintHeaderAndFooter");
+
+        // 26: put_HeaderTitle(LPCWSTR)
+        public static void SetHeaderTitle(nint s, string title)
+        {
+            fixed (char* p = title)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, int>)Com.Slot(s, 26))(s, p), "put_HeaderTitle");
+        }
+
+        private static void SetInt(nint s, int slot, int value, string name) =>
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(s, slot))(s, value), name);
+
+        private static void SetDouble(nint s, int slot, double value, string name) =>
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, double, int>)Com.Slot(s, slot))(s, value), name);
+    }
+
+    /// <summary>ICoreWebView2_7 and ICoreWebView2_16, for printing.</summary>
+    public static class Printing
+    {
+        // ICoreWebView2_7, 80: PrintToPdf(LPCWSTR resultFilePath, ICoreWebView2PrintSettings*, handler)
+        public static void PrintToPdf(nint w7, string path, nint settings, nint handler)
+        {
+            fixed (char* p = path)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, nint, nint, int>)Com.Slot(w7, 80))(w7, p, settings, handler), "PrintToPdf");
+        }
+
+        // ICoreWebView2_16, 114: ShowPrintUI(COREWEBVIEW2_PRINT_DIALOG_KIND), BROWSER 0 and SYSTEM 1
+        public static void ShowPrintUI(nint w16, int kind) =>
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(w16, 114))(w16, kind), "ShowPrintUI");
     }
 
     /// <summary>ICoreWebView2Controller.</summary>
