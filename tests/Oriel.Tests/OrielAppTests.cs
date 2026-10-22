@@ -182,6 +182,37 @@ public class OrielAppTests
     }
 
     [Fact]
+    public async Task ReportsMessagesThatBreakTheLimits()
+    {
+        var app = new OrielApp(new AppOptions { Name = "OrielTests", AssetsDirectory = @"C:\app\wwwroot", MaxMessageLength = 100 }, _platform, null);
+        var errors = new List<Exception>();
+        app.Error += e =>
+        {
+            if (e is InvalidDataException)
+                errors.Add(e); // not the missing page, the fake has no files
+        };
+        var run = RunAsync(app, () => app.OpenWindow(new WindowOptions { Title = "Main" }));
+        await WaitUntil(() => _platform.Windows.Count == 1);
+
+        Post(app, OnlyWindow(), "https://app.oriel/", new string(' ', 101));
+        await WaitUntil(() => errors.Count == 1);
+        Assert.Equal("The page of the window \"Main\" sent a message of 101 characters, more than the 100 allowed.", errors[0].Message);
+
+        app.Quit();
+        await run;
+    }
+
+    [Theory]
+    [InlineData(0, 64, 1000)]
+    [InlineData(1000, 0, 1000)]
+    [InlineData(1000, 64, -1)]
+    public void RefusesLimitsThatAreNotPositive(int length, int depth, int calls)
+    {
+        Assert.Throws<ArgumentException>(() => new OrielApp(
+            new AppOptions { Name = "OrielTests", MaxMessageLength = length, MaxMessageDepth = depth, MaxCallsInFlight = calls }, _platform, null));
+    }
+
+    [Fact]
     public async Task IgnoresMessagesOfOtherOrigins()
     {
         var app = App();
