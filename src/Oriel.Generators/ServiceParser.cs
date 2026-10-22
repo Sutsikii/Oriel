@@ -33,6 +33,13 @@ internal static class ServiceParser
             _ => null,
         };
         var name = attribute.NamedArguments.FirstOrDefault(a => a.Key == "Name").Value.Value as string ?? type.Name;
+        // The members of ServiceConcurrency, in order: the attribute holds the value.
+        var concurrency = attribute.NamedArguments.FirstOrDefault(a => a.Key == "Concurrency").Value.Value switch
+        {
+            1 => "Serial",
+            2 => "UiThread",
+            _ => "Parallel",
+        };
         if (problem is null && !IsName(name))
             problem = $"its name '{name}' is not an identifier";
         if (problem is not null)
@@ -62,7 +69,7 @@ internal static class ServiceParser
                 events.Add(new EventDef(property.Name, "on" + property.Name, DocComments.Of(property, cancellation), payload));
         }
 
-        return new ServiceDef(TypeMapper.CSharpName(type), name, DocComments.Of(type, cancellation), methods.ToEquatableArray(), events.ToEquatableArray());
+        return new ServiceDef(TypeMapper.CSharpName(type), name, concurrency, DocComments.Of(type, cancellation), methods.ToEquatableArray(), events.ToEquatableArray());
     }
 
     /// <summary>The public <c>Event&lt;T&gt;</c> properties of a service and its bases.</summary>

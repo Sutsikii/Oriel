@@ -70,6 +70,27 @@ Pages never wait on the UI thread: each call runs on the thread pool, so a
 slow method does not freeze the window. Use the usual synchronization when
 methods share state, and `OrielApp.Dispatch` to do something on the UI thread.
 
+A service can ask for another policy with `Concurrency`:
+
+```csharp
+[Service(Concurrency = ServiceConcurrency.Serial)]
+public class Cart
+{
+    private readonly List<string> _items = []; // no lock: one call at a time
+
+    public void Add(string item) => _items.Add(item);
+}
+```
+
+| `ServiceConcurrency` | Calls |
+|---|---|
+| `Parallel` (default) | Run on the thread pool, several at once. |
+| `Serial` | Run one at a time, in the order they arrived, from all windows. An `await` inside a call keeps the next one waiting. |
+| `UiThread` | Run on the UI thread, and so do their continuations after an `await`. Keep them short: the windows wait meanwhile. |
+
+Cancellation works the same under each: a serial call whose page went away
+while it waited is not run. Events are not affected.
+
 ### Parameters Oriel passes
 
 Some parameter types are not sent by pages but passed by Oriel; they are left

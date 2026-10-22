@@ -14,12 +14,27 @@ public abstract class ServiceDispatcher
     /// <summary>Creates a dispatcher for the service called <paramref name="name"/>.</summary>
     /// <param name="name">The name pages call the service by.</param>
     protected ServiceDispatcher(string name)
+        : this(name, ServiceConcurrency.Parallel)
+    {
+    }
+
+    /// <summary>Creates a dispatcher for the service called <paramref name="name"/>.</summary>
+    /// <param name="name">The name pages call the service by.</param>
+    /// <param name="concurrency">How the service's calls run.</param>
+    protected ServiceDispatcher(string name, ServiceConcurrency concurrency)
     {
         Name = name;
+        Concurrency = concurrency;
     }
 
     /// <summary>The name pages call the service by, as in <c>Greeter.Greet</c>.</summary>
     public string Name { get; }
+
+    /// <summary>How the service's calls run.</summary>
+    public ServiceConcurrency Concurrency { get; }
+
+    /// <summary>The calls of a <see cref="ServiceConcurrency.Serial"/> service, run in turn.</summary>
+    internal Oriel.Ipc.SerialQueue Queue { get; } = new();
 
     /// <summary>
     /// Calls <paramref name="method"/> with the JSON array <paramref name="args"/>.

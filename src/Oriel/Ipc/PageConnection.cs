@@ -20,6 +20,7 @@ internal sealed class PageConnection : IDisposable
     private readonly Action<string> _post;
     private readonly OrielWindow? _window;
     private readonly PageLimits _limits;
+    private readonly Action<Action>? _dispatch;
     private readonly Lock _lock = new();
     private string? _token;
     private CancellationTokenSource _page = new();
@@ -33,12 +34,17 @@ internal sealed class PageConnection : IDisposable
     /// </param>
     /// <param name="window">The window the page is in, passed to the methods that ask for it.</param>
     /// <param name="limits">What pages may send. Defaults to the defaults of <see cref="AppOptions"/>.</param>
-    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null, PageLimits? limits = null)
+    /// <param name="dispatch">
+    /// Runs an action on the UI thread, for the calls of
+    /// <see cref="ServiceConcurrency.UiThread"/> services.
+    /// </param>
+    public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null, PageLimits? limits = null, Action<Action>? dispatch = null)
     {
         _services = services;
         _post = post;
         _window = window;
         _limits = limits ?? PageLimits.Default;
+        _dispatch = dispatch;
     }
 
     /// <summary>Raised when a call fails, with the method and the exception, before the page gets the error.</summary>
@@ -100,11 +106,14 @@ internal sealed class PageConnection : IDisposable
                 _post(Protocol.ErrorMessage(id, token, $"Too many calls at once: {_limits.MaxCallsInFlight} are running"));
                 return Task.CompletedTask;
             }
+            // A serial service's turn is taken now, so calls run in the order they arrived.
+            var service = Resolve(method, out var problem);
+            var turn = service?.Concurrency == ServiceConcurrency.Serial ? service.Queue.Enter() : null;
             return Task.Run(async () =>
             {
                 try
                 {
-                    await CallAsync(doc, id, token, method, args, cancellation).ConfigureAwait(false);
+                    await CallAsync(doc, id, token, method, service, problem, turn, args, cancellation).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -171,19 +180,37 @@ internal sealed class PageConnection : IDisposable
         return current;
     }
 
-    private async Task CallAsync(JsonDocument doc, long id, string token, string method, JsonElement args, CancellationToken cancellation)
+    /// <summary>The service <paramref name="method"/> belongs to, or null and why.</summary>
+    private ServiceDispatcher? Resolve(string method, out Exception? problem)
+    {
+        problem = null;
+        var dot = method.IndexOf('.', StringComparison.Ordinal);
+        if (dot <= 0)
+            problem = new CodecException($"'{method}' does not name a method as Service.Method");
+        else if (_services.TryGet(method[..dot], out var service))
+            return service;
+        else
+            problem = new InvalidOperationException($"No service named {method[..dot]} is bound");
+        return null;
+    }
+
+    private async Task CallAsync(JsonDocument doc, long id, string token, string method, ServiceDispatcher? service, Exception? problem,
+        Task<IDisposable>? turn, JsonElement args, CancellationToken cancellation)
     {
         string reply;
         using (doc)
+        using (turn is null ? null : await turn.ConfigureAwait(false))
         {
             try
             {
-                var dot = method.IndexOf('.', StringComparison.Ordinal);
-                if (dot <= 0)
-                    throw new CodecException($"'{method}' does not name a method as Service.Method");
-                if (!_services.TryGet(method[..dot], out var service))
-                    throw new InvalidOperationException($"No service named {method[..dot]} is bound");
-                var result = await service.InvokeAsync(method[(dot + 1)..], args, new CallContext(cancellation, _window)).ConfigureAwait(false);
+                if (service is null)
+                    throw problem!;
+                cancellation.ThrowIfCancellationRequested(); // the page went away while the call waited its turn
+                var context = new CallContext(cancellation, _window);
+                var name = method[(service.Name.Length + 1)..];
+                var result = service.Concurrency == ServiceConcurrency.UiThread && _dispatch is not null
+                    ? await OnUiThread(() => service.InvokeAsync(name, args, context)).ConfigureAwait(false)
+                    : await service.InvokeAsync(name, args, context).ConfigureAwait(false);
                 reply = Protocol.ResultMessage(id, token, result);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
@@ -209,6 +236,46 @@ internal sealed class PageConnection : IDisposable
     {
         Tracing.Write($"refused {reason}");
         MessageRefused?.Invoke(reason);
+    }
+
+    /// <summary>
+    /// Starts <paramref name="call"/> on the UI thread, with a context that
+    /// brings its continuations back there.
+    /// </summary>
+    private Task<ValueWriter?> OnUiThread(Func<ValueTask<ValueWriter?>> call)
+    {
+        var done = new TaskCompletionSource<ValueWriter?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var context = new UiSynchronizationContext(_dispatch!);
+        _dispatch!(() =>
+        {
+            var previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(context);
+            try
+            {
+                Complete(call(), done);
+            }
+            catch (Exception e)
+            {
+                done.TrySetException(e);
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
+        });
+        return done.Task;
+
+        static async void Complete(ValueTask<ValueWriter?> pending, TaskCompletionSource<ValueWriter?> done)
+        {
+            try
+            {
+                done.TrySetResult(await pending);
+            }
+            catch (Exception e)
+            {
+                done.TrySetException(e);
+            }
+        }
     }
 
     private static bool TryGetString(JsonElement obj, string name, out string value)

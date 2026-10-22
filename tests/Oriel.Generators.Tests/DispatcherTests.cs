@@ -19,6 +19,23 @@ public class DispatcherTests
         Assert.Equal("\"Hello, Ada\"", await greeter.Call("Greet", """["Ada"]"""));
     }
 
+    [Theory]
+    [InlineData("", ServiceConcurrency.Parallel)]
+    [InlineData("(Concurrency = ServiceConcurrency.Serial)", ServiceConcurrency.Serial)]
+    [InlineData("(Name = \"Windows\", Concurrency = ServiceConcurrency.UiThread)", ServiceConcurrency.UiThread)]
+    public void PassesTheConcurrencyOfTheService(string arguments, ServiceConcurrency concurrency)
+    {
+        var service = Harness.Compile($$"""
+            [Service{{arguments}}]
+            public class Shell
+            {
+                public void Hide() { }
+            }
+            """).Bind("Shell");
+
+        Assert.Equal(concurrency, service.Dispatcher.Concurrency);
+    }
+
     [Fact]
     public async Task ReturnsNothingForVoidAndTask()
     {
