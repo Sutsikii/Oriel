@@ -127,7 +127,7 @@ The same `dotnet publish` then writes `bin/installer/My-App-Setup-1.0.0.exe`.
   link above.
 - **A page calls a method and gets `window.oriel is missing`**: the page is
   open in a browser, not in an Oriel window.
-- **The build reports ORIEL001 to ORIEL005**: a type or method cannot cross
+- **The build reports ORIEL001 to ORIEL006**: a type, method or error cannot cross
   to pages; [diagnostics.md](diagnostics.md) explains each one.
 - **Anything else**: run with `ORIEL_TRACE=1` to see what the app does, step
   by step.

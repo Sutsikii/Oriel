@@ -268,48 +268,22 @@ internal sealed class TypeMapper
         return "";
     }
 
+    /// <summary>
+    /// Maps the public properties of a <c>[ServiceError]</c> exception, those
+    /// it adds to <see cref="Exception"/>, or reports why one cannot be and
+    /// returns null.
+    /// </summary>
+    public List<PropertyDef>? ErrorProperties(INamedTypeSymbol type)
+    {
+        var properties = new List<PropertyDef>();
+        return Properties(type, type, properties, [], stopAt: "System.Exception") ? properties : null;
+    }
+
     private bool DefineObject(INamedTypeSymbol type, ISymbol at, string id, string csharp, ref string reason)
     {
-        // The public properties, the most derived first.
         var properties = new List<PropertyDef>();
         var symbols = new List<IPropertySymbol>();
-        var ok = true;
-        for (var t = type; t is not null && t.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType); t = t.BaseType)
-        {
-            foreach (var property in t.GetMembers().OfType<IPropertySymbol>())
-            {
-                if (property.IsStatic || property.IsIndexer
-                    || property.DeclaredAccessibility != Accessibility.Public
-                    || property.GetMethod?.DeclaredAccessibility != Accessibility.Public
-                    || symbols.Any(s => s.Name == property.Name)
-                    || HasAttribute(property, "System.Text.Json.Serialization.JsonIgnoreAttribute"))
-                {
-                    continue;
-                }
-                var mapped = Map(property.Type, property.Locations.Any(l => l.IsInSource) ? property : at, $"property {type.Name}.{property.Name}");
-                if (mapped is null)
-                {
-                    ok = false;
-                    continue;
-                }
-                var assign = property.SetMethod switch
-                {
-                    null => Assign.None,
-                    { IsInitOnly: false, DeclaredAccessibility: Accessibility.Public } => Assign.Setter,
-                    _ => Assign.Accessor,
-                };
-                symbols.Add(property);
-                properties.Add(new PropertyDef(
-                    property.Name,
-                    StringArgument(property, "System.Text.Json.Serialization.JsonPropertyNameAttribute") ?? Names.Camel(property.Name),
-                    mapped,
-                    property.Type.ToDisplayString(s_csharp),
-                    DocComments.Of(property, _cancellation),
-                    assign,
-                    property.IsRequired));
-            }
-        }
-        if (!ok)
+        if (!Properties(type, at, properties, symbols, stopAt: null))
             return false;
 
         var constructor = ChooseConstructor(type, ref reason);
@@ -340,6 +314,55 @@ internal sealed class TypeMapper
             parameters.ToEquatableArray(),
             unsafeConstructor);
         return true;
+    }
+
+    /// <summary>
+    /// Maps the public properties of <paramref name="type"/>, the most derived
+    /// first, up to <paramref name="stopAt"/> (a base type whose own are left
+    /// out) or to <see cref="object"/>. False when one cannot be mapped.
+    /// </summary>
+    private bool Properties(INamedTypeSymbol type, ISymbol at, List<PropertyDef> properties, List<IPropertySymbol> symbols, string? stopAt)
+    {
+        var ok = true;
+        for (var t = type;
+             t is not null && t.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType) && t.ToDisplayString() != stopAt;
+             t = t.BaseType)
+        {
+            foreach (var property in t.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (property.IsStatic || property.IsIndexer
+                    || property.DeclaredAccessibility != Accessibility.Public
+                    || property.GetMethod?.DeclaredAccessibility != Accessibility.Public
+                    || symbols.Any(s => s.Name == property.Name)
+                    || (stopAt is not null && property.IsOverride) // Message and the like, sent already
+                    || HasAttribute(property, "System.Text.Json.Serialization.JsonIgnoreAttribute"))
+                {
+                    continue;
+                }
+                var mapped = Map(property.Type, property.Locations.Any(l => l.IsInSource) ? property : at, $"property {type.Name}.{property.Name}");
+                if (mapped is null)
+                {
+                    ok = false;
+                    continue;
+                }
+                var assign = property.SetMethod switch
+                {
+                    null => Assign.None,
+                    { IsInitOnly: false, DeclaredAccessibility: Accessibility.Public } => Assign.Setter,
+                    _ => Assign.Accessor,
+                };
+                symbols.Add(property);
+                properties.Add(new PropertyDef(
+                    property.Name,
+                    StringArgument(property, "System.Text.Json.Serialization.JsonPropertyNameAttribute") ?? Names.Camel(property.Name),
+                    mapped,
+                    property.Type.ToDisplayString(s_csharp),
+                    DocComments.Of(property, _cancellation),
+                    assign,
+                    property.IsRequired));
+            }
+        }
+        return ok;
     }
 
     /// <summary>

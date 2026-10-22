@@ -121,6 +121,34 @@ public class DiagnosticTests
         Assert.Equal("global::A.Item and global::B.Item would all be named Item in TypeScript; rename one of them", diagnostic.GetMessage());
     }
 
+    [Theory]
+    [InlineData("[ServiceError(\"x\")] public class E { }", "E cannot be a service error: it does not derive from System.Exception")]
+    [InlineData("[ServiceError(\"\")] public class E : Exception { }", "E cannot be a service error: its code is empty")]
+    [InlineData("[ServiceError(\"x\")] public class E<T> : Exception { }", "E cannot be a service error: it is generic")]
+    public void ReportsInvalidServiceErrors(string source, string message)
+    {
+        Assert.Equal(message, Single(source, "ORIEL006").GetMessage());
+    }
+
+    [Fact]
+    public void ReportsUnsupportedPropertiesOfServiceErrors()
+    {
+        var diagnostic = Single("[ServiceError(\"x\")] public class E : Exception { public Uri Link { get; } = null!; }", "ORIEL001");
+        Assert.Equal("property E.Link cannot be sent between C# and pages: System.Uri is not a type Oriel maps", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public void ReportsServiceErrorsOfOneCode()
+    {
+        var harness = Harness.Generate("""
+            [ServiceError("gone")] public class A : Exception { }
+            [ServiceError("gone")] public class B : Exception { }
+            """);
+        var diagnostic = Assert.Single(harness.GeneratorDiagnostics);
+        Assert.Equal("ORIEL003", diagnostic.Id);
+        Assert.Equal("global::A and global::B share the error code \"gone\"; give each its own", diagnostic.GetMessage());
+    }
+
     [Fact]
     public void KeepsTheMethodsThatAreFine()
     {

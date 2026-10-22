@@ -64,6 +64,14 @@ the message. The runtime rejects the call's promise with an `Error` named
 { "t": "error", "id": 1, "k": "3f9a…", "e": "argument 'name': expected a string, got a number" }
 ```
 
+When the method threw a `[ServiceError]` exception, `c` is its code and `d`
+its data, which the `CallError` gets as `code` and `data` (see
+[bindings.md](bindings.md#errors-pages-can-tell-apart)):
+
+```json
+{ "t": "error", "id": 1, "k": "3f9a…", "e": "/d.json changed on disk", "c": "conflict", "d": { "path": "/d.json", "version": 4 } }
+```
+
 ### `event`
 
 An `Event<T>` of a service emitted `v`. Events have no token: they go to the

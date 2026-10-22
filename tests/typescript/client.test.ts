@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 /** The call the page sent last, answered with `reply`. */
-function answer(reply: { v?: unknown; e?: string }): Message {
+function answer(reply: { v?: unknown; e?: string; c?: string; d?: unknown }): Message {
   const call = sent.at(-1)!;
   page.receive({ t: reply.e === undefined ? "result" : "error", id: call.id, k: page.token, ...reply });
   return call;
@@ -60,6 +60,20 @@ test("rejects with a CallError when the method fails", async () => {
     assert.ok(err instanceof CallError);
     assert.equal(err.method, "Decks.Open");
     assert.equal(err.message, "no such deck");
+    assert.equal(err.code, null);
+    assert.equal(err.data, null);
+    return true;
+  });
+});
+
+test("rejects with the code and data of a service error", async () => {
+  const saved = Decks.save("/d.json", { title: "D" } as never);
+  await Promise.resolve();
+  answer({ e: "/d.json changed", c: "conflict", d: { path: "/d.json", version: 4 } });
+  await assert.rejects(saved, (err: unknown) => {
+    assert.ok(err instanceof CallError);
+    assert.equal(err.code, "conflict");
+    assert.deepEqual(err.data, { path: "/d.json", version: 4 });
     return true;
   });
 });

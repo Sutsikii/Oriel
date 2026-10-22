@@ -208,25 +208,54 @@ bound, and reaches the pages that have loaded.
 
 ## Errors
 
-A method that throws rejects the page's promise with a `CallError` carrying
-the exception's message. So do calls whose arguments do not fit, with the
-path of the value that did not:
+A method that throws rejects the page's promise with a `CallError`. So do
+calls whose arguments do not fit, with the path of the value that did not:
 
 ```
 argument 'deck': $.slides[2].title: expected a string, got a number
+```
+
+### Errors pages can tell apart
+
+Mark an exception with `[ServiceError("code")]`: pages get its code, and its
+public properties as `data`.
+
+```csharp
+[ServiceError("conflict")]
+public class ConflictException(string path, int version) : Exception($"{path} changed on disk")
+{
+    public string Path { get; } = path;
+    public int Version { get; } = version;
+}
 ```
 
 ```ts
 import { CallError, Decks } from "./oriel";
 
 try {
-  await Decks.open(path);
+  await Decks.save(path, deck);
 } catch (err) {
-  if (err instanceof CallError) showError(err.message);
+  if (err instanceof CallError && err.code === "conflict") {
+    reload(err.data.path, err.data.version); // err.data is a ConflictException
+  } else if (err instanceof CallError) {
+    showError(err.message);
+  }
 }
 ```
 
-`OrielApp.CallFailed` is raised in C# for every failed call, for logging.
+The client's `CallError` is a union of the app's errors, by code: checking
+`err.code` gives `err.data` its type. Other errors have a `code` and `data`
+of `null`. Exceptions derived from a `[ServiceError]` one have its code.
+
+### Messages of unexpected exceptions
+
+Other exceptions may tell about the app's internals in their messages: file
+paths, SQL. Outside development, pages get `"Service.Method failed"`
+instead. In development, and for calls that did not fit (wrong arguments,
+unknown methods), they get the message.
+
+`OrielApp.CallFailed` is raised in C# for every failed call, with the whole
+exception, for logging.
 
 ## The TypeScript client
 

@@ -36,6 +36,14 @@ public class TypeScriptTests
             public int SlideCount => Slides.Count;
         }
 
+        /// <summary>The deck changed on disk since it was opened.</summary>
+        [ServiceError("conflict")]
+        public class ConflictException(string path, int version) : Exception($"{path} changed")
+        {
+            public string Path { get; } = path;
+            public int Version { get; } = version;
+        }
+
         /// <summary>Opens, saves and searches decks.</summary>
         [Service]
         public class Decks

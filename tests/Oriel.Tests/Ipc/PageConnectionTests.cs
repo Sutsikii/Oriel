@@ -91,6 +91,74 @@ public class PageConnectionTests
         Assert.Equal(error, reply.RootElement.GetProperty("e").GetString());
     }
 
+    /// <summary>An error pages can tell apart, registered as the generator would.</summary>
+    private sealed class LockedException(string user) : Exception("C:\\data\\deck.json is locked")
+    {
+        public string User { get; } = user;
+    }
+
+    static PageConnectionTests()
+    {
+        ServiceRegistry.RegisterError<LockedException>("locked", (w, e) =>
+        {
+            w.WriteStartObject();
+            w.WriteString("user", e.User);
+            w.WriteEndObject();
+        });
+    }
+
+    [Fact]
+    public async Task RepliesWithTheCodeAndDataOfServiceErrors()
+    {
+        var services = new ServiceTable();
+        services.Add(new Throwing(new LockedException("ada")));
+        using var page = new PageConnection(services, _posted.Enqueue, showExceptionMessages: false);
+
+        await page.ReceiveAsync(Call(1, "Throwing.Run", "[]"));
+        Assert.Equal("""{"t":"error","id":1,"k":"page1","e":"C:\\data\\deck.json is locked","c":"locked","d":{"user":"ada"}}""", Single());
+    }
+
+    [Theory]
+    [InlineData(true, "no luck")]
+    [InlineData(false, "Throwing.Run failed")]
+    public async Task HidesTheMessagesOfUnexpectedExceptionsOutsideDevelopment(bool show, string message)
+    {
+        var services = new ServiceTable();
+        services.Add(new Throwing(new InvalidOperationException("no luck")));
+        using var page = new PageConnection(services, _posted.Enqueue, showExceptionMessages: show);
+        var failures = new List<Exception>();
+        page.CallFailed += (_, e) => failures.Add(e);
+
+        await page.ReceiveAsync(Call(1, "Throwing.Run", "[]"));
+        Assert.Equal($$"""{"t":"error","id":1,"k":"page1","e":"{{message}}"}""", Single());
+        Assert.Equal("no luck", Assert.Single(failures).Message); // the app still gets everything
+    }
+
+    [Theory]
+    [InlineData("Calc.Nope", "[]", "Calc has no method Nope")]
+    [InlineData("Other.Add", "[]", "No service named Other is bound")]
+    [InlineData("Add", "[]", "'Add' does not name a method as Service.Method")]
+    [InlineData("Calc.Add", "[1,\"2\"]", "argument 'b': expected a number, got a string")]
+    public async Task KeepsTheMessagesOfCallsThatDidNotFitOutsideDevelopment(string method, string args, string error)
+    {
+        using var page = new PageConnection(Services(), _posted.Enqueue, showExceptionMessages: false);
+        await page.ReceiveAsync(Call(1, method, args));
+        using var reply = JsonDocument.Parse(Single());
+        Assert.Equal(error, reply.RootElement.GetProperty("e").GetString());
+    }
+
+    private static ServiceTable Services()
+    {
+        var services = new ServiceTable();
+        services.Add(new Calculator());
+        return services;
+    }
+
+    private sealed class Throwing(Exception error) : ServiceDispatcher("Throwing")
+    {
+        public override ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context) => throw error;
+    }
+
     [Fact]
     public async Task ReportsFailedCalls()
     {
@@ -180,13 +248,6 @@ public class PageConnectionTests
         _posted.Clear();
         await page.ReceiveAsync(Call(4, "Calc.Add", "[1,2]"));
         Assert.Contains("\"v\":3", Single());
-    }
-
-    private ServiceTable Services()
-    {
-        var services = new ServiceTable();
-        services.Add(new Calculator());
-        return services;
     }
 
     [Fact]

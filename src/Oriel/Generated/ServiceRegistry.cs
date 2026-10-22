@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace Oriel.Generated;
 
@@ -12,6 +13,7 @@ namespace Oriel.Generated;
 public static class ServiceRegistry
 {
     private static readonly ConcurrentDictionary<Type, Func<object, ServiceDispatcher>> s_factories = new();
+    private static readonly ConcurrentDictionary<Type, (string Code, Action<Utf8JsonWriter, Exception> Write)> s_errors = new();
 
     /// <summary>Records how to make the dispatcher of services of type <typeparamref name="T"/>.</summary>
     public static void Register<T>(Func<T, ServiceDispatcher> factory)
@@ -19,6 +21,39 @@ public static class ServiceRegistry
     {
         ArgumentNullException.ThrowIfNull(factory);
         s_factories[typeof(T)] = service => factory((T)service);
+    }
+
+    /// <summary>
+    /// Records that exceptions of type <typeparamref name="T"/> reach pages as
+    /// errors of <paramref name="code"/>, with the data <paramref name="write"/> writes.
+    /// </summary>
+    public static void RegisterError<T>(string code, Action<Utf8JsonWriter, T> write)
+        where T : Exception
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        ArgumentNullException.ThrowIfNull(write);
+        s_errors[typeof(T)] = (code, (writer, e) => write(writer, (T)e));
+    }
+
+    /// <summary>
+    /// The code and data of <paramref name="error"/>, when its type or a base
+    /// type of it is a <see cref="ServiceErrorAttribute"/> exception.
+    /// </summary>
+    internal static bool TryGetError(Exception error, out string code, out ValueWriter data)
+    {
+        for (var type = error.GetType(); type is not null && type != typeof(Exception); type = type.BaseType)
+        {
+            if (s_errors.TryGetValue(type, out var registered))
+            {
+                code = registered.Code;
+                var write = registered.Write;
+                data = writer => write(writer, error);
+                return true;
+            }
+        }
+        code = "";
+        data = null!;
+        return false;
     }
 
     /// <summary>Makes the dispatcher of <paramref name="service"/>, by its exact type.</summary>
