@@ -145,6 +145,12 @@ with Win32 and WebView2:
   WebView2 controller: it injects `bridge.js` at document start, maps
   `https://app.oriel/` to the app's files, and forwards messages and title
   changes.
+- **`ShellDialogs`** shows the file dialogs (`IFileOpenDialog`,
+  `IFileSaveDialog`, by slot of `ShObjIdl_core.h`, as `WebView2` does)
+  and message boxes, owned by a window. `Show` runs a modal loop on the UI
+  thread: posted actions, and so calls of `UiThread` services, still run
+  meanwhile. What dialogs show is resolved in shared code (`Dialogs`), and
+  tested against the fake backend.
 
 ### When the webview fails
 

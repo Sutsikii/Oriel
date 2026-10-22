@@ -77,4 +77,30 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
     public void Recreate() => Recreations++;
 
     public void ShowErrorPage(string html) => ErrorPage = html;
+
+    /// <summary>The dialogs shown, in order.</summary>
+    public ConcurrentQueue<object> Dialogs { get; } = new();
+
+    /// <summary>What the next file dialogs answer; canceled by default.</summary>
+    public Func<FileDialogRequest, IReadOnlyList<string>?> FileDialogAnswer { get; set; } = _ => null;
+
+    /// <summary>What the next message boxes answer.</summary>
+    public MessageResult MessageAnswer { get; set; } = MessageResult.Ok;
+
+    /// <summary>The thread the last dialog showed on.</summary>
+    public int? DialogThread { get; private set; }
+
+    public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request)
+    {
+        DialogThread = Environment.CurrentManagedThreadId;
+        Dialogs.Enqueue(request);
+        return FileDialogAnswer(request);
+    }
+
+    public MessageResult ShowMessage(MessageRequest request)
+    {
+        DialogThread = Environment.CurrentManagedThreadId;
+        Dialogs.Enqueue(request);
+        return MessageAnswer;
+    }
 }

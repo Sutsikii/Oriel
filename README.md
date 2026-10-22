@@ -74,7 +74,7 @@ most of an app's footprint, as in every webview-based framework.
 
 Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
 Runtime; Linux and macOS are planned. The calls, events, generator, Windows
-backend and installers are done and tested; dialogs, menus, signing and a CLI
+backend, dialogs and installers are done and tested; menus, signing and a CLI
 are next. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
@@ -83,6 +83,8 @@ are next. See the [roadmap](docs/roadmap.md).
   native executable.
 - [Services and the TypeScript client](docs/bindings.md): what pages can
   call, and how types map.
+- [Dialogs](docs/dialogs.md): files to open, where to save, folders and
+  messages, modal to a window.
 - [Building and shipping](docs/build.md): build properties, development
   loop, publishing.
 - [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL006, and
