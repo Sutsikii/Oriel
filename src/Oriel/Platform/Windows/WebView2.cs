@@ -23,6 +23,7 @@ internal static unsafe class WebView2
     public static readonly Guid IID_NavigationStartingEventHandler = new("9adbe429-f36d-432b-9ddc-f8881fbd76e3");
     public static readonly Guid IID_NewWindowRequestedEventHandler = new("d4c185fe-c81c-4989-97af-2d3fa7ab5651");
     public static readonly Guid IID_PermissionRequestedEventHandler = new("15e1c6a3-c72a-4df3-91d7-d097fbec6bfd");
+    public static readonly Guid IID_WebResourceRequestedEventHandler = new("ab00b74c-15f1-4646-80e8-e76341d25d71");
 
     /// <summary>COREWEBVIEW2_PERMISSION_STATE_ALLOW and _DENY.</summary>
     public const int PermissionAllow = 1;
@@ -33,6 +34,9 @@ internal static unsafe class WebView2
 
     /// <summary>COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC.</summary>
     public const int MoveFocusProgrammatic = 0;
+
+    /// <summary>COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL.</summary>
+    public const int WebResourceContextAll = 0;
 
     /// <summary>
     /// Starts creating an environment with the runtime's client library:
@@ -52,6 +56,16 @@ internal static unsafe class WebView2
         // 3: CreateCoreWebView2Controller(HWND parentWindow, handler)
         public static void CreateController(nint env, nint hwnd, nint handler) =>
             Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, nint, int>)Com.Slot(env, 3))(env, hwnd, handler), "CreateCoreWebView2Controller");
+
+        // 4: CreateWebResourceResponse(IStream* content, int statusCode, LPCWSTR reasonPhrase, LPCWSTR headers, ICoreWebView2WebResourceResponse**)
+        public static nint CreateWebResourceResponse(nint env, nint content, int status, string reason, string headers)
+        {
+            nint response;
+            fixed (char* r = reason)
+            fixed (char* h = headers)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, int, char*, char*, nint*, int>)Com.Slot(env, 4))(env, content, status, r, h, &response), "CreateWebResourceResponse");
+            return response;
+        }
     }
 
     /// <summary>ICoreWebView2Controller.</summary>
@@ -119,6 +133,16 @@ internal static unsafe class WebView2
 
         // 44: add_NewWindowRequested(handler, EventRegistrationToken*)
         public static void AddNewWindowRequested(nint w, nint handler) => Add(w, 44, handler, "add_NewWindowRequested");
+
+        // 55: add_WebResourceRequested(handler, EventRegistrationToken*)
+        public static void AddWebResourceRequested(nint w, nint handler) => Add(w, 55, handler, "add_WebResourceRequested");
+
+        // 57: AddWebResourceRequestedFilter(LPCWSTR uri, COREWEBVIEW2_WEB_RESOURCE_CONTEXT)
+        public static void AddWebResourceRequestedFilter(nint w, string uri, int context)
+        {
+            fixed (char* p = uri)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, int, int>)Com.Slot(w, 57))(w, p, context), "AddWebResourceRequestedFilter");
+        }
 
         /// <summary>Calls the add_ method of an event in <paramref name="slot"/>; Oriel never removes its handlers, which go with the webview.</summary>
         private static void Add(nint w, int slot, nint handler, string name)
@@ -315,6 +339,29 @@ internal static unsafe class WebView2
             6 => WebViewFailure.GpuExited,
             _ => WebViewFailure.Other,
         };
+    }
+
+    /// <summary>ICoreWebView2WebResourceRequestedEventArgs.</summary>
+    public static class WebResourceRequestedEventArgs
+    {
+        // 3: get_Request(ICoreWebView2WebResourceRequest**); its 3: get_Uri(LPWSTR*)
+        public static string GetUri(nint a)
+        {
+            nint request;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(a, 3))(a, &request), "get_Request");
+            try
+            {
+                return GetString(request, 3, "get_Uri");
+            }
+            finally
+            {
+                Com.Release(request);
+            }
+        }
+
+        // 5: put_Response(ICoreWebView2WebResourceResponse*)
+        public static void SetResponse(nint a, nint response) =>
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, int>)Com.Slot(a, 5))(a, response), "put_Response");
     }
 
     /// <summary>ICoreWebView2WebMessageReceivedEventArgs.</summary>

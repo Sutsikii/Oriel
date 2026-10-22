@@ -9,6 +9,7 @@ are set with properties of the app's project.
 |---|---|---|
 | `OrielTypeScriptOutput` | empty | After each build, the TypeScript client is written to this path, relative to the project. Empty: not written. |
 | `OrielFrontendDist` | empty | The folder of the built frontend, copied to `wwwroot` beside the executable on build and publish. Files an earlier publish left in the published `wwwroot` are deleted. |
+| `OrielEmbedFrontend` | `false` | Embeds the frontend in the assembly instead of copying it to `wwwroot`: see [A single file](#a-single-file). |
 | `OrielFrontendDirectory` | `frontend` | The folder of the frontend's sources, where `OrielFrontendBuildCommand` runs. |
 | `OrielFrontendBuildCommand` | empty | Run before the frontend is copied, in Release builds only: for instance `npm run build`. |
 
@@ -83,6 +84,22 @@ on the .NET runtime, installed or bundled (`--self-contained`).
 Oriel itself has no native dependency: it finds the WebView2 Runtime as the
 official loader does, so there is no `WebView2Loader.dll` to ship. Users need
 the runtime, which Windows 11 has; installers can bootstrap it on Windows 10.
+
+### A single file
+
+With `OrielEmbedFrontend`, the frontend is embedded in the executable
+instead of copied to `wwwroot`. The app has no folder to lose or edit, and
+ships as one file:
+
+```xml
+<OrielEmbedFrontend>true</OrielEmbedFrontend>
+```
+
+Pages are served from the executable at the same `https://app.oriel/`, with
+the content type of each file (html, js, css, svg, wasm, fonts, images…).
+While developing, the dev server serves them as before. An app can also
+serve a frontend embedded in another assembly with
+`AppOptions.AssetsAssembly`; an `AssetsDirectory` it sets wins over both.
 
 ## Installers
 

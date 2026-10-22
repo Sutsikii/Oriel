@@ -101,5 +101,6 @@ internal sealed record PlatformWindowOptions(
     string BridgeScript,
     bool DevTools,
     string? AssetsFolder,
+    EmbeddedFrontend? EmbeddedAssets,
     string? ErrorPage,
     string UserDataFolder);

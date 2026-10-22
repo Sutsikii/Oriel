@@ -283,4 +283,36 @@ public sealed class EndToEndTests : IDisposable
 
         Assert.Equal("""{"served":true}""", report);
     }
+
+    [EndToEndFact]
+    public async Task ServesAFrontendEmbeddedInTheExecutable()
+    {
+        // The test assembly embeds Embedded/ as OrielEmbedFrontend would: no folder at all.
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsAssembly = typeof(Probe).Assembly });
+        var probe = new Probe();
+        app.Bind(probe);
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        var run = Task.Run(() => app.Run(() => app.OpenWindow(new WindowOptions { Width = 400, Height = 300 })));
+
+        var report = await probe.Reported.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        foreach (var open in app.Windows)
+            open.Close();
+        Assert.Equal(0, await run.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Empty(errors);
+
+        Assert.DoesNotContain("page error", report);
+        using var results = System.Text.Json.JsonDocument.Parse(report);
+        var types = results.RootElement.GetProperty("types");
+        Assert.Equal("200 text/html; charset=utf-8", types.GetProperty("index.html").GetString());
+        Assert.Equal("200 text/javascript; charset=utf-8", types.GetProperty("app.js").GetString());
+        Assert.Equal("200 text/css; charset=utf-8", types.GetProperty("assets/style.css").GetString());
+        Assert.Equal("200 image/svg+xml", types.GetProperty("assets/pic.svg").GetString());
+        Assert.Equal("200 application/wasm", types.GetProperty("assets/empty.wasm").GetString());
+        Assert.Equal("200 font/woff2", types.GetProperty("assets/font.woff2").GetString());
+        Assert.Equal(404, results.RootElement.GetProperty("missing").GetInt32());
+        Assert.True(results.RootElement.GetProperty("wasm").GetBoolean());
+        Assert.Equal("rgb(1, 2, 3)", results.RootElement.GetProperty("color").GetString());
+        Assert.Equal("https://app.oriel", results.RootElement.GetProperty("origin").GetString());
+    }
 }

@@ -212,7 +212,9 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             Com.Release(settings);
         }
 
-        if (_options.AssetsFolder is not null)
+        if (_options.EmbeddedAssets is { } embedded)
+            ServeEmbedded(embedded);
+        else if (_options.AssetsFolder is not null)
             WebView2.WebView.SetVirtualHostNameToFolderMapping(_webview, Frontend.AppHost, Path.GetFullPath(_options.AssetsFolder));
 
         Subscribe(WebView2.IID_WebMessageReceivedEventHandler, WebView2.WebView.AddWebMessageReceived, (_, args) =>
@@ -282,6 +284,52 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         }
         Tracing.Write($"window {Hwnd:X} navigates to {_options.Url}");
         WebView2.WebView.Navigate(_webview, _options.Url.AbsoluteUri);
+    }
+
+    /// <summary>
+    /// Answers the requests for the app's files with the frontend embedded in
+    /// it: the webview asks before going to the network, which has no
+    /// app.oriel anyway.
+    /// </summary>
+    private void ServeEmbedded(EmbeddedFrontend embedded)
+    {
+        WebView2.WebView.AddWebResourceRequestedFilter(_webview, Frontend.AppOrigin + "/*", WebView2.WebResourceContextAll);
+        Subscribe(WebView2.IID_WebResourceRequestedEventHandler, WebView2.WebView.AddWebResourceRequested, (_, args) =>
+        {
+            var uri = new Uri(WebView2.WebResourceRequestedEventArgs.GetUri(args));
+            var file = embedded.Read(uri.AbsolutePath);
+            Tracing.Write($"window {Hwnd:X} serves {uri.AbsolutePath} from the executable{(file is null ? ": not found" : "")}");
+
+            nint stream = 0;
+            if (file is not null)
+            {
+                fixed (byte* bytes = file)
+                    stream = Win32.SHCreateMemStream(bytes, (uint)file.Length);
+                if (stream == 0)
+                    throw new OutOfMemoryException($"No memory for {uri.AbsolutePath}");
+            }
+            try
+            {
+                // The files change only with the executable: no-cache makes the webview ask again, which costs nothing.
+                var headers = file is null
+                    ? "Content-Type: text/plain; charset=utf-8"
+                    : $"Content-Type: {EmbeddedFrontend.ContentType(uri.AbsolutePath)}\r\nCache-Control: no-cache";
+                var response = WebView2.Environment.CreateWebResourceResponse(
+                    _environment, stream, file is null ? 404 : 200, file is null ? "Not Found" : "OK", headers);
+                try
+                {
+                    WebView2.WebResourceRequestedEventArgs.SetResponse(args, response);
+                }
+                finally
+                {
+                    Com.Release(response);
+                }
+            }
+            finally
+            {
+                Com.Release(stream);
+            }
+        });
     }
 
     private void Subscribe(in Guid iid, Action<nint, nint> add, Action<nint, nint> handle)

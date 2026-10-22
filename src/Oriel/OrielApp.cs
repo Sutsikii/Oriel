@@ -46,7 +46,10 @@ public sealed class OrielApp : IEventSink
         Options = options;
         _platform = platform;
         Time = time ?? TimeProvider.System;
-        Frontend = new Frontend(devUrl, options.AssetsDirectory ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"));
+        Frontend = new Frontend(
+            devUrl,
+            options.AssetsDirectory ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+            options.AssetsDirectory is null ? EmbeddedFrontend.From(options.AssetsAssembly ?? Assembly.GetEntryAssembly()) : null);
     }
 
     /// <summary>The options the app was created with.</summary>
@@ -172,7 +175,8 @@ public sealed class OrielApp : IEventSink
             window.Url,
             BridgeScript.Source,
             options.DevTools ?? IsDev,
-            IsDev ? null : Frontend.AssetsFolder,
+            IsDev || Frontend.Embedded is not null ? null : Frontend.AssetsFolder,
+            IsDev ? null : Frontend.Embedded,
             missing is null ? null : MissingPage(window.Url, missing),
             Path.Combine(DataFolder(Environment.SpecialFolder.LocalApplicationData), "WebView"));
         Dispatch(() => window.Open(_platform, native));

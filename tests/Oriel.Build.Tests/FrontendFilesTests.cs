@@ -49,6 +49,27 @@ public sealed class FrontendFilesTests : IDisposable
         Assert.Equal(["assets/app-2.js", "extra.txt", "index.html"], Files(Path.Combine(_dir, "publish", "wwwroot")));
     }
 
+    [Fact]
+    public void EmbedsTheFrontendInsteadOfCopyingItWithOrielEmbedFrontend()
+    {
+        Publish("-p:OrielEmbedFrontend=true");
+
+        // Only the app's own file is left in wwwroot.
+        Assert.Equal(["extra.txt"], Files(Path.Combine(_dir, "publish", "wwwroot")));
+        Assert.Equal(["oriel-frontend/assets/app-1.js", "oriel-frontend/index.html"], Resources(Path.Combine(_dir, "publish", "App.dll")));
+    }
+
+    /// <summary>The names of the resources of an assembly, read without loading it, with / for separators.</summary>
+    private static string[] Resources(string assembly)
+    {
+        using var stream = File.OpenRead(assembly);
+        using var pe = new System.Reflection.PortableExecutable.PEReader(stream);
+        var metadata = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
+        return [.. metadata.ManifestResources
+            .Select(handle => metadata.GetString(metadata.GetManifestResource(handle).Name).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal)];
+    }
+
     private void Publish(string options)
     {
         var dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } host ? host : "dotnet";
