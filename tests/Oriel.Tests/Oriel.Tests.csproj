@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Oriel\Oriel.csproj" />
+    <ProjectReference Include="..\..\src\Oriel.Hosting\Oriel.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

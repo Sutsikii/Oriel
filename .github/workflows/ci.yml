@@ -103,7 +103,9 @@ jobs:
           global-json-file: global.json
 
       - name: Pack
-        run: dotnet pack src/Oriel -c Release -o artifacts/packages
+        run: |
+          dotnet pack src/Oriel -c Release -o artifacts/packages
+          dotnet pack src/Oriel.Hosting -c Release -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:

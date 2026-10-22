@@ -128,6 +128,28 @@ public sealed class OrielApp : IEventSink
     }
 
     /// <summary>
+    /// Lets pages call the methods of <typeparamref name="T"/>, a
+    /// <see cref="ServiceAttribute"/> class, with an instance made for each
+    /// call by <paramref name="lease"/>, which gets the calling window. The
+    /// lease's release runs once the call is done and its result written.
+    /// For instances per call or per window, such as services of a dependency
+    /// injection container in a scope; Oriel.Hosting binds services so.
+    /// </summary>
+    /// <remarks>
+    /// Events are not connected: an instance per call has no one to tell.
+    /// Declare events on a service bound once, with <see cref="Bind(object)"/>.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The class has no generated dispatcher, or another service has its name.
+    /// </exception>
+    public void Bind<T>(Func<OrielWindow?, ServiceLease<T>> lease)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(lease);
+        Services.Add(new LeasedDispatcher<T>(ServiceRegistry.Create(typeof(T), null), lease));
+    }
+
+    /// <summary>
     /// Runs the app until it quits: calls <paramref name="ready"/> on the UI
     /// thread once it can open windows, then handles events. Windows run on a
     /// UI thread of Oriel's, not on the calling thread.

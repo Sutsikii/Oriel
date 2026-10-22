@@ -35,6 +35,7 @@ src/
       IPlatform.cs          the contract of a backend
       Windows/              Win32 and WebView2
     build/                  MSBuild props and targets, shipped in the package
+  Oriel.Hosting/            apps on the .NET Generic Host: DI, ILogger, hosted services
   Oriel.Generators/         the source generator (netstandard2.0)
   Oriel.Build/              the MSBuild tasks of apps: the installer script (netstandard2.0)
 tests/

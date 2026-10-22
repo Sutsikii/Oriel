@@ -254,6 +254,57 @@ public class OrielAppTests
         await run;
     }
 
+    private sealed class Release(List<string> log) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync()
+        {
+            log.Add("released");
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task LeasesAnInstanceForEachCallAndReleasesItAfter()
+    {
+        var app = App();
+        var log = new List<string>();
+        var windows = new List<OrielWindow?>();
+        app.Bind<Greeter>(window =>
+        {
+            windows.Add(window);
+            log.Add("leased");
+            return new ServiceLease<Greeter>(new Greeter(), new Release(log));
+        });
+        OrielWindow? opened = null;
+        var run = RunAsync(app, () => opened = app.OpenWindow());
+        await WaitUntil(() => _platform.Windows.Count == 1);
+        var native = OnlyWindow();
+
+        Post(app, native, "https://app.oriel/", """{"t":"call","id":1,"k":"p","m":"Greeter.Greet","a":["Ada"]}""");
+        Assert.Equal("""{"t":"result","id":1,"k":"p","v":"Hello, Ada"}""", await NextReply(native));
+        Post(app, native, "https://app.oriel/", """{"t":"call","id":2,"k":"p","m":"Greeter.Greet","a":["Grace"]}""");
+        Assert.Equal("""{"t":"result","id":2,"k":"p","v":"Hello, Grace"}""", await NextReply(native));
+
+        Assert.Equal(["leased", "released", "leased", "released"], log);
+        Assert.All(windows, w => Assert.Same(opened, w));
+        app.Quit();
+        await run;
+    }
+
+    [Fact]
+    public async Task FailsTheCallsOfALeaseWithoutAnInstance()
+    {
+        var app = App();
+        app.Bind<Greeter>(_ => default);
+        var run = RunAsync(app, () => app.OpenWindow());
+        await WaitUntil(() => _platform.Windows.Count == 1);
+
+        Post(app, OnlyWindow(), "https://app.oriel/", """{"t":"call","id":1,"k":"p","m":"Greeter.Greet","a":["Ada"]}""");
+        Assert.StartsWith("""{"t":"error","id":1""", await NextReply(OnlyWindow()));
+        app.Quit();
+        await run;
+    }
+
     [Fact]
     public async Task SendsAnEventToOneWindowOnly()
     {

@@ -1,15 +1,20 @@
 using ChessNextMove;
+using Microsoft.Extensions.DependencyInjection;
 using Oriel;
+using Oriel.Hosting;
 
-var app = new OrielApp(new AppOptions { Name = "Chess Next Move" });
-using var engine = new Engine(Engine.Locate());
-app.Bind(engine);
+var builder = OrielApp.CreateBuilder(args);
+builder.Options = new AppOptions { Name = "Chess Next Move" };
+// The engine's process is stopped when the container disposes it, as the app quits.
+builder.Services.AddSingleton(_ => new Engine(Engine.Locate()));
+builder.Services.AddOrielService<Engine>();
 
-// The engine's process is stopped when it is disposed, as the app quits.
-return app.Run(() => app.OpenWindow(new WindowOptions
+await using var app = builder.Build();
+app.OpenWindow(new WindowOptions
 {
     Width = 1180,
     Height = 800,
     MinWidth = 760,
     MinHeight = 560,
-}));
+});
+return await app.RunAsync();

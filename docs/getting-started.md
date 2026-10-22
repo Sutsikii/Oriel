@@ -70,6 +70,10 @@ app.Bind(new Greeter());
 return app.Run(() => app.OpenWindow(new WindowOptions { Width = 800, Height = 600 }));
 ```
 
+For services from dependency injection, `ILogger` and configuration, run
+the app on the .NET Generic Host with the `Oriel.Hosting` package: see
+[hosting.md](hosting.md).
+
 ## 3. The page
 
 Build the project once (`dotnet build`): Oriel writes the TypeScript client to

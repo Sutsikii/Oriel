@@ -22,6 +22,9 @@ self-contained piece of work.
 - Native dialogs, modal to a window: open one or several files, save,
   pick a folder, message boxes.
 - Printing: print dialogs, and pages to PDF files with their layout.
+- `Oriel.Hosting`: apps on the .NET Generic Host, with services from
+  dependency injection (for the app, per window, per call), `ILogger`,
+  configuration and hosted services.
 
 ## Next
 
