@@ -145,6 +145,11 @@ JSON has no `undefined`: an argument left out between others is sent as
 | An enum | A union of its names: `"light" \| "dark"` | the name, as a string |
 | A class, record or struct | An `interface` of its public properties | object |
 
+A JavaScript string may hold a lone surrogate, half of an emoji left by
+cutting a text with `slice`; .NET reads no string from it. A call with
+one fails as an argument that does not fit ("expected a string, got one
+with a lone surrogate"), in a string or in a property name.
+
 Names are camelCase in JSON and TypeScript (`URLPath` becomes `urlPath`),
 as System.Text.Json writes them. The usual System.Text.Json attributes are
 honored:

@@ -56,7 +56,8 @@ nothing.
 ### `error`
 
 The call `id` failed: the method threw, or the arguments did not fit. `e` is
-the message. The runtime rejects the call's promise with an `Error` named
+the message, a string; were it anything else, the runtime would use
+`"Service.Method failed"`. The runtime rejects the call's promise with an `Error` named
 `CallError` with a `method` property; the generated client rethrows it as its
 `CallError` class.
 
