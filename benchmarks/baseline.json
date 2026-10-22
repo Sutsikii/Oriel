@@ -1,0 +1,13 @@
+{
+  "factor": 3,
+  "values": {
+    "DispatchAdd": 89.146,
+    "DispatchDeck": 9082.581,
+    "EncodeEvent": 131.92,
+    "ProtocolAdd": 1677.841,
+    "ProtocolDeck": 22620.256,
+    "RoundTrip.callsPerSecond": 75075.075,
+    "RoundTrip.p50Ms": 0.12,
+    "RoundTrip.p99Ms": 0.51
+  }
+}

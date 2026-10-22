@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Oriel.Benchmarks/Oriel.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Oriel.Build/Oriel.Build.csproj" />
     <Project Path="src/Oriel.Generators/Oriel.Generators.csproj" />

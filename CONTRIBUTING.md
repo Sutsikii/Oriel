@@ -32,6 +32,7 @@ the [roadmap](docs/roadmap.md).
 | Page runtime (`bridge.js`) | `node --test "tests/bridge/*.test.cjs"` |
 | Generated TypeScript (type-checked with `tsc --strict`, then run) | `cd tests/typescript && npm ci && npm test` |
 | Real windows | `ORIEL_E2E=1 dotnet test tests/Oriel.EndToEnd.Tests` |
+| What a call costs | see [benchmarks/README.md](benchmarks/README.md) (in CI too) |
 
 All of them run in CI. The end-to-end tests open windows for a few seconds
 each, so they are skipped unless `ORIEL_E2E=1`.

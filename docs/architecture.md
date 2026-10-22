@@ -19,6 +19,8 @@ the generator or a platform backend.
 ## Repository layout
 
 ```
+benchmarks/
+  Oriel.Benchmarks/         what a call costs, in process and in a real window
 src/
   Oriel/                    the library apps reference
     OrielApp.cs             the app: services, windows, event loop, events
@@ -70,6 +72,27 @@ page                         app (thread pool)                      service
    method, and returns a writer of the result.
 6. The reply is posted back to the page on the UI thread, unless the page went
    away meanwhile.
+
+### What a call costs
+
+Measured by [benchmarks/](../benchmarks/README.md) on an AMD Ryzen 7 8700G,
+Windows 11, .NET 10, WebView2 155; CI checks each change against these
+numbers (`benchmarks/baseline.json`), with a factor of 3 for its slower
+runners.
+
+| Measure | Time | Allocated |
+|---|---:|---:|
+| Dispatcher, a call of two `int`s | 89 ns | 224 B |
+| Dispatcher, a 3 KB record read and written | 9.1 µs | 10.5 KB |
+| Protocol, a page's message to its reply, two `int`s | 1.7 µs | 1.4 KB |
+| Protocol, the same with the 3 KB record each way | 22.6 µs | 21.8 KB |
+| An event's message, encoded once for every page | 132 ns | 656 B |
+
+In a real window, a call from a page and back takes **0.12 ms** at the
+median (p99 0.5 ms), one after another; with 10 000 in flight, about
+**75 000 calls a second** go through. The app's side is a small part of
+it: most of a call is the webview carrying the message between its
+processes and the app.
 
 ## Threads
 
