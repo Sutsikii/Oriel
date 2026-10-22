@@ -103,6 +103,33 @@ Assert.Equal("4", await echo.Call("Same", "[4]"));
 - The generator targets netstandard2.0 and runs inside compilers: no
   dependency beyond Roslyn, and no I/O.
 
+## Change the public API
+
+The public API of `src/Oriel` is declared in `PublicAPI.Shipped.txt` (what
+a release has) and `PublicAPI.Unshipped.txt` (what was added since). The
+build fails on a public member, or a change of signature, that is not
+declared there, so every API change shows in review:
+
+- add the line the error names to `PublicAPI.Unshipped.txt`, or move it
+  there from `Shipped` when the change breaks a released API, and say so in
+  the pull request;
+- a release moves the lines of `Unshipped` to `Shipped`.
+
+The `Oriel.Generated` namespace, hidden from completion, is what generated
+code calls. It is declared too, but it is not for apps: it changes with
+the generator, which ships in the same package.
+
+An API still expected to change gets
+`[Experimental(Experiments.Something, UrlFormat = Experiments.Url)]`, with
+a new id in [`Experiments.cs`](src/Oriel/Experiments.cs) and a row in
+[diagnostics.md](docs/diagnostics.md#experimental-apis). Its lines in the
+API files start with the id, such as `[ORIEL901]`. Making it stable removes
+the attribute, the id's row, and the prefix.
+
+Before 1.0, minor versions may break APIs, each one listed in the release
+notes. 1.0 requires that no API be experimental without a reason, and from
+then on breaking changes wait for a major version.
+
 ## Commits and pull requests
 
 - One change per commit, which builds and passes the tests on its own.

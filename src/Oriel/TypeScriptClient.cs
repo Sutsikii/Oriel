@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
 
@@ -23,6 +24,7 @@ public static class TypeScriptClient
     }
 
     /// <summary>The client of the services of <paramref name="assembly"/>, or null when it has none.</summary>
+    [Experimental(Experiments.TypeScriptClients, UrlFormat = Experiments.Url)]
     public static string? For(Assembly assembly) =>
         s_sources.TryGetValue(assembly, out var source) ? source : null;
 
@@ -33,6 +35,7 @@ public static class TypeScriptClient
     /// </summary>
     /// <returns>Whether the file changed.</returns>
     /// <exception cref="InvalidOperationException">The assembly has no services.</exception>
+    [Experimental(Experiments.TypeScriptClients, UrlFormat = Experiments.Url)]
     public static bool Write(Assembly assembly, string path)
     {
         var source = For(assembly)
