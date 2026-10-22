@@ -25,6 +25,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _titleFollowsPage = options.Title is null;
         _title = options.Title ?? app.Options.Name;
         _recovery = new RecoveryPolicy(app.Time);
+        Dialogs = new Dialogs(this);
         Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch, showExceptionMessages: app.IsDev);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
         Connection.MessageRefused += reason =>
@@ -74,10 +75,38 @@ public sealed class OrielWindow : IPlatformWindowEvents
     /// </summary>
     public event EventHandler<NavigationRequestedEventArgs>? NavigationRequested;
 
+    /// <summary>The system's dialogs, modal to this window: files, folders, messages.</summary>
+    public Dialogs Dialogs { get; }
+
     internal PageConnection Connection { get; }
 
     /// <summary>Closes the window.</summary>
     public void Close() => _app.Dispatch(() => _native?.Close());
+
+    /// <summary>
+    /// Shows a modal dialog with <paramref name="show"/> on the UI thread, and
+    /// completes with what it returns; with <paramref name="whenClosed"/> when
+    /// the window is closed, or closes before the dialog shows.
+    /// </summary>
+    internal Task<T> ShowModal<T>(Func<IPlatformWindow, T> show, T whenClosed)
+    {
+        // Not dispatched: the app may have quit with its last window.
+        if (_closed)
+            return Task.FromResult(whenClosed);
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _app.Dispatch(() =>
+        {
+            try
+            {
+                done.SetResult(_native is { } native && !_closed ? show(native) : whenClosed);
+            }
+            catch (Exception e)
+            {
+                done.SetException(e);
+            }
+        });
+        return done.Task;
+    }
 
     /// <summary>Opens the developer tools of the page, when <see cref="WindowOptions.DevTools"/> allows them.</summary>
     public void OpenDevTools() => _app.Dispatch(() => _native?.OpenDevTools());

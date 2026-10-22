@@ -50,7 +50,50 @@ internal interface IPlatformWindow
 
     /// <summary>Shows <paramref name="html"/> in place of the page, which keeps failing.</summary>
     void ShowErrorPage(string html);
+
+    /// <summary>
+    /// Shows a file or folder dialog, modal to the window, and returns once it
+    /// is closed: the full paths chosen, or null when it was canceled.
+    /// </summary>
+    IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request);
+
+    /// <summary>Shows a message box, modal to the window, and returns the button pressed.</summary>
+    MessageResult ShowMessage(MessageRequest request);
 }
+
+internal enum FileDialogKind
+{
+    /// <summary>A file that exists.</summary>
+    Open,
+
+    /// <summary>Files that exist, one or more.</summary>
+    OpenMany,
+
+    /// <summary>Where to save a file, asking before replacing one.</summary>
+    Save,
+
+    /// <summary>A folder that exists.</summary>
+    Folder,
+}
+
+/// <summary>A kind of file of a dialog: what it shows, and its patterns joined by <c>;</c>, such as <c>*.png;*.jpg</c>.</summary>
+internal sealed record FileTypeSpec(string Name, string Spec);
+
+/// <summary>
+/// A file dialog to show, with everything resolved: <c>Directory</c> is a
+/// full path that exists, or null.
+/// </summary>
+internal sealed record FileDialogRequest(FileDialogKind Kind, string? Title, IReadOnlyList<FileTypeSpec> Filters, string? Directory)
+{
+    /// <summary>The name a save dialog proposes.</summary>
+    public string? FileName { get; init; }
+
+    /// <summary>The extension a save dialog adds to a name typed without one, without its dot.</summary>
+    public string? DefaultExtension { get; init; }
+}
+
+/// <summary>A message box to show.</summary>
+internal sealed record MessageRequest(string Title, string Text, MessageKind Kind, MessageButtons Buttons);
 
 /// <summary>What a backend window tells Oriel. Called on the UI thread.</summary>
 internal interface IPlatformWindowEvents

@@ -81,6 +81,10 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             Win32.PostMessageW(Hwnd, Win32.WM_CLOSE, 0, 0);
     }
 
+    public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => ShellDialogs.Show(Hwnd, request);
+
+    public MessageResult ShowMessage(MessageRequest request) => ShellDialogs.Message(Hwnd, request);
+
     public void Fail(Exception error) => _events.Failed(error);
 
     /// <summary>Destroys the window at once, as the app quits.</summary>

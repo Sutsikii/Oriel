@@ -18,6 +18,8 @@ self-contained piece of work.
   publish, NativeAOT.
 - Installers: `OrielInstaller` builds a per-user Inno Setup installer on
   publish, with shortcuts, an uninstaller and a WebView2 check.
+- Native dialogs, modal to a window: open one or several files, save,
+  pick a folder, message boxes.
 
 ## Next
 
@@ -31,7 +33,6 @@ self-contained piece of work.
 
 ### Windows and desktop
 
-- **Native dialogs**: open, save, message boxes.
 - **Menus**: the window's menu bar and context menus, with accelerators
   that reach the page when it handles them.
 - **Window control**: position, size, state, full screen, frameless windows

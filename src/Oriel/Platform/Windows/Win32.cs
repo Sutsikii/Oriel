@@ -41,6 +41,20 @@ internal static unsafe partial class Win32
 
     public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
+    public const uint MB_OK = 0x0;
+    public const uint MB_OKCANCEL = 0x1;
+    public const uint MB_YESNOCANCEL = 0x3;
+    public const uint MB_YESNO = 0x4;
+    public const uint MB_ICONERROR = 0x10;
+    public const uint MB_ICONQUESTION = 0x20;
+    public const uint MB_ICONWARNING = 0x30;
+    public const uint MB_ICONINFORMATION = 0x40;
+
+    public const int IDOK = 1;
+    public const int IDCANCEL = 2;
+    public const int IDYES = 6;
+    public const int IDNO = 7;
+
     public const int IDC_ARROW = 32512;
     public const int IDI_APPLICATION = 32512;
 
@@ -175,6 +189,15 @@ internal static unsafe partial class Win32
 
     [LibraryImport("ole32.dll")]
     public static partial void CoTaskMemFree(nint p);
+
+    [LibraryImport("ole32.dll")]
+    public static partial int CoCreateInstance(Guid* clsid, nint outer, uint context, Guid* iid, nint* result);
+
+    [LibraryImport("shell32.dll")]
+    public static partial int SHCreateItemFromParsingName(char* path, nint bindContext, Guid* iid, nint* result);
+
+    [LibraryImport("user32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int MessageBoxW(nint hwnd, string text, string caption, uint type);
 
     /// <summary>An IStream over a copy of <paramref name="size"/> bytes; 0 when memory runs out.</summary>
     [LibraryImport("shlwapi.dll")]

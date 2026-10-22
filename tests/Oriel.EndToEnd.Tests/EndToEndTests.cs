@@ -273,6 +273,107 @@ public sealed class EndToEndTests : IDisposable
     }
 
     [EndToEndFact]
+    public async Task ShowsDialogsModalToTheirWindow()
+    {
+        File.WriteAllText(Path.Combine(_assets, "index.html"), """<script type="module">await oriel.call("E2E.Loaded", []);</script>""");
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var probe = new Probe();
+        app.Bind(probe);
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        OrielWindow? window = null;
+        var run = Task.Run(() => app.Run(() => window = app.OpenWindow(new WindowOptions { Title = "Dialogs", Width = 600, Height = 400 })));
+        await probe.FirstLoad.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        // Each dialog is found on screen, then closed as a person would.
+        var open = window!.Dialogs.OpenFileAsync(new() { Title = "Oriel open test", Filters = [new("Text", "*.txt")], Directory = _assets });
+        var dialog = await Dialog.Find("Oriel open test");
+        Assert.Equal("OrielWindow", Dialog.OwnerClass(dialog));
+        Dialog.Post(dialog, Dialog.WM_CLOSE, 0);
+        Assert.Null(await open.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // OK takes the name proposed, given whole; the extension comes from the filter.
+        var save = window.Dialogs.SaveFileAsync(new() { Title = "Oriel save test", FileName = Path.Combine(_assets, "notes"), Filters = [new("Text", "*.txt")] });
+        dialog = await Dialog.Find("Oriel save test");
+        for (var i = 0; i < 20 && !save.IsCompleted; i++)
+        {
+            // The dialog takes commands once it has finished starting.
+            Dialog.Post(dialog, Dialog.WM_COMMAND, Dialog.IDOK);
+            await Task.WhenAny(save, Task.Delay(500));
+        }
+        Assert.Equal(Path.Combine(_assets, "notes.txt"), await save.WaitAsync(TimeSpan.FromSeconds(10)), ignoreCase: true);
+
+        var folder = window.Dialogs.PickFolderAsync(new() { Title = "Oriel folder test" });
+        Dialog.Post(await Dialog.Find("Oriel folder test"), Dialog.WM_CLOSE, 0);
+        Assert.Null(await folder.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        var message = window.Dialogs.MessageAsync(new() { Text = "Keep going?", Kind = MessageKind.Question, Buttons = MessageButtons.YesNo });
+        dialog = await Dialog.Find("Dialogs"); // titled after its window
+        Assert.Equal("OrielWindow", Dialog.OwnerClass(dialog));
+        Dialog.Post(dialog, Dialog.WM_COMMAND, Dialog.IDNO);
+        Assert.Equal(MessageResult.No, await message.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        window.Close();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Empty(errors);
+    }
+
+    /// <summary>Finds and drives the system's dialogs of this process, as a person would.</summary>
+    private static class Dialog
+    {
+        public const uint WM_CLOSE = 0x0010;
+        public const uint WM_COMMAND = 0x0111;
+        public const nint IDOK = 1;
+        public const nint IDNO = 7;
+
+        /// <summary>The dialog of this process titled <paramref name="title"/>, once it shows.</summary>
+        public static async Task<nint> Find(string title)
+        {
+            for (var i = 0; i < 100; i++)
+            {
+                for (nint h = 0; (h = FindWindowExW(0, h, "#32770", null)) != 0;)
+                {
+                    GetWindowThreadProcessId(h, out var pid);
+                    var text = new System.Text.StringBuilder(256);
+                    GetWindowTextW(h, text, text.Capacity);
+                    if (pid == Environment.ProcessId && text.ToString() == title)
+                        return h;
+                }
+                await Task.Delay(100);
+            }
+            throw new TimeoutException($"no dialog \"{title}\" showed");
+        }
+
+        /// <summary>The window class of the dialog's owner.</summary>
+        public static string OwnerClass(nint dialog)
+        {
+            var name = new System.Text.StringBuilder(256);
+            GetClassNameW(GetWindow(dialog, 4 /* GW_OWNER */), name, name.Capacity);
+            return name.ToString();
+        }
+
+        public static void Post(nint dialog, uint msg, nint wParam) => PostMessageW(dialog, msg, wParam, 0);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern nint FindWindowExW(nint parent, nint after, string className, string? title);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int GetWindowTextW(nint hwnd, System.Text.StringBuilder text, int max);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int GetClassNameW(nint hwnd, System.Text.StringBuilder name, int max);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(nint hwnd, out int pid);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern nint GetWindow(nint hwnd, uint command);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool PostMessageW(nint hwnd, uint msg, nint wParam, nint lParam);
+    }
+
+    [EndToEndFact]
     public async Task ServesTheAppsFilesBesideThePage()
     {
         File.WriteAllText(Path.Combine(_assets, "data.json"), """{"served":true}""");

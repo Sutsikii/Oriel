@@ -15,10 +15,26 @@ Oriel.AppOptions.Name.get -> string!
 Oriel.AppOptions.Name.init -> void
 Oriel.AppOptions.QuitWhenLastWindowCloses.get -> bool
 Oriel.AppOptions.QuitWhenLastWindowCloses.init -> void
+Oriel.Dialogs
+Oriel.Dialogs.MessageAsync(Oriel.MessageOptions! options) -> System.Threading.Tasks.Task<Oriel.MessageResult>!
+Oriel.Dialogs.OpenFileAsync(Oriel.OpenFileOptions? options = null) -> System.Threading.Tasks.Task<string?>!
+Oriel.Dialogs.OpenFilesAsync(Oriel.OpenFileOptions? options = null) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
+Oriel.Dialogs.PickFolderAsync(Oriel.FolderOptions? options = null) -> System.Threading.Tasks.Task<string?>!
+Oriel.Dialogs.SaveFileAsync(Oriel.SaveFileOptions? options = null) -> System.Threading.Tasks.Task<string?>!
 Oriel.Event<T>
 Oriel.Event<T>.Attach(string! name, System.Action<System.Text.Json.Utf8JsonWriter!, T>! write, Oriel.Generated.IEventSink! sink) -> void
 Oriel.Event<T>.Emit(T payload) -> void
 Oriel.Event<T>.Event() -> void
+Oriel.FileFilter
+Oriel.FileFilter.FileFilter(string! name, params string![]! patterns) -> void
+Oriel.FileFilter.Name.get -> string!
+Oriel.FileFilter.Patterns.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Oriel.FolderOptions
+Oriel.FolderOptions.Directory.get -> string?
+Oriel.FolderOptions.Directory.init -> void
+Oriel.FolderOptions.FolderOptions() -> void
+Oriel.FolderOptions.Title.get -> string?
+Oriel.FolderOptions.Title.init -> void
 Oriel.Generated.Arguments
 Oriel.Generated.CallContext
 Oriel.Generated.CallContext.Cancellation.get -> System.Threading.CancellationToken
@@ -38,6 +54,31 @@ Oriel.Generated.ServiceDispatcher.ServiceDispatcher(string! name) -> void
 Oriel.Generated.ServiceDispatcher.ServiceDispatcher(string! name, Oriel.ServiceConcurrency concurrency) -> void
 Oriel.Generated.ServiceRegistry
 Oriel.Generated.ValueWriter
+Oriel.MessageButtons
+Oriel.MessageButtons.Ok = 0 -> Oriel.MessageButtons
+Oriel.MessageButtons.OkCancel = 1 -> Oriel.MessageButtons
+Oriel.MessageButtons.YesNo = 2 -> Oriel.MessageButtons
+Oriel.MessageButtons.YesNoCancel = 3 -> Oriel.MessageButtons
+Oriel.MessageKind
+Oriel.MessageKind.Error = 2 -> Oriel.MessageKind
+Oriel.MessageKind.Info = 0 -> Oriel.MessageKind
+Oriel.MessageKind.Question = 3 -> Oriel.MessageKind
+Oriel.MessageKind.Warning = 1 -> Oriel.MessageKind
+Oriel.MessageOptions
+Oriel.MessageOptions.Buttons.get -> Oriel.MessageButtons
+Oriel.MessageOptions.Buttons.init -> void
+Oriel.MessageOptions.Kind.get -> Oriel.MessageKind
+Oriel.MessageOptions.Kind.init -> void
+Oriel.MessageOptions.MessageOptions() -> void
+Oriel.MessageOptions.Text.get -> string!
+Oriel.MessageOptions.Text.init -> void
+Oriel.MessageOptions.Title.get -> string?
+Oriel.MessageOptions.Title.init -> void
+Oriel.MessageResult
+Oriel.MessageResult.Cancel = 1 -> Oriel.MessageResult
+Oriel.MessageResult.No = 3 -> Oriel.MessageResult
+Oriel.MessageResult.Ok = 0 -> Oriel.MessageResult
+Oriel.MessageResult.Yes = 2 -> Oriel.MessageResult
 Oriel.NavigationAction
 Oriel.NavigationAction.Allow = 0 -> Oriel.NavigationAction
 Oriel.NavigationAction.Deny = 1 -> Oriel.NavigationAction
@@ -48,9 +89,16 @@ Oriel.NavigationRequestedEventArgs.Action.set -> void
 Oriel.NavigationRequestedEventArgs.IsNewWindow.get -> bool
 Oriel.NavigationRequestedEventArgs.IsUserInitiated.get -> bool
 Oriel.NavigationRequestedEventArgs.Uri.get -> System.Uri!
+Oriel.OpenFileOptions
+Oriel.OpenFileOptions.Directory.get -> string?
+Oriel.OpenFileOptions.Directory.init -> void
+Oriel.OpenFileOptions.Filters.get -> System.Collections.Generic.IReadOnlyList<Oriel.FileFilter!>!
+Oriel.OpenFileOptions.Filters.init -> void
+Oriel.OpenFileOptions.OpenFileOptions() -> void
+Oriel.OpenFileOptions.Title.get -> string?
+Oriel.OpenFileOptions.Title.init -> void
 Oriel.OrielApp
 Oriel.OrielApp.Bind(object! service) -> void
-[ORIEL901]Oriel.OrielApp.CallFailed -> System.Action<string!, System.Exception!>?
 Oriel.OrielApp.DataDirectory.get -> string!
 Oriel.OrielApp.Dispatch(System.Action! action) -> void
 Oriel.OrielApp.Error -> System.Action<System.Exception!>?
@@ -64,6 +112,7 @@ Oriel.OrielApp.Windows.get -> System.Collections.Generic.IReadOnlyList<Oriel.Ori
 Oriel.OrielWindow
 Oriel.OrielWindow.Close() -> void
 Oriel.OrielWindow.Closed -> System.EventHandler?
+Oriel.OrielWindow.Dialogs.get -> Oriel.Dialogs!
 Oriel.OrielWindow.IsClosed.get -> bool
 Oriel.OrielWindow.NavigationRequested -> System.EventHandler<Oriel.NavigationRequestedEventArgs!>?
 Oriel.OrielWindow.OpenDevTools() -> void
@@ -72,6 +121,16 @@ Oriel.OrielWindow.Title.get -> string!
 Oriel.OrielWindow.Title.set -> void
 Oriel.OrielWindow.Url.get -> System.Uri!
 Oriel.OrielWindow.WebViewFailed -> System.EventHandler<Oriel.WebViewFailedEventArgs!>?
+Oriel.SaveFileOptions
+Oriel.SaveFileOptions.Directory.get -> string?
+Oriel.SaveFileOptions.Directory.init -> void
+Oriel.SaveFileOptions.FileName.get -> string?
+Oriel.SaveFileOptions.FileName.init -> void
+Oriel.SaveFileOptions.Filters.get -> System.Collections.Generic.IReadOnlyList<Oriel.FileFilter!>!
+Oriel.SaveFileOptions.Filters.init -> void
+Oriel.SaveFileOptions.SaveFileOptions() -> void
+Oriel.SaveFileOptions.Title.get -> string?
+Oriel.SaveFileOptions.Title.init -> void
 Oriel.ServiceAttribute
 Oriel.ServiceAttribute.Concurrency.get -> Oriel.ServiceConcurrency
 Oriel.ServiceAttribute.Concurrency.set -> void
@@ -140,6 +199,9 @@ Oriel.WindowOptions.Url.init -> void
 Oriel.WindowOptions.Width.get -> int
 Oriel.WindowOptions.Width.init -> void
 Oriel.WindowOptions.WindowOptions() -> void
+[ORIEL901]Oriel.OrielApp.CallFailed -> System.Action<string!, System.Exception!>?
+[ORIEL902]static Oriel.TypeScriptClient.For(System.Reflection.Assembly! assembly) -> string?
+[ORIEL902]static Oriel.TypeScriptClient.Write(System.Reflection.Assembly! assembly, string! path) -> bool
 abstract Oriel.Generated.ServiceDispatcher.InvokeAsync(string! method, System.Text.Json.JsonElement args, Oriel.Generated.CallContext! context) -> System.Threading.Tasks.ValueTask<Oriel.Generated.ValueWriter?>
 const Oriel.OrielApp.GenerateVariable = "ORIEL_GENERATE" -> string!
 static Oriel.Generated.Arguments.Count(System.Text.Json.JsonElement args, string! method, int min, int max) -> int
@@ -196,8 +258,6 @@ static Oriel.Generated.Json.WriteArray<T>(System.Text.Json.Utf8JsonWriter! w, Sy
 static Oriel.Generated.Json.WriteDictionary<T>(System.Text.Json.Utf8JsonWriter! w, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, T>>! items, System.Action<System.Text.Json.Utf8JsonWriter!, T>! write) -> void
 static Oriel.Generated.ServiceRegistry.Register<T>(System.Func<T!, Oriel.Generated.ServiceDispatcher!>! factory) -> void
 static Oriel.Generated.ServiceRegistry.RegisterError<T>(string! code, System.Action<System.Text.Json.Utf8JsonWriter!, T!>! write) -> void
-[ORIEL902]static Oriel.TypeScriptClient.For(System.Reflection.Assembly! assembly) -> string?
 static Oriel.TypeScriptClient.Register(System.Reflection.Assembly! assembly, string! source) -> void
-[ORIEL902]static Oriel.TypeScriptClient.Write(System.Reflection.Assembly! assembly, string! path) -> bool
 virtual Oriel.Generated.ServiceDispatcher.Attach(Oriel.Generated.IEventSink! sink) -> void
 virtual Oriel.Generated.ValueWriter.Invoke(System.Text.Json.Utf8JsonWriter! writer) -> void
