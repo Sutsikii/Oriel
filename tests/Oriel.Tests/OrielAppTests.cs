@@ -255,6 +255,90 @@ public class OrielAppTests
     }
 
     [Fact]
+    public async Task SendsAnEventToOneWindowOnly()
+    {
+        var app = App();
+        var greeter = new Greeter();
+        app.Bind(greeter);
+        OrielWindow[] opened = [];
+        var run = RunAsync(app, () => opened = [app.OpenWindow(), app.OpenWindow()]);
+        await WaitUntil(() => _platform.Windows.Count == 2);
+        var natives = _platform.Windows.ToArray();
+        foreach (var w in natives)
+            Post(app, w, "https://app.oriel/", """{"t":"hello","k":"p"}""");
+        await Task.Delay(50);
+
+        greeter.Greeted.EmitTo(opened[1], "Grace");
+        Assert.Equal("""{"t":"event","n":"Greeter.Greeted","v":"Grace"}""", await NextPosted(natives[1]));
+        await Task.Delay(50);
+        Assert.Empty(natives[0].Posted);
+
+        // Once the window closed, nothing is sent, and nothing throws.
+        natives[1].Close();
+        await WaitUntil(() => opened[1].IsClosed);
+        greeter.Greeted.EmitTo(opened[1], "late");
+        await Task.Delay(50);
+        Assert.Empty(natives[1].Posted);
+
+        app.Quit();
+        await run;
+    }
+
+    [Fact]
+    public void EmitsToWindowsOfItsOwnAppOnly()
+    {
+        var app = App();
+        var greeter = new Greeter();
+        app.Bind(greeter);
+        var other = new OrielApp(new AppOptions { Name = "Other", AssetsDirectory = @"C:\app\wwwroot" }, new FakePlatform(), null);
+        var window = other.OpenWindow();
+
+        Assert.Throws<ArgumentException>(() => greeter.Greeted.EmitTo(window, "Ada"));
+        new Greeter().Greeted.EmitTo(window, "unbound"); // does nothing, as Emit does
+    }
+
+    [Fact]
+    public void NumbersWindowsAndFindsThemByName()
+    {
+        var app = App();
+        var first = app.OpenWindow();
+        var settings = app.OpenWindow(new WindowOptions { Name = "settings" });
+
+        Assert.Equal((1, 2), (first.Id, settings.Id));
+        Assert.Null(first.Name);
+        Assert.Equal("settings", settings.Name);
+        Assert.Same(settings, app.FindWindow("settings"));
+        Assert.Null(app.FindWindow("SETTINGS")); // names compare exactly
+        Assert.Null(app.FindWindow("missing"));
+    }
+
+    [Fact]
+    public async Task KeepsOneWindowOfAName()
+    {
+        var app = App();
+        OrielWindow? settings = null;
+        var run = RunAsync(app, () =>
+        {
+            app.OpenWindow();
+            settings = app.OpenWindow(new WindowOptions { Name = "settings" });
+        });
+        await WaitUntil(() => _platform.Windows.Count == 2);
+
+        var e = Assert.Throws<InvalidOperationException>(() => app.OpenWindow(new WindowOptions { Name = "settings" }));
+        Assert.Contains("\"settings\" is open already", e.Message);
+        Assert.Equal(2, app.Windows.Count);
+
+        // Closed, the name is free again, under a new id.
+        _platform.Windows.ToArray()[1].Close();
+        await WaitUntil(() => settings!.IsClosed);
+        Assert.Null(app.FindWindow("settings"));
+        Assert.Equal(3, app.OpenWindow(new WindowOptions { Name = "settings" }).Id);
+
+        app.Quit();
+        await run;
+    }
+
+    [Fact]
     public async Task ShowsThePagesTitleUnlessGivenOne()
     {
         var app = App();

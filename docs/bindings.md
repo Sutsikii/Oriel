@@ -206,6 +206,42 @@ stop();
 `Emit` can be called from any thread. It does nothing until the service is
 bound, and reaches the pages that have loaded.
 
+### Events to one window
+
+`EmitTo(window, payload)` sends to the page of one window: the window a
+call came from, or one found by its name. An editor and its preview, a
+list and its detail, stay in sync this way:
+
+```csharp
+[Service]
+public sealed class Slides(OrielApp app)
+{
+    public Event<int> Shown { get; } = new();
+
+    /// <summary>Opens the presenter view, or brings back the one that is open.</summary>
+    public void Present() =>
+        _ = app.FindWindow("presenter") ?? app.OpenWindow(new() { Name = "presenter", Url = "/presenter.html" });
+
+    /// <summary>Shows slide <paramref name="index"/> in the presenter view.</summary>
+    public void Show(int index)
+    {
+        if (app.FindWindow("presenter") is { } presenter)
+            Shown.EmitTo(presenter, index);
+    }
+}
+```
+
+Windows are told apart by:
+
+- `OrielWindow.Id`, a number unique in the app (1, 2, …);
+- `WindowOptions.Name`, a name of the app's choosing, which
+  `OrielApp.FindWindow` finds. Two open windows cannot share a name:
+  `OpenWindow` throws for the second. Once its window closes, a name is
+  free again.
+
+`OrielApp.Windows` lists the windows that are open. `EmitTo` a window
+that closed does nothing.
+
 ## Errors
 
 A method that throws rejects the page's promise with a `CallError`. So do
