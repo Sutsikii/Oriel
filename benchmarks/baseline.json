@@ -1,13 +1,13 @@
 {
   "factor": 3,
   "values": {
-    "DispatchAdd": 89.146,
-    "DispatchDeck": 9082.581,
-    "EncodeEvent": 131.92,
-    "ProtocolAdd": 1677.841,
-    "ProtocolDeck": 22620.256,
-    "RoundTrip.callsPerSecond": 75075.075,
-    "RoundTrip.p50Ms": 0.12,
-    "RoundTrip.p99Ms": 0.51
+    "DispatchAdd": 143.339,
+    "DispatchDeck": 15434.924,
+    "EncodeEvent": 243.809,
+    "ProtocolAdd": 3643.254,
+    "ProtocolDeck": 66285.303,
+    "RoundTrip.callsPerSecond": 17599.437,
+    "RoundTrip.p50Ms": 0.28,
+    "RoundTrip.p99Ms": 0.39
   }
 }

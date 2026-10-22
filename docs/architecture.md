@@ -76,9 +76,9 @@ page                         app (thread pool)                      service
 ### What a call costs
 
 Measured by [benchmarks/](../benchmarks/README.md) on an AMD Ryzen 7 8700G,
-Windows 11, .NET 10, WebView2 155; CI checks each change against these
-numbers (`benchmarks/baseline.json`), with a factor of 3 for its slower
-runners.
+Windows 11, .NET 10, WebView2 155. GitHub's `windows-latest` runners are
+2 to 4 times slower (17 600 calls a second in the round trip); CI checks
+each change against their numbers, in `benchmarks/baseline.json`.
 
 | Measure | Time | Allocated |
 |---|---:|---:|

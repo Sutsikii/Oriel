@@ -34,11 +34,13 @@ The Benchmarks workflow runs them on each push to `main`, on pull
 requests that change `src/` or `benchmarks/`, and on demand. The table goes
 to the job's summary, and the reports to the `benchmark-results` artifact.
 
-The baseline was measured on a developer machine. CI's runners are
-slower and noisier, hence the factor of 3: it catches a call that became
-several times slower, not a few percent. After a change that makes calls
-faster or slower on purpose, update the baseline in the same pull request:
+The baseline is CI's own: the numbers of a `windows-latest` runner, 2 to
+4 times slower than a developer machine. Runners are noisy, hence the
+factor of 3: it catches a call that became several times slower, not a
+few percent. After a change that makes calls faster or slower on purpose,
+update the baseline from the run's `benchmark-results` artifact:
 
 ```sh
-dotnet run --project benchmarks/Oriel.Benchmarks -c Release -- check benchmark-results benchmark-results/roundtrip.json benchmarks/baseline.json --update
+gh run download <run id> -n benchmark-results -D ci-results
+dotnet run --project benchmarks/Oriel.Benchmarks -c Release -- check ci-results ci-results/roundtrip.json benchmarks/baseline.json --update
 ```
