@@ -74,8 +74,8 @@ most of an app's footprint, as in every webview-based framework.
 
 Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
 Runtime; Linux and macOS are planned. The calls, events, generator, Windows
-backend, dialogs, menus and installers are done and tested; window control,
-signing and a CLI are next. See the [roadmap](docs/roadmap.md).
+backend, window control, dialogs, menus and installers are done and tested;
+tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 
@@ -87,6 +87,8 @@ signing and a CLI are next. See the [roadmap](docs/roadmap.md).
   per window, `ILogger` and hosted services, with `Oriel.Hosting`.
 - [Dialogs](docs/dialogs.md): files to open, where to save, folders and
   messages, modal to a window.
+- [Windows](docs/windows.md): position, size, states, full screen,
+  frameless windows, and placements remembered across runs.
 - [Menus](docs/menus.md): the menu bar, context menus, and accelerators
   the page gets first.
 - [Printing](docs/printing.md): print dialogs, and pages to PDF files.

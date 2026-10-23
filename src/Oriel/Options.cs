@@ -66,6 +66,42 @@ public sealed class WindowOptions
     /// <summary>The height of the window, in device-independent pixels.</summary>
     public int Height { get; init; } = 768;
 
+    /// <summary>
+    /// Where the window opens, from the left of the screen, in
+    /// device-independent pixels. Defaults to where Windows puts new windows.
+    /// </summary>
+    public int? X { get; init; }
+
+    /// <summary>Where the window opens, from the top of the screen, in device-independent pixels.</summary>
+    public int? Y { get; init; }
+
+    /// <summary>Whether the window opens in the middle of its monitor, rather than at <see cref="X"/> and <see cref="Y"/>.</summary>
+    public bool Center { get; init; }
+
+    /// <summary>Whether the window opens minimized or maximized. Defaults to neither.</summary>
+    public WindowState State { get; init; }
+
+    /// <summary>Whether the window stays over the others, as <see cref="OrielWindow.IsAlwaysOnTop"/>.</summary>
+    public bool AlwaysOnTop { get; init; }
+
+    /// <summary>
+    /// Whether the window has no title bar nor border: the page is all of it,
+    /// and draws its own title bar. Parts of the page with the CSS
+    /// <c>app-region: drag</c> move the window as a title bar would. It can
+    /// be resized from its sides and bottom. Its <see cref="Menu"/> shows no
+    /// bar, but its accelerators work.
+    /// </summary>
+    public bool Frameless { get; init; }
+
+    /// <summary>
+    /// A name to remember the window's placement by, such as <c>"main"</c>:
+    /// where it was, its size, and whether it was maximized, saved as it
+    /// closes and restored the next time a window of that key opens, on the
+    /// same monitor. A monitor that is gone puts it where it would be without
+    /// one. Defaults to none: nothing is remembered.
+    /// </summary>
+    public string? StateKey { get; init; }
+
     /// <summary>The smallest width the window can be resized to, in device-independent pixels.</summary>
     public int MinWidth { get; init; }
 

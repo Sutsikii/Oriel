@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
@@ -25,19 +26,24 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     private NativeMenu? _bar;
     private NativeMenu? _contextMenu;
     private nint _menuTheme;
+    private bool _fullScreen;
+    private bool _leavingFullScreen;
+    private Win32.WINDOWPLACEMENT _beforeFullScreen;
+    private nint _styleBeforeFullScreen;
 
     public WindowsWebWindow(WindowsPlatform platform, PlatformWindowOptions options, IPlatformWindowEvents events)
     {
         _platform = platform;
         _options = options;
         _events = events;
-        _bar = options.Menu is null ? null : new NativeMenu(options.Menu, bar: true);
+        // A frameless window has no frame to show a bar in.
+        _bar = options.Menu is null || options.Frameless ? null : new NativeMenu(options.Menu, bar: true);
 
         fixed (char* cls = "OrielWindow")
         fixed (char* title = options.Title)
         {
             Hwnd = Win32.CreateWindowExW(
-                0, cls, title, Win32.WS_OVERLAPPEDWINDOW,
+                options.AlwaysOnTop ? Win32.WS_EX_TOPMOST : 0, cls, title, Win32.WS_OVERLAPPEDWINDOW,
                 Win32.CW_USEDEFAULT, Win32.CW_USEDEFAULT, options.Width, options.Height,
                 0, _bar?.Handle ?? 0, platform.Instance, 0);
         }
@@ -50,7 +56,13 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
 
         // Sizes are in device-independent pixels: scale them to the window's display.
         var scale = Scale;
-        Win32.SetWindowPos(Hwnd, 0, 0, 0, Scaled(options.Width, scale), Scaled(options.Height, scale), Win32.SWP_NOMOVE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
+        Win32.RECT where;
+        Win32.GetWindowRect(Hwnd, &where);
+        var x = options.X is { } dx ? Scaled(dx, scale) : where.Left;
+        var y = options.Y is { } dy ? Scaled(dy, scale) : where.Top;
+        Win32.SetWindowPos(Hwnd, 0, x, y, Scaled(options.Width, scale), Scaled(options.Height, scale), Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
+        if (options.Center)
+            Center();
         ApplyTheme();
     }
 
@@ -61,7 +73,19 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     /// <summary>Shows the window and starts creating its webview.</summary>
     public void Start()
     {
-        Win32.ShowWindow(Hwnd, Win32.SW_SHOWNORMAL);
+        var show = _options.State switch
+        {
+            WindowState.Maximized => Win32.SW_SHOWMAXIMIZED,
+            WindowState.Minimized => Win32.SW_SHOWMINIMIZED,
+            _ => Win32.SW_SHOWNORMAL,
+        };
+        // A frameless window computes its frame anew (WM_NCCALCSIZE), now
+        // that the window procedure knows it.
+        if (_options.Frameless)
+            Win32.SetWindowPos(Hwnd, 0, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE | Win32.SWP_FRAMECHANGED);
+        if (_options.Placement is { } saved && RestorePlacement(saved) is { } maximized)
+            show = maximized ? Win32.SW_SHOWMAXIMIZED : Win32.SW_SHOWNORMAL;
+        Win32.ShowWindow(Hwnd, show);
         Tracing.Write($"window {Hwnd:X} shown, creating its webview");
         _platform.WithEnvironment(_options.UserDataFolder, CreateController, Fail);
     }
@@ -96,13 +120,161 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
 
     public void SetMenu(Menu? menu)
     {
-        if (_destroyed)
+        if (_destroyed || _options.Frameless)
             return;
         var old = _bar;
         _bar = menu is null ? null : new NativeMenu(menu, bar: true);
-        Win32.SetMenu(Hwnd, _bar?.Handle ?? 0);
+        if (!_fullScreen)
+            Win32.SetMenu(Hwnd, _bar?.Handle ?? 0);
         old?.Dispose(); // a window destroys only the menu it has
         Resize();
+    }
+
+    public void SetBounds(int? x, int? y, int? width, int? height)
+    {
+        if (_destroyed)
+            return;
+        if (Win32.IsIconic(Hwnd) || Win32.IsZoomed(Hwnd))
+            Win32.ShowWindow(Hwnd, Win32.SW_RESTORE);
+        var scale = Scale;
+        Win32.RECT r;
+        Win32.GetWindowRect(Hwnd, &r);
+        Win32.SetWindowPos(Hwnd, 0,
+            x is { } nx ? Scaled(nx, scale) : r.Left,
+            y is { } ny ? Scaled(ny, scale) : r.Top,
+            width is { } w ? Scaled(w, scale) : r.Right - r.Left,
+            height is { } h ? Scaled(h, scale) : r.Bottom - r.Top,
+            Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
+    }
+
+    public void Center()
+    {
+        if (_destroyed)
+            return;
+        var info = new Win32.MONITORINFO { cbSize = (uint)sizeof(Win32.MONITORINFO) };
+        if (!Win32.GetMonitorInfoW(Win32.MonitorFromWindow(Hwnd, Win32.MONITOR_DEFAULTTONEAREST), &info))
+            return;
+        Win32.RECT r;
+        Win32.GetWindowRect(Hwnd, &r);
+        var work = info.rcWork;
+        var x = work.Left + (work.Right - work.Left - (r.Right - r.Left)) / 2;
+        var y = work.Top + (work.Bottom - work.Top - (r.Bottom - r.Top)) / 2;
+        Win32.SetWindowPos(Hwnd, 0, x, Math.Max(work.Top, y), 0, 0, Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
+    }
+
+    public void SetState(WindowState state)
+    {
+        if (!_destroyed)
+        {
+            Win32.ShowWindow(Hwnd, state switch
+            {
+                WindowState.Minimized => Win32.SW_MINIMIZE,
+                WindowState.Maximized => Win32.SW_SHOWMAXIMIZED,
+                _ => Win32.SW_RESTORE,
+            });
+        }
+    }
+
+    /// <summary>Takes the frame and the bar off, and fills the monitor; or puts them back, where the window was.</summary>
+    public void SetFullScreen(bool fullScreen)
+    {
+        if (_destroyed || fullScreen == _fullScreen)
+            return;
+        if (fullScreen)
+        {
+            var info = new Win32.MONITORINFO { cbSize = (uint)sizeof(Win32.MONITORINFO) };
+            if (!Win32.GetMonitorInfoW(Win32.MonitorFromWindow(Hwnd, Win32.MONITOR_DEFAULTTONEAREST), &info))
+                return;
+            _beforeFullScreen = Placement(out _);
+            _styleBeforeFullScreen = Win32.GetWindowLongPtrW(Hwnd, Win32.GWL_STYLE);
+            _fullScreen = true;
+            Win32.SetMenu(Hwnd, 0);
+            Win32.SetWindowLongPtrW(Hwnd, Win32.GWL_STYLE, _styleBeforeFullScreen & ~(nint)Win32.WS_OVERLAPPEDWINDOW);
+            var m = info.rcMonitor;
+            Win32.SetWindowPos(Hwnd, 0, m.Left, m.Top, m.Right - m.Left, m.Bottom - m.Top, Win32.SWP_NOOWNERZORDER | Win32.SWP_FRAMECHANGED);
+        }
+        else
+        {
+            // The window passes through sizes of no interest on its way back: it tells only where it ends.
+            _leavingFullScreen = true;
+            Win32.SetWindowLongPtrW(Hwnd, Win32.GWL_STYLE, _styleBeforeFullScreen);
+            Win32.SetMenu(Hwnd, _bar?.Handle ?? 0);
+            var before = _beforeFullScreen;
+            Win32.SetWindowPlacement(Hwnd, &before);
+            _fullScreen = false;
+            Win32.SetWindowPos(Hwnd, 0, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_NOOWNERZORDER | Win32.SWP_FRAMECHANGED);
+            _leavingFullScreen = false;
+            ReportBounds();
+        }
+    }
+
+    public void SetAlwaysOnTop(bool onTop)
+    {
+        if (!_destroyed)
+            Win32.SetWindowPos(Hwnd, onTop ? Win32.HWND_TOPMOST : Win32.HWND_NOTOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+    }
+
+    public void Focus()
+    {
+        if (_destroyed)
+            return;
+        if (Win32.IsIconic(Hwnd))
+            Win32.ShowWindow(Hwnd, Win32.SW_RESTORE);
+        Win32.SetForegroundWindow(Hwnd); // refused when another app has the keyboard: Windows flashes it instead
+    }
+
+    /// <summary>
+    /// <c>left,top,right,bottom,maximized</c>: the window's normal rectangle,
+    /// in the workspace pixels of <c>GetWindowPlacement</c>, and 1 when it is
+    /// maximized, or would be once restored.
+    /// </summary>
+    public string Placement()
+    {
+        var placement = _fullScreen ? _beforeFullScreen : Placement(out _);
+        var r = placement.rcNormalPosition;
+        var maximized = placement.showCmd == Win32.SW_SHOWMAXIMIZED
+            || (placement.showCmd == Win32.SW_SHOWMINIMIZED && (placement.flags & Win32.WPF_RESTORETOMAXIMIZED) != 0);
+        return string.Create(CultureInfo.InvariantCulture, $"{r.Left},{r.Top},{r.Right},{r.Bottom},{(maximized ? 1 : 0)}");
+    }
+
+    private Win32.WINDOWPLACEMENT Placement(out bool ok)
+    {
+        var placement = new Win32.WINDOWPLACEMENT { length = (uint)sizeof(Win32.WINDOWPLACEMENT) };
+        ok = Win32.GetWindowPlacement(Hwnd, &placement);
+        return placement;
+    }
+
+    /// <summary>
+    /// Puts the window where <paramref name="saved"/> says, while it is still
+    /// hidden; returns whether it was maximized, or null when the placement is
+    /// not one, or its monitor is gone.
+    /// </summary>
+    private bool? RestorePlacement(string saved)
+    {
+        var parts = saved.Split(',');
+        if (parts.Length != 5)
+            return null;
+        var n = new int[5];
+        for (var i = 0; i < 5; i++)
+        {
+            if (!int.TryParse(parts[i], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out n[i]))
+                return null;
+        }
+        var rect = new Win32.RECT { Left = n[0], Top = n[1], Right = n[2], Bottom = n[3] };
+        if (rect.Right <= rect.Left || rect.Bottom <= rect.Top || Win32.MonitorFromRect(&rect, Win32.MONITOR_DEFAULTTONULL) == 0)
+            return null;
+        var placement = new Win32.WINDOWPLACEMENT
+        {
+            length = (uint)sizeof(Win32.WINDOWPLACEMENT),
+            showCmd = Win32.SW_HIDE,
+            rcNormalPosition = rect,
+        };
+        // Twice: moving to a monitor of another scale resizes the window
+        // (WM_DPICHANGED); the second time, it is at that scale already.
+        Win32.SetWindowPlacement(Hwnd, &placement);
+        Win32.SetWindowPlacement(Hwnd, &placement);
+        Tracing.Write($"window {Hwnd:X} restored to {saved}");
+        return n[4] == 1;
     }
 
     public MenuItem? ShowContextMenu(Menu menu, PagePoint? at)
@@ -258,6 +430,39 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             case Win32.WM_SIZE:
                 if ((int)wParam != Win32.SIZE_MINIMIZED)
                     Resize();
+                if ((int)wParam is Win32.SIZE_MINIMIZED or Win32.SIZE_MAXIMIZED or 0)
+                {
+                    _events.StateChanged((int)wParam switch
+                    {
+                        Win32.SIZE_MINIMIZED => WindowState.Minimized,
+                        Win32.SIZE_MAXIMIZED => WindowState.Maximized,
+                        _ => WindowState.Normal,
+                    });
+                }
+                ReportBounds();
+                return true;
+
+            case Win32.WM_MOVE:
+                ReportBounds();
+                return true;
+
+            case Win32.WM_ACTIVATE:
+                _events.FocusChanged(Win32.LoWord((nint)wParam) != Win32.WA_INACTIVE);
+                return false; // Windows gives the focus back, then WM_SETFOCUS hands it to the webview
+
+            case Win32.WM_NCCALCSIZE when _options.Frameless && wParam != 0 && !_fullScreen:
+                // No caption: the client area goes up to the window's top. The
+                // sides and bottom keep their frame, which is invisible and resizes.
+                var calc = (Win32.NCCALCSIZE_PARAMS*)lParam;
+                var dpi = Win32.GetDpiForWindow(Hwnd);
+                var padding = Win32.GetSystemMetricsForDpi(Win32.SM_CXPADDEDBORDER, dpi);
+                var frameX = Win32.GetSystemMetricsForDpi(Win32.SM_CXSIZEFRAME, dpi) + padding;
+                var frameY = Win32.GetSystemMetricsForDpi(Win32.SM_CYSIZEFRAME, dpi) + padding;
+                calc->rgrc0.Left += frameX;
+                calc->rgrc0.Right -= frameX;
+                calc->rgrc0.Bottom -= frameY;
+                if (Win32.IsZoomed(Hwnd))
+                    calc->rgrc0.Top += frameY; // a maximized window's frame is off the monitor, the top's too
                 return true;
 
             case Win32.WM_SETFOCUS:
@@ -396,6 +601,7 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             WebView2.Settings.SetStatusBarEnabled(settings, false);
             WebView2.Settings.SetDevToolsEnabled(settings, _options.DevTools);
             WebView2.Settings.SetDefaultContextMenusEnabled(settings, _options.DevTools);
+            WebView2.Settings.EnableNonClientRegions(settings);
         }
         finally
         {
@@ -576,6 +782,19 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         _webview = 0;
         _controller = 0;
     }
+
+    /// <summary>Tells where the window is, when it is neither minimized, maximized nor full screen.</summary>
+    private void ReportBounds()
+    {
+        if (_destroyed || _fullScreen || _leavingFullScreen || Win32.IsIconic(Hwnd) || Win32.IsZoomed(Hwnd))
+            return;
+        Win32.RECT r;
+        Win32.GetWindowRect(Hwnd, &r);
+        var scale = Scale;
+        _events.BoundsChanged(new WindowBounds(Dips(r.Left, scale), Dips(r.Top, scale), Dips(r.Right - r.Left, scale), Dips(r.Bottom - r.Top, scale)));
+    }
+
+    private static int Dips(int pixels, double scale) => (int)Math.Round(pixels / scale);
 
     private static KeyModifiers Modifiers()
     {

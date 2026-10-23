@@ -15,6 +15,7 @@ internal static unsafe class WebView2
     public static readonly Guid IID_ICoreWebView2_7 = new("79C24D83-09A3-45AE-9418-487F32A58740");
     public static readonly Guid IID_ICoreWebView2_16 = new("0EB34DC9-9F91-41E1-8639-95CD5943906B");
     public static readonly Guid IID_ICoreWebView2Environment6 = new("E59EE362-ACBD-4857-9A8E-D3644D9459A9");
+    public static readonly Guid IID_ICoreWebView2Settings9 = new("0528a73b-e92d-49f4-927a-e547dddaa37d");
     public static readonly Guid IID_ICoreWebView2AcceleratorKeyPressedEventArgs2 = new("03b2c8c8-7799-4e34-bd66-ed26aa85f2bf");
 
     // Handlers Oriel implements.
@@ -332,6 +333,23 @@ internal static unsafe class WebView2
         // 12: put_AreDevToolsEnabled(BOOL)
         public static void SetDevToolsEnabled(nint s, bool value) =>
             Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(s, 12))(s, value ? 1 : 0), "put_AreDevToolsEnabled");
+
+        // ICoreWebView2Settings9, 38: put_IsNonClientRegionSupportEnabled(BOOL), for app-region: drag.
+        // An older runtime lacks it: the page's drag regions do nothing.
+        public static void EnableNonClientRegions(nint s)
+        {
+            var s9 = Com.QueryInterface(s, IID_ICoreWebView2Settings9);
+            if (s9 == 0)
+                return;
+            try
+            {
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(s9, 38))(s9, 1), "put_IsNonClientRegionSupportEnabled");
+            }
+            finally
+            {
+                Com.Release(s9);
+            }
+        }
 
         // 14: put_AreDefaultContextMenusEnabled(BOOL)
         public static void SetDefaultContextMenusEnabled(nint s, bool value) =>

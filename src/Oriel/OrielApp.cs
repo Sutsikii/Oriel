@@ -108,6 +108,13 @@ public sealed class OrielApp : IEventSink
     /// <summary>The clock windows count failures with; tests give their own.</summary>
     internal TimeProvider Time { get; }
 
+    /// <summary>Where the windows with a <see cref="WindowOptions.StateKey"/> remember their placement: <c>windows.json</c> in <see cref="DataDirectory"/>.</summary>
+    internal PlacementStore Placements
+    {
+        get => field ??= new PlacementStore(Path.Combine(DataDirectory, "windows.json"));
+        set;
+    }
+
     /// <summary>
     /// Lets pages call the methods of <paramref name="service"/>, an instance of
     /// a <see cref="ServiceAttribute"/> class, and connects its events.
@@ -220,7 +227,16 @@ public sealed class OrielApp : IEventSink
             IsDev ? null : Frontend.Embedded,
             missing is null ? null : MissingPage(window.Url, missing),
             Path.Combine(DataFolder(Environment.SpecialFolder.LocalApplicationData), "WebView"),
-            options.Menu);
+            options.Menu)
+        {
+            X = options.X,
+            Y = options.Y,
+            Center = options.Center,
+            State = options.State,
+            AlwaysOnTop = options.AlwaysOnTop,
+            Frameless = options.Frameless,
+            Placement = options.StateKey is null ? null : Placements.Load(options.StateKey),
+        };
         Dispatch(() => window.Open(_platform, native));
         return window;
     }

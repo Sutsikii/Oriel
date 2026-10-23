@@ -126,6 +126,26 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
 
     public void ActivateMenuBar(char mnemonic) => BarActivations.Enqueue(mnemonic);
 
+    /// <summary>What the window was asked to do with its placement, in order, such as <c>"bounds 10,20,,"</c> or <c>"state Maximized"</c>.</summary>
+    public ConcurrentQueue<string> Placements { get; } = new();
+
+    public void SetBounds(int? x, int? y, int? width, int? height) => Placements.Enqueue($"bounds {x},{y},{width},{height}");
+
+    public void Center() => Placements.Enqueue("center");
+
+    public void SetState(WindowState state) => Placements.Enqueue($"state {state}");
+
+    public void SetFullScreen(bool fullScreen) => Placements.Enqueue($"full screen {fullScreen}");
+
+    public void SetAlwaysOnTop(bool onTop) => Placements.Enqueue($"on top {onTop}");
+
+    public void Focus() => Placements.Enqueue("focus");
+
+    /// <summary>What <see cref="Placement"/> answers, as the app closes the window.</summary>
+    public string CurrentPlacement { get; set; } = "fake placement";
+
+    public string Placement() => CurrentPlacement;
+
     public ConcurrentQueue<string> EditCommands { get; } = new();
 
     public void RunEditCommand(string command) => EditCommands.Enqueue(command);
