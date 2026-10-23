@@ -22,6 +22,8 @@ self-contained piece of work.
 - Native dialogs, modal to a window: open one or several files, save,
   pick a folder, message boxes.
 - Printing: print dialogs, and pages to PDF files with their layout.
+- Menus: the menu bar and context menus, with check items, roles and
+  accelerators the page gets first; dark with Windows.
 - `Oriel.Hosting`: apps on the .NET Generic Host, with services from
   dependency injection (for the app, per window, per call), `ILogger`,
   configuration and hosted services.
@@ -37,8 +39,6 @@ self-contained piece of work.
 
 ### Windows and desktop
 
-- **Menus**: the window's menu bar and context menus, with accelerators
-  that reach the page when it handles them.
 - **Window control**: position, size, state, full screen, frameless windows
   with drag regions, and remembering their placement.
 - **Tray icon, notifications, single instance, deep links.**

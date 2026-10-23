@@ -15,6 +15,7 @@ internal static unsafe class WebView2
     public static readonly Guid IID_ICoreWebView2_7 = new("79C24D83-09A3-45AE-9418-487F32A58740");
     public static readonly Guid IID_ICoreWebView2_16 = new("0EB34DC9-9F91-41E1-8639-95CD5943906B");
     public static readonly Guid IID_ICoreWebView2Environment6 = new("E59EE362-ACBD-4857-9A8E-D3644D9459A9");
+    public static readonly Guid IID_ICoreWebView2AcceleratorKeyPressedEventArgs2 = new("03b2c8c8-7799-4e34-bd66-ed26aa85f2bf");
 
     // Handlers Oriel implements.
     public static readonly Guid IID_EnvironmentCompletedHandler = new("4e8a3389-c9d8-4bd2-b6b5-124fee6cc14d");
@@ -28,6 +29,8 @@ internal static unsafe class WebView2
     public static readonly Guid IID_PermissionRequestedEventHandler = new("15e1c6a3-c72a-4df3-91d7-d097fbec6bfd");
     public static readonly Guid IID_WebResourceRequestedEventHandler = new("ab00b74c-15f1-4646-80e8-e76341d25d71");
     public static readonly Guid IID_PrintToPdfCompletedHandler = new("ccf1ef04-fd8e-4d5f-b2de-0983e41b8c36");
+    public static readonly Guid IID_AcceleratorKeyPressedEventHandler = new("b29c7e28-fa79-41a8-8e44-65811c76dcb2");
+    public static readonly Guid IID_CallDevToolsProtocolMethodCompletedHandler = new("5c4889f0-5ef6-4c5a-952c-d8f1b92d0574");
 
     /// <summary>COREWEBVIEW2_PRINT_ORIENTATION_LANDSCAPE.</summary>
     public const int PrintLandscape = 1;
@@ -41,6 +44,10 @@ internal static unsafe class WebView2
 
     /// <summary>COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC.</summary>
     public const int MoveFocusProgrammatic = 0;
+
+    /// <summary>COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN and _SYSTEM_KEY_DOWN, a key pressed with Alt.</summary>
+    public const int KeyDown = 0;
+    public const int SystemKeyDown = 2;
 
     /// <summary>COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL.</summary>
     public const int WebResourceContextAll = 0;
@@ -162,6 +169,13 @@ internal static unsafe class WebView2
         public static void MoveFocus(nint c) =>
             ((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(c, 12))(c, MoveFocusProgrammatic);
 
+        // 19: add_AcceleratorKeyPressed(handler, EventRegistrationToken*)
+        public static void AddAcceleratorKeyPressed(nint c, nint handler)
+        {
+            long token;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, long*, int>)Com.Slot(c, 19))(c, handler, &token), "add_AcceleratorKeyPressed");
+        }
+
         // 23: NotifyParentWindowPositionChanged()
         public static void NotifyParentWindowPositionChanged(nint c) =>
             ((delegate* unmanaged[Stdcall]<nint, int>)Com.Slot(c, 23))(c);
@@ -255,6 +269,14 @@ internal static unsafe class WebView2
                 return ((delegate* unmanaged[Stdcall]<nint, char*, int>)Com.Slot(w, 33))(w, p);
         }
 
+        // 36: CallDevToolsProtocolMethod(LPCWSTR methodName, LPCWSTR parametersAsJson, handler)
+        public static void CallDevToolsProtocolMethod(nint w, string method, string parameters, nint handler)
+        {
+            fixed (char* m = method)
+            fixed (char* p = parameters)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, char*, char*, nint, int>)Com.Slot(w, 36))(w, m, p, handler), "CallDevToolsProtocolMethod");
+        }
+
         // 34: add_WebMessageReceived(handler, EventRegistrationToken*)
         public static void AddWebMessageReceived(nint w, nint handler)
         {
@@ -333,6 +355,43 @@ internal static unsafe class WebView2
 
     private static void SetInt(nint a, int slot, int value, string name) =>
         Com.Check(((delegate* unmanaged[Stdcall]<nint, int, int>)Com.Slot(a, slot))(a, value), name);
+
+    /// <summary>ICoreWebView2AcceleratorKeyPressedEventArgs, and its 2 for the browser's own accelerators.</summary>
+    public static class AcceleratorKeyPressedEventArgs
+    {
+        // 3: get_KeyEventKind(COREWEBVIEW2_KEY_EVENT_KIND*)
+        public static int GetKind(nint a)
+        {
+            int kind;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, int*, int>)Com.Slot(a, 3))(a, &kind), "get_KeyEventKind");
+            return kind;
+        }
+
+        // 4: get_VirtualKey(UINT*)
+        public static int GetVirtualKey(nint a)
+        {
+            uint key;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, uint*, int>)Com.Slot(a, 4))(a, &key), "get_VirtualKey");
+            return (int)key;
+        }
+
+        // ICoreWebView2AcceleratorKeyPressedEventArgs2, 10: put_IsBrowserAcceleratorKeyEnabled(BOOL).
+        // The page still gets the key; an older runtime lacks it.
+        public static void DisableBrowserAccelerator(nint a)
+        {
+            var a2 = Com.QueryInterface(a, IID_ICoreWebView2AcceleratorKeyPressedEventArgs2);
+            if (a2 == 0)
+                return;
+            try
+            {
+                SetInt(a2, 10, 0, "put_IsBrowserAcceleratorKeyEnabled");
+            }
+            finally
+            {
+                Com.Release(a2);
+            }
+        }
+    }
 
     /// <summary>ICoreWebView2NavigationStartingEventArgs.</summary>
     public static class NavigationStartingEventArgs

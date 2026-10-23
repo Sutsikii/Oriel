@@ -55,6 +55,42 @@ Oriel.Generated.ServiceDispatcher.ServiceDispatcher(string! name) -> void
 Oriel.Generated.ServiceDispatcher.ServiceDispatcher(string! name, Oriel.ServiceConcurrency concurrency) -> void
 Oriel.Generated.ServiceRegistry
 Oriel.Generated.ValueWriter
+Oriel.Menu
+Oriel.Menu.Items.get -> System.Collections.Generic.IReadOnlyList<Oriel.MenuItem!>!
+Oriel.Menu.Menu(params System.Collections.Generic.IReadOnlyList<Oriel.MenuItem!>! items) -> void
+Oriel.MenuItem
+Oriel.MenuItem.Accelerator.get -> string?
+Oriel.MenuItem.Accelerator.init -> void
+Oriel.MenuItem.Clicked.get -> System.Action<Oriel.OrielWindow!>?
+Oriel.MenuItem.Clicked.init -> void
+Oriel.MenuItem.Enabled.get -> bool
+Oriel.MenuItem.Enabled.set -> void
+Oriel.MenuItem.IsCheckable.get -> bool
+Oriel.MenuItem.IsCheckable.init -> void
+Oriel.MenuItem.IsChecked.get -> bool
+Oriel.MenuItem.IsChecked.set -> void
+Oriel.MenuItem.IsSeparator.get -> bool
+Oriel.MenuItem.Items.get -> System.Collections.Generic.IReadOnlyList<Oriel.MenuItem!>!
+Oriel.MenuItem.Items.init -> void
+Oriel.MenuItem.MenuItem(Oriel.MenuRole role) -> void
+Oriel.MenuItem.MenuItem(string! text, string? accelerator = null) -> void
+Oriel.MenuItem.Role.get -> Oriel.MenuRole
+Oriel.MenuItem.Text.get -> string!
+Oriel.MenuItem.Text.set -> void
+Oriel.MenuRole
+Oriel.MenuRole.CloseWindow = 11 -> Oriel.MenuRole
+Oriel.MenuRole.Copy = 4 -> Oriel.MenuRole
+Oriel.MenuRole.Cut = 3 -> Oriel.MenuRole
+Oriel.MenuRole.Delete = 6 -> Oriel.MenuRole
+Oriel.MenuRole.DevTools = 9 -> Oriel.MenuRole
+Oriel.MenuRole.None = 0 -> Oriel.MenuRole
+Oriel.MenuRole.Paste = 5 -> Oriel.MenuRole
+Oriel.MenuRole.Print = 10 -> Oriel.MenuRole
+Oriel.MenuRole.Quit = 12 -> Oriel.MenuRole
+Oriel.MenuRole.Redo = 2 -> Oriel.MenuRole
+Oriel.MenuRole.Reload = 8 -> Oriel.MenuRole
+Oriel.MenuRole.SelectAll = 7 -> Oriel.MenuRole
+Oriel.MenuRole.Undo = 1 -> Oriel.MenuRole
 Oriel.MessageButtons
 Oriel.MessageButtons.Ok = 0 -> Oriel.MessageButtons
 Oriel.MessageButtons.OkCancel = 1 -> Oriel.MessageButtons
@@ -118,11 +154,15 @@ Oriel.OrielWindow.Closed -> System.EventHandler?
 Oriel.OrielWindow.Dialogs.get -> Oriel.Dialogs!
 Oriel.OrielWindow.Id.get -> int
 Oriel.OrielWindow.IsClosed.get -> bool
+Oriel.OrielWindow.Menu.get -> Oriel.Menu?
+Oriel.OrielWindow.Menu.set -> void
 Oriel.OrielWindow.Name.get -> string?
 Oriel.OrielWindow.NavigationRequested -> System.EventHandler<Oriel.NavigationRequestedEventArgs!>?
 Oriel.OrielWindow.OpenDevTools() -> void
 Oriel.OrielWindow.Options.get -> Oriel.WindowOptions!
 Oriel.OrielWindow.PrintToPdfAsync(string! path, Oriel.PdfOptions? options = null) -> System.Threading.Tasks.Task<bool>!
+Oriel.OrielWindow.ShowContextMenuAsync(Oriel.Menu! menu) -> System.Threading.Tasks.Task<Oriel.MenuItem?>!
+Oriel.OrielWindow.ShowContextMenuAsync(Oriel.Menu! menu, double x, double y) -> System.Threading.Tasks.Task<Oriel.MenuItem?>!
 Oriel.OrielWindow.ShowPrintDialog(Oriel.PrintDialog dialog = Oriel.PrintDialog.Browser) -> void
 Oriel.OrielWindow.Title.get -> string!
 Oriel.OrielWindow.Title.set -> void
@@ -225,6 +265,8 @@ Oriel.WindowOptions.DevTools.get -> bool?
 Oriel.WindowOptions.DevTools.init -> void
 Oriel.WindowOptions.Height.get -> int
 Oriel.WindowOptions.Height.init -> void
+Oriel.WindowOptions.Menu.get -> Oriel.Menu?
+Oriel.WindowOptions.Menu.init -> void
 Oriel.WindowOptions.MinHeight.get -> int
 Oriel.WindowOptions.MinHeight.init -> void
 Oriel.WindowOptions.MinWidth.get -> int
@@ -240,6 +282,7 @@ Oriel.WindowOptions.Url.init -> void
 Oriel.WindowOptions.Width.get -> int
 Oriel.WindowOptions.Width.init -> void
 Oriel.WindowOptions.WindowOptions() -> void
+static Oriel.MenuItem.Separator() -> Oriel.MenuItem!
 [ORIEL901]Oriel.OrielApp.CallFailed -> System.Action<string!, System.Exception!>?
 [ORIEL902]static Oriel.TypeScriptClient.For(System.Reflection.Assembly! assembly) -> string?
 [ORIEL902]static Oriel.TypeScriptClient.Write(System.Reflection.Assembly! assembly, string! path) -> bool

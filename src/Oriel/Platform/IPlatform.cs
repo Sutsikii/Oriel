@@ -71,7 +71,29 @@ internal interface IPlatformWindow
     /// there is no page.
     /// </summary>
     void PrintToPdf(string path, PdfOptions? options, Action<bool> done);
+
+    /// <summary>Shows <paramref name="menu"/> as the window's bar, or removes the bar when null. Clicks go to <see cref="IPlatformWindowEvents.MenuItemClicked"/>.</summary>
+    void SetMenu(Menu? menu);
+
+    /// <summary>
+    /// Shows <paramref name="menu"/> at <paramref name="at"/>, a point of the
+    /// page in CSS pixels, or at the mouse pointer when null; returns once it
+    /// is closed: the item clicked, or null.
+    /// </summary>
+    MenuItem? ShowContextMenu(Menu menu, PagePoint? at);
+
+    /// <summary>
+    /// Opens the menu of the bar whose mnemonic is <paramref name="mnemonic"/>,
+    /// as Alt and that letter do; or, for <c>'\0'</c>, selects the bar, as F10 does.
+    /// </summary>
+    void ActivateMenuBar(char mnemonic);
+
+    /// <summary>Runs an editing command of the webview, such as <c>Copy</c>, in the page's focused element.</summary>
+    void RunEditCommand(string command);
 }
+
+/// <summary>A point of the page, in CSS pixels from its top left corner.</summary>
+internal readonly record struct PagePoint(double X, double Y);
 
 internal enum FileDialogKind
 {
@@ -139,6 +161,16 @@ internal interface IPlatformWindowEvents
 
     /// <summary>A document at <paramref name="uri"/> asks for <paramref name="permission"/>; true grants it.</summary>
     bool PermissionRequested(string uri, WebPermissions permission);
+
+    /// <summary>An item of the window's bar was clicked.</summary>
+    void MenuItemClicked(MenuItem item);
+
+    /// <summary>
+    /// Whether <paramref name="chord"/> may run an item of the window's bar,
+    /// once the page left it alone: the backend then keeps the webview from
+    /// using it, as it would Ctrl+P or F5.
+    /// </summary>
+    bool IsAccelerator(KeyChord chord);
 }
 
 /// <summary>
@@ -158,4 +190,5 @@ internal sealed record PlatformWindowOptions(
     string? AssetsFolder,
     EmbeddedFrontend? EmbeddedAssets,
     string? ErrorPage,
-    string UserDataFolder);
+    string UserDataFolder,
+    Menu? Menu = null);

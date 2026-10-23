@@ -178,6 +178,33 @@ with Win32 and WebView2:
   thread: posted actions, and so calls of `UiThread` services, still run
   meanwhile. What dialogs show is resolved in shared code (`Dialogs`), and
   tested against the fake backend.
+- **`NativeMenu`** turns a `Menu` into a Win32 menu, numbering its items
+  for `WM_COMMAND`, and refreshes each popup from its items on
+  `WM_INITMENUPOPUP`. **`DarkMenus`** makes menus dark through uxtheme's
+  functions by ordinal, and paints the bar (`WM_UAHDRAWMENU`,
+  `WM_UAHDRAWMENUITEM`), which Windows paints light whatever the theme.
+
+### Accelerators
+
+The webview has the keyboard focus, in a process of its own: keys never
+reach the window's message loop, so `TranslateAccelerator` cannot see them.
+And a menu that takes Ctrl+Z before the page breaks the page's editors.
+So keys go through the page:
+
+1. WebView2 raises `AcceleratorKeyPressed` before the page gets a key.
+   When the key is an accelerator of the bar (`IPlatformWindowEvents.IsAccelerator`),
+   the backend turns off the webview's own use of it
+   (`IsBrowserAcceleratorKeyEnabled`), so Ctrl+P does not print as well;
+   the page still gets the key.
+2. `bridge.js` listens to `keydown` on `window` in the capture phase, first,
+   and waits for the event's dispatch to end. Unless a listener called
+   `preventDefault()`, it sends a `key` message.
+3. `OrielWindow` runs the bar's item, or opens the bar for Alt and a
+   mnemonic, or F10.
+
+The editing roles (Copy, Paste…) run as a DevTools key event with
+editing commands (`Input.dispatchKeyEvent`), as the keyboard would: pages
+cannot paste by themselves.
 
 ### When the webview fails
 

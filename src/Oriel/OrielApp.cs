@@ -219,7 +219,8 @@ public sealed class OrielApp : IEventSink
             IsDev || Frontend.Embedded is not null ? null : Frontend.AssetsFolder,
             IsDev ? null : Frontend.Embedded,
             missing is null ? null : MissingPage(window.Url, missing),
-            Path.Combine(DataFolder(Environment.SpecialFolder.LocalApplicationData), "WebView"));
+            Path.Combine(DataFolder(Environment.SpecialFolder.LocalApplicationData), "WebView"),
+            options.Menu);
         Dispatch(() => window.Open(_platform, native));
         return window;
     }

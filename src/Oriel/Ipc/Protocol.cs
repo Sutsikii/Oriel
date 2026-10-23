@@ -17,6 +17,12 @@ internal static class Protocol
     /// <summary>A page calls a method: <c>{"t":"call","id":1,"k":token,"m":"Greeter.Greet","a":[...]}</c>.</summary>
     public const string Call = "call";
 
+    /// <summary>
+    /// The page left a key alone that may be a menu's accelerator:
+    /// <c>{"t":"key","k":token,"c":keyCode,"m":modifiers}</c>, the modifiers Ctrl 1, Shift 2, Alt 4.
+    /// </summary>
+    public const string Key = "key";
+
     /// <summary>A call returned: <c>{"t":"result","id":1,"k":token,"v":value}</c>, without <c>v</c> for nothing.</summary>
     public const string Result = "result";
 

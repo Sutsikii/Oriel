@@ -88,4 +88,7 @@ public sealed class WindowOptions
     /// denied. Defaults to <see cref="WebPermissions.None"/>.
     /// </summary>
     public WebPermissions Permissions { get; init; }
+
+    /// <summary>The menu bar of the window; see <see cref="OrielWindow.Menu"/>. Defaults to none.</summary>
+    public Menu? Menu { get; init; }
 }

@@ -60,9 +60,7 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
 
     public void SetTitle(string title) => Title = title;
 
-    public void OpenDevTools()
-    {
-    }
+    public void OpenDevTools() => DevToolsOpened++;
 
     public void Close() => Events.Closed();
 
@@ -105,6 +103,34 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
     public void ShowPrintDialog(PrintDialog dialog) => PrintDialogs.Enqueue(dialog);
 
     public void PrintToPdf(string path, PdfOptions? options, Action<bool> done) => Pdfs.Enqueue((path, options, done));
+
+    /// <summary>The menu of the bar, as the backend last got it.</summary>
+    public Menu? Menu { get; private set; } = options.Menu;
+
+    public void SetMenu(Menu? menu) => Menu = menu;
+
+    /// <summary>The context menus shown, in order, with where.</summary>
+    public ConcurrentQueue<(Menu Menu, PagePoint? At)> ContextMenus { get; } = new();
+
+    /// <summary>What the next context menus answer: the item clicked. None by default.</summary>
+    public Func<Menu, MenuItem?> ContextMenuAnswer { get; set; } = _ => null;
+
+    public MenuItem? ShowContextMenu(Menu menu, PagePoint? at)
+    {
+        ContextMenus.Enqueue((menu, at));
+        return ContextMenuAnswer(menu);
+    }
+
+    /// <summary>The menus of the bar opened from the keyboard, by mnemonic.</summary>
+    public ConcurrentQueue<char> BarActivations { get; } = new();
+
+    public void ActivateMenuBar(char mnemonic) => BarActivations.Enqueue(mnemonic);
+
+    public ConcurrentQueue<string> EditCommands { get; } = new();
+
+    public void RunEditCommand(string command) => EditCommands.Enqueue(command);
+
+    public int DevToolsOpened { get; private set; }
 
     public MessageResult ShowMessage(MessageRequest request)
     {

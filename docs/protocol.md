@@ -42,6 +42,22 @@ method's parameters, without the ones Oriel passes itself (see
 
 `id` numbers the calls of a page, from 1.
 
+### `key`
+
+The page let a key with Ctrl or Alt, or a function key, go by: no listener
+called `preventDefault()` on its `keydown`. It may be the accelerator of
+the window's menu (see [menus.md](menus.md#accelerators)). `c` is the
+key's `keyCode`, a Windows virtual-key code; `m` the modifiers, Ctrl 1,
+Shift 2 and Alt 4. Keys typed with AltGr, and Shift, Ctrl or Alt alone,
+are not sent.
+
+```json
+{ "t": "key", "k": "3f9a…", "c": 83, "m": 1 }
+```
+
+The runtime sees keys before the page's listeners, and sends them once
+they all ran.
+
 ## Messages from the app
 
 ### `result`

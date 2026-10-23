@@ -143,3 +143,48 @@ test("the runtime cannot be changed by pages", () => {
   const { runtime } = setup();
   assert.ok(Object.isFrozen(runtime));
 });
+
+/** A keydown as the page's listeners leave it. */
+function key(keyCode, mods = {}, prevented = false) {
+  return {
+    keyCode,
+    ctrlKey: !!mods.ctrl,
+    shiftKey: !!mods.shift,
+    altKey: !!mods.alt,
+    isComposing: false,
+    getModifierState: (name) => name === "AltGraph" && !!mods.altGraph,
+    defaultPrevented: prevented,
+  };
+}
+
+const turn = () => new Promise((resolve) => setTimeout(resolve));
+
+test("reports the shortcuts the page left alone, after its listeners", async () => {
+  const { keyDown, sent, token } = setup();
+  const e = key(83, { ctrl: true, shift: true });
+  keyDown(e);
+  assert.equal(sent.length, 1); // not before the page's listeners ran
+  await turn();
+  keyDown(key(116));
+  keyDown(key(70, { alt: true }));
+  await turn();
+  assert.deepEqual(sent.slice(1), [
+    { t: "key", k: token, c: 83, m: 3 },
+    { t: "key", k: token, c: 116, m: 0 },
+    { t: "key", k: token, c: 70, m: 4 },
+  ]);
+});
+
+test("leaves the keys the page handled, plain keys and AltGr to the page", async () => {
+  const { keyDown, sent } = setup();
+  const handled = key(90, { ctrl: true });
+  keyDown(handled);
+  handled.defaultPrevented = true; // a listener after the runtime's
+  keyDown(key(90));
+  keyDown(key(48, { ctrl: true, alt: true, altGraph: true }));
+  keyDown({ ...key(65, { ctrl: true }), isComposing: true });
+  keyDown(key(17, { ctrl: true })); // Ctrl itself
+  keyDown(key(18, { alt: true }));
+  await turn();
+  assert.equal(sent.length, 1);
+});
