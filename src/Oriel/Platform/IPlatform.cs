@@ -88,6 +88,29 @@ internal interface IPlatformWindow
     /// </summary>
     void ActivateMenuBar(char mnemonic);
 
+    /// <summary>Moves or resizes the window, in device-independent pixels; null keeps what it is. A minimized or maximized window is restored first.</summary>
+    void SetBounds(int? x, int? y, int? width, int? height);
+
+    /// <summary>Puts the window in the middle of its monitor's work area.</summary>
+    void Center();
+
+    void SetState(WindowState state);
+
+    void SetFullScreen(bool fullScreen);
+
+    void SetAlwaysOnTop(bool onTop);
+
+    /// <summary>Brings the window to the front and gives it the keyboard, restoring it when minimized.</summary>
+    void Focus();
+
+    /// <summary>
+    /// The window's placement, in a form of the backend's own that
+    /// <see cref="PlatformWindowOptions.Placement"/> takes back: the
+    /// position and size it has when neither minimized nor maximized, and
+    /// whether it is maximized. Still available while <see cref="IPlatformWindowEvents.Closed"/> runs.
+    /// </summary>
+    string Placement();
+
     /// <summary>Runs an editing command of the webview, such as <c>Copy</c>, in the page's focused element.</summary>
     void RunEditCommand(string command);
 }
@@ -162,6 +185,15 @@ internal interface IPlatformWindowEvents
     /// <summary>A document at <paramref name="uri"/> asks for <paramref name="permission"/>; true grants it.</summary>
     bool PermissionRequested(string uri, WebPermissions permission);
 
+    /// <summary>The window moved or was resized; <paramref name="bounds"/> are its new ones.</summary>
+    void BoundsChanged(WindowBounds bounds);
+
+    /// <summary>The window was minimized, maximized or restored.</summary>
+    void StateChanged(WindowState state);
+
+    /// <summary>The window became the active one, or stopped being it.</summary>
+    void FocusChanged(bool focused);
+
     /// <summary>An item of the window's bar was clicked.</summary>
     void MenuItemClicked(MenuItem item);
 
@@ -178,6 +210,11 @@ internal interface IPlatformWindowEvents
 /// pixels. When <c>ErrorPage</c> is set, the window shows that HTML instead of
 /// <c>Url</c>, which cannot be shown.
 /// </summary>
+/// <remarks>
+/// <c>Placement</c>, from <see cref="IPlatformWindow.Placement"/> of an
+/// earlier window, wins over the position, size and state when the backend
+/// can still use it.
+/// </remarks>
 internal sealed record PlatformWindowOptions(
     string Title,
     int Width,
@@ -191,4 +228,19 @@ internal sealed record PlatformWindowOptions(
     EmbeddedFrontend? EmbeddedAssets,
     string? ErrorPage,
     string UserDataFolder,
-    Menu? Menu = null);
+    Menu? Menu = null)
+{
+    public int? X { get; init; }
+
+    public int? Y { get; init; }
+
+    public bool Center { get; init; }
+
+    public WindowState State { get; init; }
+
+    public bool AlwaysOnTop { get; init; }
+
+    public bool Frameless { get; init; }
+
+    public string? Placement { get; init; }
+}

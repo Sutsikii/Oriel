@@ -94,6 +94,9 @@ public sealed class EndToEndTests : IDisposable
     public void Dispose()
     {
         Directory.Delete(_assets, recursive: true);
+        var roaming = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _name);
+        if (Directory.Exists(roaming))
+            Directory.Delete(roaming, recursive: true);
         var data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), _name);
         for (var i = 0; i < 10 && Directory.Exists(data); i++)
         {
@@ -221,6 +224,104 @@ public sealed class EndToEndTests : IDisposable
 
         Assert.Equal("pressed", report);
         Assert.Equal(["save", "refresh"], clicks);
+    }
+
+    /// <summary>
+    /// Runs an app with one window of <paramref name="options"/>, calls
+    /// <paramref name="act"/> once its page loaded, then closes it.
+    /// </summary>
+    private async Task RunWindow(WindowOptions options, Func<OrielApp, OrielWindow, Task> act)
+    {
+        File.WriteAllText(Path.Combine(_assets, "index.html"), """
+            <!doctype html><html><body><script type="module">await oriel.call("E2E.Loaded", []);</script></body></html>
+            """);
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var probe = new Probe();
+        app.Bind(probe);
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        var opened = new TaskCompletionSource<OrielWindow>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = Task.Run(() => app.Run(() => opened.SetResult(app.OpenWindow(options))));
+        var window = await opened.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await probe.FirstLoad.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await act(app, window);
+        window.Close();
+        Assert.Equal(0, await run.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Empty(errors);
+    }
+
+    /// <summary>Waits until <paramref name="done"/> holds, as windows move in steps.</summary>
+    private static async Task Until(Func<bool> done, string what)
+    {
+        for (var i = 0; i < 100 && !done(); i++)
+            await Task.Delay(50);
+        Assert.True(done(), what);
+    }
+
+    [EndToEndFact]
+    public async Task APlacementComesBackAcrossRuns()
+    {
+        var options = new WindowOptions { Width = 500, Height = 400, StateKey = "main" };
+        WindowBounds moved = default;
+        await RunWindow(options, async (_, window) =>
+        {
+            window.Move(123, 77);
+            window.Resize(640, 480);
+            await Until(() => window.Bounds is { X: 123, Y: 77, Width: 640, Height: 480 }, $"moved, at {window.Bounds}");
+            moved = window.Bounds;
+        });
+
+        await RunWindow(options, async (_, window) =>
+        {
+            await Until(() => window.Bounds == moved, $"back at {moved}, at {window.Bounds}");
+            Assert.Equal(WindowState.Normal, window.State);
+            var maximized = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            window.StateChanged += (_, _) =>
+            {
+                if (window.State == WindowState.Maximized)
+                    maximized.TrySetResult();
+            };
+            window.Maximize();
+            await maximized.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        });
+
+        await RunWindow(options, async (_, window) =>
+        {
+            await Until(() => window.State == WindowState.Maximized, "maximized again");
+            window.Restore();
+            await Until(() => window.State == WindowState.Normal && window.Bounds == moved, $"restored to {moved}, at {window.Bounds}");
+        });
+    }
+
+    [EndToEndFact]
+    public async Task FullScreenComesBackWhereItWas()
+    {
+        await RunWindow(new WindowOptions { Width = 500, Height = 400, X = 200, Y = 150 }, async (_, window) =>
+        {
+            await Until(() => window.Bounds is { X: 200, Y: 150, Width: 500, Height: 400 }, $"opened at {window.Bounds}");
+            var resized = 0;
+            window.Resized += (_, _) => resized++;
+            window.IsFullScreen = true;
+            await Task.Delay(300);
+            Assert.Equal(new WindowBounds(200, 150, 500, 400), window.Bounds); // full screen is not a placement
+            window.IsFullScreen = false;
+            await Task.Delay(300);
+            Assert.Equal(new WindowBounds(200, 150, 500, 400), window.Bounds);
+            Assert.Equal(0, resized);
+        });
+    }
+
+    [EndToEndFact]
+    public async Task AFramelessWindowFillsItselfWithThePage()
+    {
+        await RunWindow(new WindowOptions { Width = 500, Height = 400, Frameless = true, Center = true, Menu = new Menu(new MenuItem("&File")) }, async (_, window) =>
+        {
+            await Until(() => window.Bounds is { Width: 500, Height: 400 }, $"sized, at {window.Bounds}");
+            window.Maximize();
+            await Until(() => window.State == WindowState.Maximized, "maximized");
+            window.Restore();
+            await Until(() => window.State == WindowState.Normal && window.Bounds is { Width: 500, Height: 400 }, $"restored, at {window.Bounds}");
+        });
     }
 
     [EndToEndFact]

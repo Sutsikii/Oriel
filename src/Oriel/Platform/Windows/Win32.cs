@@ -13,13 +13,37 @@ internal static unsafe partial class Win32
     public const uint CS_VREDRAW = 0x0001;
 
     public const uint WS_OVERLAPPEDWINDOW = 0x00CF0000;
+    public const uint WS_POPUP = 0x80000000;
+    public const uint WS_EX_TOPMOST = 0x00000008;
+    public const int GWL_STYLE = -16;
+    public static readonly nint HWND_TOPMOST = -1;
+    public static readonly nint HWND_NOTOPMOST = -2;
     public const uint WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
     public const int CW_USEDEFAULT = unchecked((int)0x80000000);
     public static readonly nint HWND_MESSAGE = -3;
 
+    public const int SW_HIDE = 0;
     public const int SW_SHOWNORMAL = 1;
+    public const int SW_SHOWMINIMIZED = 2;
+    public const int SW_SHOWMAXIMIZED = 3;
+    public const int SW_MINIMIZE = 6;
+    public const int SW_RESTORE = 9;
+
+    public const uint WPF_RESTORETOMAXIMIZED = 0x0002;
+
+    public const uint MONITOR_DEFAULTTONULL = 0;
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    public const int SM_CXSIZEFRAME = 32;
+    public const int SM_CYSIZEFRAME = 33;
+    public const int SM_CXPADDEDBORDER = 92;
+
+    public const int WA_INACTIVE = 0;
 
     public const uint WM_DESTROY = 0x0002;
+    public const uint WM_MOVE = 0x0003;
+    public const uint WM_ACTIVATE = 0x0006;
+    public const uint WM_NCCALCSIZE = 0x0083;
     public const uint WM_SIZE = 0x0005;
     public const uint WM_SETFOCUS = 0x0007;
     public const uint WM_CLOSE = 0x0010;
@@ -40,8 +64,12 @@ internal static unsafe partial class Win32
     public const uint SWP_NOZORDER = 0x0004;
     public const uint SWP_NOACTIVATE = 0x0010;
     public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_FRAMECHANGED = 0x0020;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
 
     public const int SIZE_MINIMIZED = 1;
+    public const int SIZE_MAXIMIZED = 2;
 
     public const nuint SC_KEYMENU = 0xF100;
 
@@ -155,6 +183,75 @@ internal static unsafe partial class Win32
         public POINT ptMinTrackSize;
         public POINT ptMaxTrackSize;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WINDOWPLACEMENT
+    {
+        public uint length;
+        public uint flags;
+        public uint showCmd;
+        public POINT ptMinPosition;
+        public POINT ptMaxPosition;
+        public RECT rcNormalPosition;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MONITORINFO
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    /// <summary>What <see cref="WM_NCCALCSIZE"/> points to when its wParam is TRUE: the first rectangle becomes the client area.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NCCALCSIZE_PARAMS
+    {
+        public RECT rgrc0;
+        public RECT rgrc1;
+        public RECT rgrc2;
+        public nint lppos;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowPlacement(nint hwnd, WINDOWPLACEMENT* placement);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPlacement(nint hwnd, WINDOWPLACEMENT* placement);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint MonitorFromWindow(nint hwnd, uint flags);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint MonitorFromRect(RECT* rect, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetMonitorInfoW(nint monitor, MONITORINFO* info);
+
+    [LibraryImport("user32.dll")]
+    public static partial int GetSystemMetricsForDpi(int index, uint dpi);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetWindowLongPtrW(nint hwnd, int index);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint SetWindowLongPtrW(nint hwnd, int index, nint value);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetForegroundWindow(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsZoomed(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsIconic(nint hwnd);
 
     [StructLayout(LayoutKind.Sequential)]
     public struct MENUITEMINFOW

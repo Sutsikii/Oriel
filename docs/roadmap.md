@@ -24,6 +24,9 @@ self-contained piece of work.
 - Printing: print dialogs, and pages to PDF files with their layout.
 - Menus: the menu bar and context menus, with check items, roles and
   accelerators the page gets first; dark with Windows.
+- Window control: position, size, states, full screen, always on top,
+  focus; frameless windows with drag regions; placements remembered across
+  runs, on the right monitor.
 - `Oriel.Hosting`: apps on the .NET Generic Host, with services from
   dependency injection (for the app, per window, per call), `ILogger`,
   configuration and hosted services.
@@ -39,8 +42,6 @@ self-contained piece of work.
 
 ### Windows and desktop
 
-- **Window control**: position, size, state, full screen, frameless windows
-  with drag regions, and remembering their placement.
 - **Tray icon, notifications, single instance, deep links.**
 - **Embedded files**: the frontend inside the executable, served through
   `WebResourceRequested`, for a single-file app.

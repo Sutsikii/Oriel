@@ -184,6 +184,23 @@ with Win32 and WebView2:
   functions by ordinal, and paints the bar (`WM_UAHDRAWMENU`,
   `WM_UAHDRAWMENUITEM`), which Windows paints light whatever the theme.
 
+### Placements and frameless windows
+
+A window's placement is the backend's own string (`IPlatformWindow.Placement`):
+on Windows, the rectangle and state of `GetWindowPlacement`, which is the
+normal rectangle whatever the window's state. `OrielWindow` saves it by
+`StateKey` as the window closes, in `PlacementStore`, and passes it back to
+the next window, whose backend checks its monitor still exists. It is
+restored with `SetWindowPlacement` while the window is hidden, twice: the
+first move to a monitor of another scale resizes the window
+(`WM_DPICHANGED`), the second puts it right.
+
+A frameless window keeps its frame for Windows, so it has a shadow and
+resizes, but its `WM_NCCALCSIZE` gives the client area up to the top:
+the caption is gone, the side and bottom borders are invisible already. The
+page's `app-region: drag` is WebView2's, with
+`IsNonClientRegionSupportEnabled`.
+
 ### Accelerators
 
 The webview has the keyboard focus, in a process of its own: keys never

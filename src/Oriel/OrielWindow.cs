@@ -16,6 +16,12 @@ public sealed class OrielWindow : IPlatformWindowEvents
     private volatile string _title;
     private volatile bool _closed;
     private volatile Menu? _menu;
+    private readonly Lock _placementLock = new();
+    private WindowBounds _bounds;
+    private volatile WindowState _state;
+    private volatile bool _focused;
+    private volatile bool _fullScreen;
+    private volatile bool _alwaysOnTop;
     private readonly RecoveryPolicy _recovery;
     private readonly List<TaskCompletionSource<bool>> _pendingPdfs = [];
 
@@ -30,6 +36,9 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _recovery = new RecoveryPolicy(app.Time);
         Dialogs = new Dialogs(this);
         _menu = options.Menu;
+        _bounds = new WindowBounds(options.X ?? 0, options.Y ?? 0, Math.Max(1, options.Width), Math.Max(1, options.Height));
+        _state = options.State;
+        _alwaysOnTop = options.AlwaysOnTop;
         Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch, showExceptionMessages: app.IsDev);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
         Connection.KeyPressed += chord => app.Dispatch(() => PressKey(chord));
@@ -141,6 +150,97 @@ public sealed class OrielWindow : IPlatformWindowEvents
 
     /// <summary>Closes the window.</summary>
     public void Close() => _app.Dispatch(() => _native?.Close());
+
+    /// <summary>
+    /// Where the window is, frame included, in device-independent pixels, as
+    /// it was last moved or resized. Neither minimizing nor maximizing changes it.
+    /// </summary>
+    public WindowBounds Bounds
+    {
+        get
+        {
+            lock (_placementLock)
+                return _bounds;
+        }
+    }
+
+    /// <summary>Whether the window is minimized, maximized, or neither.</summary>
+    public WindowState State => _state;
+
+    /// <summary>Whether the window is the active one, with the keyboard.</summary>
+    public bool IsFocused => _focused;
+
+    /// <summary>Whether the window fills its monitor, without its frame nor the taskbar. Any thread may set it.</summary>
+    public bool IsFullScreen
+    {
+        get => _fullScreen;
+        set
+        {
+            _fullScreen = value;
+            Native(native => native.SetFullScreen(value));
+        }
+    }
+
+    /// <summary>Whether the window stays over the others, even when it is not the active one. Any thread may set it.</summary>
+    public bool IsAlwaysOnTop
+    {
+        get => _alwaysOnTop;
+        set
+        {
+            _alwaysOnTop = value;
+            Native(native => native.SetAlwaysOnTop(value));
+        }
+    }
+
+    /// <summary>Raised on the UI thread when the window moved.</summary>
+    public event EventHandler? Moved;
+
+    /// <summary>Raised on the UI thread when the window was resized.</summary>
+    public event EventHandler? Resized;
+
+    /// <summary>Raised on the UI thread when the window was minimized, maximized or restored: see <see cref="State"/>.</summary>
+    public event EventHandler? StateChanged;
+
+    /// <summary>Raised on the UI thread when the window became the active one, or stopped being it: see <see cref="IsFocused"/>.</summary>
+    public event EventHandler? FocusChanged;
+
+    /// <summary>Moves the window to <paramref name="x"/> and <paramref name="y"/>, in device-independent pixels, restoring it first when minimized or maximized.</summary>
+    public void Move(int x, int y) => Native(native => native.SetBounds(x, y, null, null));
+
+    /// <summary>Resizes the window, frame included, in device-independent pixels, restoring it first when minimized or maximized.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">A size is not positive.</exception>
+    public void Resize(int width, int height)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        Native(native => native.SetBounds(null, null, width, height));
+    }
+
+    /// <summary>Puts the window in the middle of its monitor.</summary>
+    public void Center() => Native(native => native.Center());
+
+    /// <summary>Minimizes the window to the taskbar.</summary>
+    public void Minimize() => Native(native => native.SetState(WindowState.Minimized));
+
+    /// <summary>Maximizes the window.</summary>
+    public void Maximize() => Native(native => native.SetState(WindowState.Maximized));
+
+    /// <summary>Restores the window from minimized or maximized.</summary>
+    public void Restore() => Native(native => native.SetState(WindowState.Normal));
+
+    /// <summary>
+    /// Brings the window to the front and gives it the keyboard, restoring it
+    /// when minimized. Windows may only flash it in the taskbar, when another
+    /// app has the keyboard.
+    /// </summary>
+    public void Focus() => Native(native => native.Focus());
+
+    /// <summary>Runs <paramref name="act"/> with the backend's window on the UI thread, unless the window is closed.</summary>
+    private void Native(Action<IPlatformWindow> act) => _app.Dispatch(() =>
+    {
+        if (!_closed && _native is { } native)
+            act(native);
+    });
 
     /// <summary>
     /// Opens a print dialog for the page, as Ctrl+P does. It returns at once;
@@ -261,6 +361,17 @@ public sealed class OrielWindow : IPlatformWindowEvents
         if (_closed)
             return;
         _closed = true;
+        if (Options.StateKey is { } key && _native is { } native)
+        {
+            try
+            {
+                _app.Placements.Save(key, native.Placement());
+            }
+            catch (Exception e)
+            {
+                _app.ReportError(e); // the window closes all the same
+            }
+        }
         _native = null;
         Connection.Dispose();
         // The webview went with the window: its PDFs will never be written.
@@ -274,6 +385,48 @@ public sealed class OrielWindow : IPlatformWindowEvents
     }
 
     void IPlatformWindowEvents.Failed(Exception error) => _app.ReportError(error);
+
+    void IPlatformWindowEvents.BoundsChanged(WindowBounds bounds)
+    {
+        WindowBounds before;
+        lock (_placementLock)
+        {
+            before = _bounds;
+            _bounds = bounds;
+        }
+        if ((bounds.X, bounds.Y) != (before.X, before.Y))
+            Raise(Moved);
+        if ((bounds.Width, bounds.Height) != (before.Width, before.Height))
+            Raise(Resized);
+    }
+
+    void IPlatformWindowEvents.StateChanged(WindowState state)
+    {
+        if (state == _state)
+            return;
+        _state = state;
+        Raise(StateChanged);
+    }
+
+    void IPlatformWindowEvents.FocusChanged(bool focused)
+    {
+        if (focused == _focused)
+            return;
+        _focused = focused;
+        Raise(FocusChanged);
+    }
+
+    private void Raise(EventHandler? handler)
+    {
+        try
+        {
+            handler?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception e)
+        {
+            _app.ReportError(e);
+        }
+    }
 
     void IPlatformWindowEvents.MenuItemClicked(MenuItem item) => Run(item);
 
