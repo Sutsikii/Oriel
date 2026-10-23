@@ -65,6 +65,12 @@ internal sealed class PageConnection : IDisposable
     public event Action<string>? MessageRefused;
 
     /// <summary>
+    /// Raised when the page let a key with Ctrl or Alt, or a function key, go
+    /// by without <c>preventDefault()</c>: it may be the accelerator of a menu.
+    /// </summary>
+    public event Action<KeyChord>? KeyPressed;
+
+    /// <summary>
     /// Handles a message from the page. Calls run on the thread pool; the task
     /// completes once the reply, if any, is posted. Messages that are not JSON
     /// or break a limit are refused, other malformed ones ignored.
@@ -133,6 +139,14 @@ internal sealed class PageConnection : IDisposable
                     Interlocked.Decrement(ref _callsInFlight);
                 }
             });
+        }
+
+        if (type == Protocol.Key
+            && root.TryGetProperty("c", out var code) && code.ValueKind == JsonValueKind.Number && code.TryGetInt32(out var key)
+            && root.TryGetProperty("m", out var mods) && mods.ValueKind == JsonValueKind.Number && mods.TryGetInt32(out var modifiers)
+            && !cancellation.IsCancellationRequested)
+        {
+            KeyPressed?.Invoke(new KeyChord(key, (KeyModifiers)modifiers & (KeyModifiers.Ctrl | KeyModifiers.Shift | KeyModifiers.Alt)));
         }
 
         doc.Dispose(); // a hello, or a message of a later protocol

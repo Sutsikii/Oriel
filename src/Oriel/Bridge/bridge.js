@@ -84,9 +84,30 @@
       }
     }
 
+    /**
+     * Sees a keydown of the page first, and reports it to the app once the
+     * page's listeners had their turn, unless one of them called
+     * preventDefault(): it may be the accelerator of a menu. Only keys with
+     * Ctrl or Alt and function keys: the others are the page's, and AltGr
+     * (Ctrl+Alt on Windows) types characters.
+     */
+    function keyDown(e) {
+      const fn = e.keyCode >= 112 && e.keyCode <= 135;
+      if (!(e.ctrlKey || e.altKey || fn) || e.isComposing || MODIFIER_KEYS.has(e.keyCode)) return;
+      if (typeof e.getModifierState === "function" && e.getModifierState("AltGraph")) return;
+      setTimeout(() => {
+        if (e.defaultPrevented) return;
+        const m = (e.ctrlKey ? 1 : 0) | (e.shiftKey ? 2 : 0) | (e.altKey ? 4 : 0);
+        send({ t: "key", k: token, c: e.keyCode, m });
+      });
+    }
+
     send({ t: "hello", k: token });
-    return { runtime: Object.freeze({ call, on }), receive, token };
+    return { runtime: Object.freeze({ call, on }), receive, keyDown, token };
   }
+
+  /** Shift, Ctrl, Alt and the Windows keys: pressed alone, they are no shortcut. */
+  const MODIFIER_KEYS = new Set([16, 17, 18, 91, 92, 93]);
 
   /**
    * The error a failed call rejects with; the generated client rethrows it as
@@ -131,7 +152,8 @@
   // Only the top document of an Oriel window talks to the app.
   const webview = root.chrome && root.chrome.webview;
   if (!webview || root.oriel || root.top !== root) return;
-  const { runtime, receive } = createRuntime((message) => webview.postMessage(message));
+  const { runtime, receive, keyDown } = createRuntime((message) => webview.postMessage(message));
   webview.addEventListener("message", (e) => receive(e.data));
+  root.addEventListener("keydown", keyDown, true);
   Object.defineProperty(root, "oriel", { value: runtime, enumerable: true });
 })(globalThis);

@@ -21,12 +21,17 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     private string? _errorPage;
     private bool _browserGone;
     private bool _destroyed;
+    private bool _dark;
+    private NativeMenu? _bar;
+    private NativeMenu? _contextMenu;
+    private nint _menuTheme;
 
     public WindowsWebWindow(WindowsPlatform platform, PlatformWindowOptions options, IPlatformWindowEvents events)
     {
         _platform = platform;
         _options = options;
         _events = events;
+        _bar = options.Menu is null ? null : new NativeMenu(options.Menu, bar: true);
 
         fixed (char* cls = "OrielWindow")
         fixed (char* title = options.Title)
@@ -34,10 +39,14 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             Hwnd = Win32.CreateWindowExW(
                 0, cls, title, Win32.WS_OVERLAPPEDWINDOW,
                 Win32.CW_USEDEFAULT, Win32.CW_USEDEFAULT, options.Width, options.Height,
-                0, 0, platform.Instance, 0);
+                0, _bar?.Handle ?? 0, platform.Instance, 0);
         }
         if (Hwnd == 0)
-            throw new COMException("Creating the window failed", Marshal.GetHRForLastWin32Error());
+        {
+            var error = Marshal.GetHRForLastWin32Error();
+            _bar?.Dispose();
+            throw new COMException("Creating the window failed", error);
+        }
 
         // Sizes are in device-independent pixels: scale them to the window's display.
         var scale = Scale;
@@ -84,6 +93,74 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => ShellDialogs.Show(Hwnd, request);
 
     public MessageResult ShowMessage(MessageRequest request) => ShellDialogs.Message(Hwnd, request);
+
+    public void SetMenu(Menu? menu)
+    {
+        if (_destroyed)
+            return;
+        var old = _bar;
+        _bar = menu is null ? null : new NativeMenu(menu, bar: true);
+        Win32.SetMenu(Hwnd, _bar?.Handle ?? 0);
+        old?.Dispose(); // a window destroys only the menu it has
+        Resize();
+    }
+
+    public MenuItem? ShowContextMenu(Menu menu, PagePoint? at)
+    {
+        if (_destroyed)
+            return null;
+        Win32.POINT point;
+        if (at is { } p)
+        {
+            // The webview fills the client area: CSS pixels are scaled, from its corner.
+            var scale = Scale;
+            point = new Win32.POINT { X = (int)Math.Round(p.X * scale), Y = (int)Math.Round(p.Y * scale) };
+            Win32.ClientToScreen(Hwnd, &point);
+        }
+        else
+        {
+            Win32.GetCursorPos(&point);
+        }
+        using var native = new NativeMenu(menu, bar: false);
+        _contextMenu = native;
+        try
+        {
+            var id = Win32.TrackPopupMenuEx(native.Handle, Win32.TPM_RETURNCMD | Win32.TPM_RIGHTBUTTON, point.X, point.Y, Hwnd, 0);
+            return native.Command(id);
+        }
+        finally
+        {
+            _contextMenu = null;
+        }
+    }
+
+    public void ActivateMenuBar(char mnemonic)
+    {
+        // Posted: the menu's loop runs once this key is done with.
+        if (_bar is not null && !_destroyed)
+            Win32.PostMessageW(Hwnd, Win32.WM_SYSCOMMAND, Win32.SC_KEYMENU, mnemonic);
+    }
+
+    public void RunEditCommand(string command)
+    {
+        if (_webview == 0)
+            return;
+        // A key event carrying an editing command runs it as the keyboard
+        // would, in the focused element: pages cannot paste by themselves.
+        var handler = ComCallback.ForResult(WebView2.IID_CallDevToolsProtocolMethodCompletedHandler, (hr, _) =>
+        {
+            if (hr < 0)
+                Tracing.Write($"window {Hwnd:X}: the editing command {command} failed with 0x{hr:X8}");
+        });
+        try
+        {
+            WebView2.WebView.CallDevToolsProtocolMethod(_webview, "Input.dispatchKeyEvent", $$"""{"type":"keyDown","commands":["{{command}}"]}""", handler);
+        }
+        finally
+        {
+            Com.Release(handler);
+        }
+    }
 
     public void ShowPrintDialog(PrintDialog dialog)
     {
@@ -207,12 +284,43 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
                 ApplyTheme();
                 return false;
 
+            case Win32.WM_COMMAND:
+                // From the bar: accelerators come from the page, not as WM_COMMAND.
+                if (Win32.HiWord((nint)wParam) == 0 && lParam == 0 && _bar?.Command(Win32.LoWord((nint)wParam)) is { } item)
+                {
+                    _events.MenuItemClicked(item);
+                    return true;
+                }
+                return false;
+
+            case Win32.WM_INITMENUPOPUP:
+                return _contextMenu?.Refresh((nint)wParam) == true || _bar?.Refresh((nint)wParam) == true;
+
+            case Win32.WM_UAHDRAWMENU when _dark && _bar is not null:
+                DarkMenus.PaintBar(Hwnd, (Win32.UAHMENU*)lParam);
+                return true;
+
+            case Win32.WM_UAHDRAWMENUITEM when _dark && _bar is not null:
+                if (_menuTheme == 0)
+                    _menuTheme = Win32.OpenThemeData(Hwnd, "Menu");
+                DarkMenus.PaintItem(_menuTheme, (Win32.UAHDRAWMENUITEM*)lParam);
+                return true;
+
+            case Win32.WM_NCPAINT or Win32.WM_NCACTIVATE when _dark && _bar is not null:
+                result = Win32.DefWindowProcW(Hwnd, msg, wParam, lParam);
+                DarkMenus.PaintLineUnderBar(Hwnd);
+                return true;
+
             case Win32.WM_CLOSE:
                 Win32.DestroyWindow(Hwnd);
                 return true;
 
             case Win32.WM_DESTROY:
                 _destroyed = true;
+                _bar = null; // destroyed with the window
+                if (_menuTheme != 0)
+                    Win32.CloseThemeData(_menuTheme);
+                _menuTheme = 0;
                 ReleaseWebView();
                 _platform.Forget(Hwnd);
                 _events.Closed();
@@ -333,8 +441,31 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             _events.WebViewFailed(failure);
         });
 
+        // The page gets the keys first: an accelerator of the bar only keeps
+        // the webview from using it, as it would Ctrl+P or F5, and runs once
+        // the page left it alone (bridge.js says so).
+        var keys = ComCallback.ForEvent(WebView2.IID_AcceleratorKeyPressedEventHandler, (_, args) =>
+        {
+            if (WebView2.AcceleratorKeyPressedEventArgs.GetKind(args) is not (WebView2.KeyDown or WebView2.SystemKeyDown))
+                return;
+            var chord = new KeyChord(WebView2.AcceleratorKeyPressedEventArgs.GetVirtualKey(args), Modifiers());
+            if (_events.IsAccelerator(chord))
+                WebView2.AcceleratorKeyPressedEventArgs.DisableBrowserAccelerator(args);
+        });
+        try
+        {
+            WebView2.Controller.AddAcceleratorKeyPressed(_controller, keys);
+        }
+        finally
+        {
+            Com.Release(keys);
+        }
+
         Resize();
         WebView2.Controller.SetVisible(_controller, true);
+        // The window took the focus as it showed, before there was a webview to give it to.
+        if (Win32.GetFocus() == Hwnd)
+            WebView2.Controller.MoveFocus(_controller);
 
         // The bridge must be in place before the first page starts.
         var added = ComCallback.ForResult(WebView2.IID_AddScriptCompletedHandler, (hr, _) =>
@@ -446,11 +577,27 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         _controller = 0;
     }
 
-    /// <summary>Gives the title bar the dark look when Windows is set to dark apps.</summary>
+    private static KeyModifiers Modifiers()
+    {
+        var modifiers = KeyModifiers.None;
+        if (Win32.GetKeyState(Win32.VK_CONTROL) < 0)
+            modifiers |= KeyModifiers.Ctrl;
+        if (Win32.GetKeyState(Win32.VK_SHIFT) < 0)
+            modifiers |= KeyModifiers.Shift;
+        if (Win32.GetKeyState(Win32.VK_MENU) < 0)
+            modifiers |= KeyModifiers.Alt;
+        return modifiers;
+    }
+
+    /// <summary>Gives the title bar and the menus the dark look when Windows is set to dark apps.</summary>
     private void ApplyTheme()
     {
-        int dark = UsesDarkTheme() ? 1 : 0;
+        _dark = UsesDarkTheme();
+        int dark = _dark ? 1 : 0;
         Win32.DwmSetWindowAttribute(Hwnd, Win32.DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(int));
+        DarkMenus.Apply(Hwnd, _dark);
+        if (_bar is not null)
+            Win32.DrawMenuBar(Hwnd);
     }
 
     private static bool UsesDarkTheme()

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Oriel.Platform;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
@@ -61,6 +62,10 @@ public sealed class Probe
 
     public void Report(string result) => Reported.TrySetResult(result);
 
+    /// <summary>Clicks an item of <paramref name="role"/> in the window's menu, as the person would.</summary>
+    public void Click(OrielWindow window, string role) =>
+        window.App.Dispatch(() => ((IPlatformWindowEvents)window).MenuItemClicked(new MenuItem(Enum.Parse<MenuRole>(role))));
+
     public TaskCompletionSource FirstLoad { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public TaskCompletionSource SecondLoad { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -104,7 +109,7 @@ public sealed class EndToEndTests : IDisposable
     }
 
     /// <summary>Runs an app showing a page of <paramref name="script"/>, until the page reports; then closes it.</summary>
-    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null)
+    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null, Menu? menu = null)
     {
         File.WriteAllText(Path.Combine(_assets, "index.html"), $$"""
             <!doctype html>
@@ -127,7 +132,7 @@ public sealed class EndToEndTests : IDisposable
         OrielWindow? window = null;
         var run = Task.Run(() => app.Run(() =>
         {
-            window = app.OpenWindow(new WindowOptions { Width = 400, Height = 300 });
+            window = app.OpenWindow(new WindowOptions { Width = 400, Height = 300, Menu = menu });
             setUp?.Invoke(window);
         }));
 
@@ -177,6 +182,71 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal("https://app.oriel", root.GetProperty("origin").GetString());
         Assert.Equal("Done", window.Title);
         Assert.True(window.IsClosed);
+    }
+
+    [EndToEndFact]
+    public async Task AcceleratorsRunTheMenuUnlessThePageHandlesThem()
+    {
+        var clicks = new List<string>();
+        void Clicked(string what)
+        {
+            lock (clicks)
+                clicks.Add(what);
+        }
+        var menu = new Menu(new MenuItem("&File")
+        {
+            Items =
+            [
+                new MenuItem("&Save", "Ctrl+S") { Clicked = _ => Clicked("save") },
+                new MenuItem("&Find", "Ctrl+K") { Clicked = _ => Clicked("find") },
+                new MenuItem("&Refresh", "F5") { Clicked = _ => Clicked("refresh") },
+            ],
+        });
+
+        var (report, _, _, _) = await RunPage("""
+            // The page keeps Ctrl+K, as an editor keeps Ctrl+Z.
+            addEventListener("keydown", (e) => { if (e.ctrlKey && e.keyCode === 75) e.preventDefault(); });
+            const press = (keyCode, ctrlKey) => {
+              const e = new KeyboardEvent("keydown", { ctrlKey, bubbles: true, cancelable: true });
+              Object.defineProperty(e, "keyCode", { get: () => keyCode });
+              document.body.dispatchEvent(e);
+            };
+            press(75, true);
+            press(83, true);
+            press(116, false);
+            press(83, false); // a plain S is the page's
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            await oriel.call("E2E.Report", ["pressed"]);
+            """, menu: menu);
+
+        Assert.Equal("pressed", report);
+        Assert.Equal(["save", "refresh"], clicks);
+    }
+
+    [EndToEndFact]
+    public async Task EditingRolesEditThePage()
+    {
+        var (report, _, _, _) = await RunPage("""
+            const field = document.createElement("input");
+            field.value = "some text";
+            document.body.append(field);
+            field.focus();
+            const after = async (role) => {
+              await oriel.call("E2E.Click", [role]);
+              await new Promise((resolve) => setTimeout(resolve, 300));
+              return field.value;
+            };
+            // Chromium drops input until the page has painted.
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            field.setSelectionRange(0, 0);
+            await after("SelectAll");
+            const selected = field.selectionEnd - field.selectionStart;
+            const deleted = await after("Delete");
+            const undone = await after("Undo");
+            await oriel.call("E2E.Report", [JSON.stringify({ selected, deleted, undone })]);
+            """, menu: new Menu(new MenuItem("&Edit") { Items = [new MenuItem(MenuRole.Undo)] }));
+
+        Assert.Equal("""{"selected":9,"deleted":"","undone":"some text"}""", report);
     }
 
     [EndToEndFact]

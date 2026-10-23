@@ -15,6 +15,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
     private IPlatformWindow? _native;
     private volatile string _title;
     private volatile bool _closed;
+    private volatile Menu? _menu;
     private readonly RecoveryPolicy _recovery;
     private readonly List<TaskCompletionSource<bool>> _pendingPdfs = [];
 
@@ -28,8 +29,10 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _title = options.Title ?? app.Options.Name;
         _recovery = new RecoveryPolicy(app.Time);
         Dialogs = new Dialogs(this);
+        _menu = options.Menu;
         Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch, showExceptionMessages: app.IsDev);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
+        Connection.KeyPressed += chord => app.Dispatch(() => PressKey(chord));
         Connection.MessageRefused += reason =>
             app.ReportError(new InvalidDataException($"The page of the window \"{Title}\" sent {reason}."));
     }
@@ -89,6 +92,52 @@ public sealed class OrielWindow : IPlatformWindowEvents
     public Dialogs Dialogs { get; }
 
     internal PageConnection Connection { get; }
+
+    /// <summary>
+    /// The menu bar of the window, or null for none. Any thread may set it.
+    /// The accelerators of its items run them, once the page left the keys
+    /// alone; see <see cref="MenuItem.Accelerator"/>.
+    /// </summary>
+    public Menu? Menu
+    {
+        get => _menu;
+        set
+        {
+            _menu = value;
+            _app.Dispatch(() =>
+            {
+                if (!_closed)
+                    _native?.SetMenu(value);
+            });
+        }
+    }
+
+    /// <summary>
+    /// Shows <paramref name="menu"/> at the mouse pointer, as a right click
+    /// does, and runs the item clicked. Any thread may call it.
+    /// </summary>
+    /// <returns>The item clicked, once it ran; null when the menu was closed without a click, or the window is closed.</returns>
+    public Task<MenuItem?> ShowContextMenuAsync(Menu menu) => ShowContextMenu(menu, null);
+
+    /// <summary>
+    /// Shows <paramref name="menu"/> at a point of the page, in CSS pixels
+    /// from its top left corner, such as the <c>clientX</c> and <c>clientY</c>
+    /// of a <c>contextmenu</c> event; and runs the item clicked. Any thread may call it.
+    /// </summary>
+    /// <returns>The item clicked, once it ran; null when the menu was closed without a click, or the window is closed.</returns>
+    public Task<MenuItem?> ShowContextMenuAsync(Menu menu, double x, double y) => ShowContextMenu(menu, new PagePoint(x, y));
+
+    private Task<MenuItem?> ShowContextMenu(Menu menu, PagePoint? at)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        return ShowModal<MenuItem?>(native =>
+        {
+            var item = native.ShowContextMenu(menu, at);
+            if (item is not null)
+                Run(item);
+            return item;
+        }, null);
+    }
 
     /// <summary>Closes the window.</summary>
     public void Close() => _app.Dispatch(() => _native?.Close());
@@ -225,6 +274,88 @@ public sealed class OrielWindow : IPlatformWindowEvents
     }
 
     void IPlatformWindowEvents.Failed(Exception error) => _app.ReportError(error);
+
+    void IPlatformWindowEvents.MenuItemClicked(MenuItem item) => Run(item);
+
+    bool IPlatformWindowEvents.IsAccelerator(KeyChord chord) => Accelerated(chord) is not null;
+
+    /// <summary>A key the page left alone: it runs an item of the bar, or opens the bar as Alt and a letter, or F10, do.</summary>
+    private void PressKey(KeyChord chord)
+    {
+        if (_closed || _native is not { } native)
+            return;
+        switch (Accelerated(chord))
+        {
+            case MenuItem item:
+                Tracing.Write($"{chord} runs the menu item {item.Text}");
+                Run(item);
+                break;
+            case char mnemonic:
+                Tracing.Write($"{chord} opens the menu bar");
+                native.ActivateMenuBar(mnemonic);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// What <paramref name="chord"/> does in the bar: the item it runs, the
+    /// mnemonic of the menu it opens (<c>'\0'</c> for F10, which selects the
+    /// bar), or null for nothing.
+    /// </summary>
+    private object? Accelerated(KeyChord chord)
+    {
+        if (_menu is not { } menu)
+            return null;
+        if (menu.Find(chord) is { } item)
+            return item;
+        if (chord.Modifiers == KeyModifiers.Alt && chord.Key is >= 'A' and <= 'Z' or >= '0' and <= '9' && menu.FindMnemonic((char)chord.Key) >= 0)
+            return (char)chord.Key;
+        if (chord == new KeyChord(0x79, KeyModifiers.None))
+            return '\0';
+        return null;
+    }
+
+    /// <summary>Does what <paramref name="item"/> does, on the UI thread: toggles its check, then its handler or its role.</summary>
+    private void Run(MenuItem item)
+    {
+        if (item.IsSeparator || item.Items.Count > 0 || !item.Enabled)
+            return;
+        if (item.IsCheckable)
+            item.IsChecked = !item.IsChecked;
+        try
+        {
+            if (item.Clicked is { } clicked)
+            {
+                clicked(this);
+                return;
+            }
+            switch (item.Role)
+            {
+                case var role when Roles.IsEditing(role):
+                    _native?.RunEditCommand(Roles.EditCommand(role));
+                    break;
+                case MenuRole.Reload:
+                    _native?.Reload();
+                    break;
+                case MenuRole.DevTools:
+                    _native?.OpenDevTools();
+                    break;
+                case MenuRole.Print:
+                    _native?.ShowPrintDialog(PrintDialog.Browser);
+                    break;
+                case MenuRole.CloseWindow:
+                    _native?.Close();
+                    break;
+                case MenuRole.Quit:
+                    _app.Quit();
+                    break;
+            }
+        }
+        catch (Exception e)
+        {
+            _app.ReportError(e);
+        }
+    }
 
     NavigationAction IPlatformWindowEvents.NavigationStarting(string uri, bool isUserInitiated) =>
         Navigate(uri, isNewWindow: false, isUserInitiated);
