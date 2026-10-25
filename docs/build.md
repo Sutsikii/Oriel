@@ -143,6 +143,10 @@ Installing a new version over an old one replaces it: the two share an
 GUID of your own once the app ships, and keep it: renaming the app would
 otherwise make the next version a different app.
 
+An app made by copying an example keeps the example's `OrielAppId`, and
+its installs would replace the example's, or those of any other copy:
+publishing it warns, and gives a new GUID to use instead.
+
 | Property | Default | What it does |
 |---|---|---|
 | `OrielInstaller` | `false` | Builds the installer after `dotnet publish`. |
