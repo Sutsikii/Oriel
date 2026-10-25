@@ -94,6 +94,8 @@ tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/
 - [Printing](docs/printing.md): print dialogs, and pages to PDF files.
 - [Building and shipping](docs/build.md): build properties, development
   loop, publishing.
+- [WebView2](docs/webview2.md): the runtime apps need, its updates, and
+  machines without it.
 - [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL006, and
   the experimental APIs.
 - [The page protocol](docs/protocol.md): the messages under the client.
