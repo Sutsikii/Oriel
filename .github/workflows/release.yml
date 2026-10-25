@@ -1,0 +1,106 @@
+name: Release
+
+# Pushing a tag v0.1.0-preview.1 tests, packs Oriel and Oriel.Hosting at
+# version 0.1.0-preview.1, publishes them to nuget.org and creates the
+# GitHub release, with that version's section of CHANGELOG.md as its notes.
+# On pull requests that touch the release, it runs up to the packages and
+# their notes, and publishes nothing.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - CHANGELOG.md
+      - Directory.Build.props
+      - src/*/*.csproj
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  release:
+    name: Pack and publish
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Find the version
+        id: version
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            # A dry run takes the newest version of the changelog.
+            version="$(sed -n 's/^## \([0-9][^ ]*\).*/\1/p' CHANGELOG.md | head -n 1)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version $version"
+
+      - name: Take the release notes from the changelog
+        shell: bash
+        run: |
+          awk -v v="${{ steps.version.outputs.version }}" '
+            $0 ~ "^## " { if (found) exit; found = ($2 == v); next }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md has no section '## ${{ steps.version.outputs.version }}'." >&2
+            exit 1
+          fi
+          cat release-notes.md
+
+      - name: Build
+        run: dotnet build -c Release -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      - name: Pack
+        run: |
+          dotnet pack src/Oriel -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
+          dotnet pack src/Oriel.Hosting -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages
+
+      - name: Publish to nuget.org
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "artifacts/packages/*.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Create the GitHub release
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "${{ steps.version.outputs.version }}" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" artifacts/packages/* \
+            --title "Oriel ${{ steps.version.outputs.version }}" \
+            --notes-file release-notes.md $prerelease

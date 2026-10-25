@@ -31,7 +31,7 @@ references by the package:
     <PublishAot>true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Oriel" Version="0.1.0" />
+    <PackageReference Include="Oriel" Version="0.1.0-preview.1" />
   </ItemGroup>
 </Project>
 ```
@@ -39,9 +39,9 @@ references by the package:
 One package brings the library, the source generator and the build steps.
 [build.md](build.md) describes each `Oriel*` property.
 
-> The package is not on nuget.org yet. Build it from the repository with
-> `dotnet pack src/Oriel -c Release -o packages`, and add that folder as a
-> package source (`dotnet nuget add source <path>/packages -n oriel-local`).
+The package is on [nuget.org](https://www.nuget.org/packages/Oriel), in
+preview: `dotnet add package Oriel --prerelease` adds the newest one.
+[CHANGELOG.md](../CHANGELOG.md) says what each version changes.
 
 ## 2. A service
 
