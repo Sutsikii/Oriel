@@ -7,7 +7,8 @@ and a native executable at the end.
 
 - Windows 10 1809 or later, with the
   [Microsoft Edge WebView2 Runtime](https://go.microsoft.com/fwlink/p/?LinkId=2124703)
-  (Windows 11 has it).
+  (Windows 11 has it; [webview2.md](webview2.md) says which machines lack
+  it, and what apps do there).
 - The [.NET 10 SDK](https://dotnet.microsoft.com/download).
 - [Node.js](https://nodejs.org) 20 or later, for the frontend.
 - For a native executable (NativeAOT): Visual Studio or its Build Tools, with
