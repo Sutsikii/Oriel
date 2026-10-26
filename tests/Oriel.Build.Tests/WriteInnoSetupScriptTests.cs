@@ -37,10 +37,10 @@ public sealed class WriteInnoSetupScriptTests : IDisposable
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Inno Setup 6", "ISCC.exe"),
     }.FirstOrDefault(File.Exists);
 
-    private WriteInnoSetupScript Task(string? appId = null) => new()
+    private WriteInnoSetupScript Task(string? appId = null, string appName = "Oriel Demo") => new()
     {
         BuildEngine = _engine,
-        AppName = "Oriel Demo",
+        AppName = appName,
         AppVersion = "0.3.0",
         AppId = appId,
         Publisher = "Oriel contributors",
@@ -65,6 +65,22 @@ public sealed class WriteInnoSetupScriptTests : IDisposable
     {
         Assert.True(Task("{0F8C2B9E-1D3A-4C5B-8E7F-6A5B4C3D2E1F}").Execute());
         Assert.Contains("AppId={{0F8C2B9E-1D3A-4C5B-8E7F-6A5B4C3D2E1F}\n", File.ReadAllText(Path.Combine(_dir, "obj", "installer.iss")));
+    }
+
+    [Fact]
+    public void WarnsAboutTheAppIdOfAnExample()
+    {
+        Assert.True(Task("B13EF445-3A27-45B7-82B4-62BA76E87C5B").Execute());
+        var warning = Assert.Single(_engine.Warnings);
+        Assert.StartsWith("Oriel: OrielAppId B13EF445-3A27-45B7-82B4-62BA76E87C5B is the AppId of the example 'Oriel Hello'.", warning);
+        Assert.Contains("set OrielAppId to a GUID of your own", warning);
+    }
+
+    [Fact]
+    public void TheExampleItselfKeepsItsAppIdWithoutAWarning()
+    {
+        Assert.True(Task("{b13ef445-3a27-45b7-82b4-62ba76e87c5b}", "Oriel Hello").Execute());
+        Assert.Empty(_engine.Warnings);
     }
 
     [Fact]
@@ -102,6 +118,8 @@ public sealed class WriteInnoSetupScriptTests : IDisposable
     {
         public List<string> Errors { get; } = [];
 
+        public List<string> Warnings { get; } = [];
+
         public bool ContinueOnError => false;
 
         public int LineNumberOfTaskNode => 0;
@@ -112,9 +130,7 @@ public sealed class WriteInnoSetupScriptTests : IDisposable
 
         public void LogErrorEvent(BuildErrorEventArgs e) => Errors.Add(e.Message!);
 
-        public void LogWarningEvent(BuildWarningEventArgs e)
-        {
-        }
+        public void LogWarningEvent(BuildWarningEventArgs e) => Warnings.Add(e.Message!);
 
         public void LogMessageEvent(BuildMessageEventArgs e)
         {

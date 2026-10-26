@@ -10,6 +10,17 @@ namespace Oriel.Build;
 /// </summary>
 public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
 {
+    /// <summary>
+    /// The AppIds of the examples, with the names they ship under. An app
+    /// made by copying an example keeps its AppId, and its installs then
+    /// replace the example's, or another copy's.
+    /// </summary>
+    private static readonly Dictionary<Guid, string> ExampleAppIds = new()
+    {
+        [new Guid("B13EF445-3A27-45B7-82B4-62BA76E87C5B")] = "Oriel Hello",
+        [new Guid("40CE192C-19D9-4610-8190-F2186238026E")] = "Chess Next Move",
+    };
+
     /// <summary>The app's name, as users see it.</summary>
     [Required]
     public string AppName { get; set; } = "";
@@ -61,6 +72,12 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
         {
             Log.LogError($"Oriel: OrielAppId '{AppId}' is not a GUID.");
             return false;
+        }
+        if (!string.IsNullOrEmpty(AppId) && ExampleAppIds.TryGetValue(Guid.Parse(AppId), out var example) && AppName != example)
+        {
+            Log.LogWarning(
+                $"Oriel: OrielAppId {AppId} is the AppId of the example '{example}'. Installing '{AppName}' would replace that " +
+                $"example, or any other app copied from it: set OrielAppId to a GUID of your own, such as {Guid.NewGuid().ToString().ToUpperInvariant()}.");
         }
 
         var appId = string.IsNullOrEmpty(AppId) ? InnoSetupScript.StableAppId(AppName).ToString() : AppId!;
