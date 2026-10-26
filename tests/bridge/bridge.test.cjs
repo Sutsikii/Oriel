@@ -2,7 +2,7 @@
 // Run with `node --test tests/bridge`.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createRuntime } = require("../../src/Oriel/Bridge/bridge.js");
+const { createRuntime, findTransport, start } = require("../../src/Oriel/Bridge/bridge.js");
 
 /** A runtime whose posted messages are kept, parsed. */
 function setup() {
@@ -247,4 +247,87 @@ test("gives the page the paths of dropped files, as an event", () => {
   runtime.on("oriel:filesDropped", (drop) => drops.push(drop));
   receive(JSON.stringify({ t: "event", n: "oriel:filesDropped", v: { paths: ["C:\a.txt"], x: 1, y: 2 } }));
   assert.deepEqual(drops, [{ paths: ["C:\a.txt"], x: 1, y: 2 }]);
+});
+
+/** A page's global object, with the webview's channel `channel` adds. */
+function fakePage(channel) {
+  const page = { listeners: {}, addEventListener: (type, f, capture) => (page.listeners[type] = { f, capture }) };
+  page.top = page;
+  channel(page);
+  return page;
+}
+
+/** A WebView2 page: chrome.webview, as Windows gives it. */
+function webView2Page({ withFiles = true } = {}) {
+  const posted = [];
+  const page = fakePage((p) => {
+    p.chrome = {
+      webview: {
+        postMessage: (m) => posted.push(JSON.parse(m)),
+        addEventListener: (type, f) => (p.webviewListener = { type, f }),
+      },
+    };
+    if (withFiles) p.chrome.webview.postMessageWithAdditionalObjects = (m, files) => posted.push({ ...JSON.parse(m), files });
+  });
+  return { page, posted };
+}
+
+/** A WebKit page: the script message handler "oriel", as macOS and Linux give it. */
+function webKitPage() {
+  const posted = [];
+  const page = fakePage((p) => {
+    p.webkit = { messageHandlers: { oriel: { postMessage: (m) => posted.push(JSON.parse(m)) } } };
+  });
+  return { page, posted };
+}
+
+test("starts in a WebView2 page: posts through chrome.webview, receives its messages", async () => {
+  const { page, posted } = webView2Page();
+  start(page);
+  assert.equal(typeof page.oriel.call, "function");
+  assert.equal(posted[0].t, "hello");
+  assert.equal(page.webviewListener.type, "message");
+  const result = page.oriel.call("Greeter.Greet", ["Ada"]);
+  page.webviewListener.f({ data: JSON.stringify({ t: "result", id: 1, k: posted[0].k, v: "Hello" }) });
+  assert.equal(await result, "Hello");
+  assert.deepEqual(Object.keys(page.listeners).sort(), ["dragover", "drop", "keydown"]);
+  assert.ok(Object.values(page.listeners).every((l) => l.capture));
+});
+
+test("starts in a WebKit page: posts through the oriel handler, receives through __orielReceive", async () => {
+  const { page, posted } = webKitPage();
+  start(page);
+  assert.equal(posted[0].t, "hello");
+  const result = page.oriel.call("Greeter.Greet", ["Ada"]);
+  page.__orielReceive(JSON.stringify({ t: "result", id: 1, k: posted[0].k, v: "Hello" }));
+  assert.equal(await result, "Hello");
+  assert.equal(Object.keys(page).includes("__orielReceive"), false); // not enumerable
+  assert.throws(() => {
+    "use strict";
+    page.__orielReceive = () => {};
+  }); // nor replaceable
+});
+
+test("sends files only where the webview can", () => {
+  assert.equal(typeof findTransport(webView2Page().page).postFiles, "function");
+  assert.equal(findTransport(webView2Page({ withFiles: false }).page).postFiles, null);
+  assert.equal(findTransport(webKitPage().page).postFiles, null);
+});
+
+test("does nothing outside an Oriel window, in frames, or twice", () => {
+  const plain = fakePage(() => {});
+  start(plain);
+  assert.equal(plain.oriel, undefined);
+  assert.equal(findTransport(plain), null);
+
+  const { page: frame, posted } = webView2Page();
+  frame.top = {};
+  start(frame);
+  assert.equal(frame.oriel, undefined);
+  assert.equal(posted.length, 0);
+
+  const { page, posted: twice } = webKitPage();
+  start(page);
+  start(page);
+  assert.equal(twice.length, 1);
 });

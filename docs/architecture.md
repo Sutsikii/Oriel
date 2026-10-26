@@ -264,10 +264,12 @@ own, and `Platforms.Current` picks it. It must:
 - run its event loop on the thread that calls `Run`, and run `Post`ed actions
   on it;
 - open a window showing `PlatformWindowOptions.Url`, with
-  `BridgeScript` injected at document start in the top frame, and
-  `window.chrome.webview`'s `postMessage`/`message` replaced by the
-  system's message channel (bridge.js looks for `chrome.webview`: give it
-  that shape);
+  `BridgeScript` injected at document start in the top frame;
+- give the page a message channel bridge.js knows (`findTransport` there):
+  `chrome.webview` on WebView2; on WebKit, a script message handler named
+  `oriel` (`webkit.messageHandlers.oriel.postMessage(string)`) for the
+  page's messages, and `window.__orielReceive(string)`, called with
+  evaluated script, for the app's;
 - serve `AssetsFolder` at `https://app.oriel/` when it is set;
 - report each message with the URL of the document that sent it, title
   changes, and the window's end through `IPlatformWindowEvents`.

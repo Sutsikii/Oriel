@@ -175,22 +175,55 @@
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
 
-  if (typeof module === "object" && module.exports) {
-    module.exports = { createRuntime };
-    return;
+  /**
+   * The message channel of the webview the page runs in, or null outside an
+   * Oriel window: `post` sends a string to the app, `postFiles` a string
+   * with File objects (null when the webview cannot), and `listen` hands
+   * the app's messages to a function. docs/architecture.md says what a new
+   * backend provides.
+   */
+  function findTransport(root) {
+    // WebView2 (Windows): chrome.webview.
+    const webview = root.chrome && root.chrome.webview;
+    if (webview && typeof webview.postMessage === "function") {
+      return {
+        post: (message) => webview.postMessage(message),
+        postFiles:
+          typeof webview.postMessageWithAdditionalObjects === "function"
+            ? (message, files) => webview.postMessageWithAdditionalObjects(message, files)
+            : null, // an older runtime: drops reach the page only
+        listen: (receive) => webview.addEventListener("message", (e) => receive(e.data)),
+      };
+    }
+    // WebKit (macOS, Linux): the script message handler "oriel" the backend
+    // registers; it delivers messages by calling __orielReceive.
+    const handler = root.webkit && root.webkit.messageHandlers && root.webkit.messageHandlers.oriel;
+    if (handler && typeof handler.postMessage === "function") {
+      return {
+        post: (message) => handler.postMessage(message),
+        postFiles: null, // the backend reads dropped files' paths itself
+        listen: (receive) => Object.defineProperty(root, "__orielReceive", { value: receive }),
+      };
+    }
+    return null;
   }
 
-  // Only the top document of an Oriel window talks to the app.
-  const webview = root.chrome && root.chrome.webview;
-  if (!webview || root.oriel || root.top !== root) return;
-  const postFiles =
-    typeof webview.postMessageWithAdditionalObjects === "function"
-      ? (message, files) => webview.postMessageWithAdditionalObjects(message, files)
-      : null; // an older runtime: drops reach the page only
-  const { runtime, receive, keyDown, dragOver, drop } = createRuntime((message) => webview.postMessage(message), postFiles);
-  webview.addEventListener("message", (e) => receive(e.data));
-  root.addEventListener("keydown", keyDown, true);
-  root.addEventListener("dragover", dragOver, true);
-  root.addEventListener("drop", drop, true);
-  Object.defineProperty(root, "oriel", { value: runtime, enumerable: true });
+  /** Starts the runtime in a page: `window.oriel`, and the listeners it needs. */
+  function start(root) {
+    // Only the top document of an Oriel window talks to the app.
+    const transport = findTransport(root);
+    if (!transport || root.oriel || root.top !== root) return;
+    const { runtime, receive, keyDown, dragOver, drop } = createRuntime(transport.post, transport.postFiles);
+    transport.listen(receive);
+    root.addEventListener("keydown", keyDown, true);
+    root.addEventListener("dragover", dragOver, true);
+    root.addEventListener("drop", drop, true);
+    Object.defineProperty(root, "oriel", { value: runtime, enumerable: true });
+  }
+
+  if (typeof module === "object" && module.exports) {
+    module.exports = { createRuntime, findTransport, start };
+    return;
+  }
+  start(root);
 })(globalThis);
