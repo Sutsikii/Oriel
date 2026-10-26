@@ -255,6 +255,25 @@ page comes back.
    returns are released with `Com.Release`; objects it passes to callbacks
    are borrowed for the call (`Com.AddRef` to keep one).
 
+## The Linux backend
+
+[`Platform/Linux`](../src/Oriel/Platform/Linux) drives GTK 3 and WebKitGTK
+4.1 through `LibraryImport` of the system's libraries ([`Gtk.cs`](../src/Oriel/Platform/Linux/Gtk.cs)):
+
+- **`LinuxPlatform`** runs the GTK main loop, posts with `g_idle_add`, and
+  serves the app's files at `oriel://app.oriel/` with a URI scheme of the
+  default web context, registered once per process. The loops of all the
+  apps of a process run on one thread, "Oriel GTK": WebKit aborts when a
+  thread other than the first one uses it.
+- **`LinuxWebWindow`** is a `GtkWindow` holding a `WebKitWebView`. The
+  bridge is a user script of the top frame; pages post to the script
+  message handler `oriel`, and messages reach them through
+  `window.__orielReceive`. URLs are mapped between `oriel://app.oriel`,
+  which the view sees, and `https://app.oriel`, which the rest of Oriel
+  sees. Signals are `UnmanagedCallersOnly` functions that find their window
+  through a `GCHandle`, freed on an idle callback after the window's
+  `destroy`, since the view still signals while it is destroyed.
+
 ## Adding a platform
 
 A backend implements `IPlatform` and `IPlatformWindow`
