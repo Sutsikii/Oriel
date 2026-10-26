@@ -56,6 +56,20 @@ Node, and lighter webview wrappers leave the calls untyped. Oriel is built
 around the typed bridge, the way [Wails](https://wails.io), Tauri and
 [MyGo](https://github.com/egoist/mygo) are in Go and Rust.
 
+## Try it
+
+On Windows 10 or 11, with the .NET 10 SDK and Node.js:
+
+```sh
+dotnet new install Oriel.Templates
+dotnet new oriel -o MyApp
+cd MyApp/frontend
+npm install
+npm run dev
+```
+
+[Getting started](docs/getting-started.md) goes on from there.
+
 ## Measured
 
 The [hello example](examples/hello), published with NativeAOT, on Windows 11:

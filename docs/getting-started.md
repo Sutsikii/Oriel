@@ -11,43 +11,45 @@ and a native executable at the end.
   it, and what apps do there).
 - The [.NET 10 SDK](https://dotnet.microsoft.com/download).
 - [Node.js](https://nodejs.org) 20 or later, for the frontend.
-- For a native executable (NativeAOT): Visual Studio or its Build Tools, with
-  the "Desktop development with C++" workload.
+
+Later, for a native executable (NativeAOT) only: Visual Studio or its Build
+Tools, with the "Desktop development with C++" workload.
 
 ## 1. The project
 
-Start from the example, which has everything wired: copy
-[`examples/hello`](../examples/hello) and replace its `Directory.Build.*`
-references by the package:
+Install the templates once, then create the app:
 
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <DefaultItemExcludes>$(DefaultItemExcludes);frontend/**</DefaultItemExcludes>
-    <OrielTypeScriptOutput>frontend/src/oriel.ts</OrielTypeScriptOutput>
-    <OrielFrontendDist>frontend/dist</OrielFrontendDist>
-    <OrielFrontendBuildCommand>npm run build</OrielFrontendBuildCommand>
-    <PublishAot>true</PublishAot>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Oriel" Version="0.1.0-preview.1" />
-  </ItemGroup>
-</Project>
+```sh
+dotnet new install Oriel.Templates
+dotnet new oriel -o MyApp
+cd MyApp/frontend
+npm install
+npm run dev
 ```
 
-One package brings the library, the source generator and the build steps.
-[build.md](build.md) describes each `Oriel*` property.
+A window opens with a page that calls C#. `npm run dev` starts Vite and
+`dotnet watch` together: editing the page reloads it; editing C# rebuilds
+the app, restarts it and rewrites the TypeScript client.
 
-The package is on [nuget.org](https://www.nuget.org/packages/Oriel), in
-preview: `dotnet add package Oriel --prerelease` adds the newest one.
-[CHANGELOG.md](../CHANGELOG.md) says what each version changes.
+The app has:
+
+| File | What it is |
+|---|---|
+| `MyApp.csproj` | The project, with the `Oriel` package and its build properties ([build.md](build.md)), and an `OrielAppId` of its own |
+| `Program.cs` | Binds the services and opens the window |
+| `Services.cs` | A `[Service]` class, which the page calls |
+| `frontend/` | A Vite and TypeScript frontend; `src/oriel.ts` is the generated client |
+
+One package brings the library, the source generator and the build steps.
+It is on [nuget.org](https://www.nuget.org/packages/Oriel), in preview;
+[CHANGELOG.md](../CHANGELOG.md) says what each version changes. To add
+Oriel to a project of your own instead, `dotnet add package Oriel
+--prerelease`, then set the properties the template's project sets.
 
 ## 2. A service
 
-A service is a class marked `[Service]`. Its public methods are what pages
-can call:
+A service is a class marked `[Service]`. Its public methods and events are
+what pages can use; `Services.cs` has one:
 
 ```csharp
 using Oriel;
@@ -56,17 +58,18 @@ using Oriel;
 [Service]
 public class Greeter
 {
-    /// <summary>Returns a greeting for <paramref name="name"/>.</summary>
-    public string Greet(string name) => $"Hello, {name}!";
+    /// <summary>Greets <paramref name="name"/>.</summary>
+    public Greeting Greet(string name) => new($"Hello, {name}!", DateTimeOffset.Now);
+
+    /// <summary>Fires when someone was greeted.</summary>
+    public Event<string> Greeted { get; } = new();
 }
 ```
 
-Bind an instance, and open a window:
+`Program.cs` binds an instance, and opens a window:
 
 ```csharp
-using Oriel;
-
-var app = new OrielApp(new AppOptions { Name = "My App" });
+var app = new OrielApp(new AppOptions { Name = "MyApp" });
 app.Bind(new Greeter());
 return app.Run(() => app.OpenWindow(new WindowOptions { Width = 800, Height = 600 }));
 ```
@@ -77,13 +80,14 @@ the app on the .NET Generic Host with the `Oriel.Hosting` package: see
 
 ## 3. The page
 
-Build the project once (`dotnet build`): Oriel writes the TypeScript client to
-`frontend/src/oriel.ts`. Import it like any module:
+Each build writes the TypeScript client to `frontend/src/oriel.ts`. The page
+imports it like any module:
 
 ```ts
 import { Greeter } from "./oriel";
 
-document.body.textContent = await Greeter.greet("Ada");
+const greeting = await Greeter.greet("Ada"); // { text: string; at: string }
+Greeter.onGreeted((name) => console.log(`greeted ${name}`));
 ```
 
 `Greeter.greet` is typed from the C# method, its documentation comment
@@ -92,16 +96,9 @@ enums, lists, nullable types, events and more.
 
 ## 4. Develop
 
-From `frontend/`:
-
-```sh
-npm install
-npm run dev
-```
-
-This starts Vite and `dotnet watch` together. Editing the page reloads it;
-editing C# rebuilds the app, restarts it and rewrites `oriel.ts`, so the
-compiler of the page sees the change at once.
+While `npm run dev` runs, add a method to `Greeter` and save: the app
+restarts, `oriel.ts` gets the method, and the page's editor completes it.
+Rename one, and the page's compiler shows each call that broke.
 
 ## 5. Ship
 

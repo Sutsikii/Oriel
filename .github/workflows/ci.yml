@@ -92,6 +92,61 @@ jobs:
           name: hello-installer
           path: examples/hello/bin/installer
 
+  template:
+    name: Create an app with dotnet new
+    runs-on: windows-latest
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pack Oriel and the templates
+        run: |
+          dotnet pack src/Oriel -c Release -p:Version=${{ env.VERSION }} -o ${{ runner.temp }}/packages
+          dotnet pack templates/Oriel.Templates -c Release -p:Version=${{ env.VERSION }} -o ${{ runner.temp }}/packages
+
+      # Outside the repository, so that its build settings do not apply: the
+      # app builds as it would on a user's machine, from the packages.
+      - name: Create an app
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          dotnet new install "packages/Oriel.Templates.$VERSION.nupkg"
+          dotnet new oriel -o Contoso.Notes
+          dotnet new nugetconfig -o Contoso.Notes
+          dotnet nuget add source "$(cygpath -w "$RUNNER_TEMP/packages")" -n local --configfile Contoso.Notes/nuget.config
+          if grep -rn OrielTemplate Contoso.Notes; then
+            echo "The template's name was left in the app." >&2
+            exit 1
+          fi
+
+      - name: Build it, with its frontend
+        working-directory: ${{ runner.temp }}/Contoso.Notes
+        run: |
+          cd frontend
+          npm install
+          cd ..
+          dotnet build -c Release
+
+      # NuGet takes a later version when the one asked for is missing.
+      - name: Check it uses the packages just made
+        shell: bash
+        run: grep -q "\"oriel/$VERSION\"" "$RUNNER_TEMP/Contoso.Notes/obj/project.assets.json"
+
+      - name: Check the template's client is up to date
+        shell: bash
+        run: |
+          sed 's/Contoso\.Notes/OrielTemplate/g' "$RUNNER_TEMP/Contoso.Notes/frontend/src/oriel.ts" > "$RUNNER_TEMP/oriel.ts"
+          git diff --no-index --exit-code templates/Oriel.Templates/content/oriel/frontend/src/oriel.ts "$RUNNER_TEMP/oriel.ts"
+
   package:
     name: Pack
     runs-on: windows-latest
@@ -106,6 +161,7 @@ jobs:
         run: |
           dotnet pack src/Oriel -c Release -o artifacts/packages
           dotnet pack src/Oriel.Hosting -c Release -o artifacts/packages
+          dotnet pack templates/Oriel.Templates -c Release -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:

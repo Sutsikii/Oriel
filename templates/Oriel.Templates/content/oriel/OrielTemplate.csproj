@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DefaultItemExcludes>$(DefaultItemExcludes);frontend/**</DefaultItemExcludes>
+
+    <!-- Oriel: where the TypeScript client goes, and where the built frontend is. -->
+    <OrielTypeScriptOutput>frontend/src/oriel.ts</OrielTypeScriptOutput>
+    <OrielFrontendDist>frontend/dist</OrielFrontendDist>
+    <OrielFrontendBuildCommand>npm run build</OrielFrontendBuildCommand>
+
+    <!-- dotnet publish -c Release -r win-x64 gives a native executable (it needs the C++ build tools). -->
+    <PublishAot>true</PublishAot>
+
+    <!-- What Windows shows. Set OrielInstaller to true for a setup wizard on publish (it needs Inno Setup). -->
+    <Product>OrielTemplate</Product>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <OrielInstaller>false</OrielInstaller>
+    <!-- Identifies the app across versions: keep it once the app ships. -->
+    <OrielAppId>7F3C2A51-0B6E-4D8A-9C1F-5E2B8A4D6C90</OrielAppId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Oriel" Version="$OrielVersion$" />
+  </ItemGroup>
+
+</Project>
