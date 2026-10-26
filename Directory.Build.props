@@ -9,6 +9,19 @@
     <Authors>Oriel contributors</Authors>
     <Copyright>Copyright (c) Oriel contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- The release workflow sets the version from the tag: -p:Version=0.1.0-preview.1. -->
     <Version>0.1.0</Version>
+    <PackageProjectUrl>https://github.com/Sutsikii/Oriel</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Sutsikii/Oriel</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>https://github.com/Sutsikii/Oriel/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <!-- SourceLink: apps step into Oriel's sources from the symbol package. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 </Project>

@@ -153,6 +153,25 @@ then on breaking changes wait for a major version.
   user-visible changes in `docs/`, design changes in
   `docs/architecture.md`.
 
+## Release
+
+A tag publishes a release. Add a section `## 0.2.0` (or `0.2.0-preview.1`)
+at the top of [CHANGELOG.md](CHANGELOG.md), merge it, then tag `main`:
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The release workflow builds and tests at that version, pushes `Oriel` and
+`Oriel.Hosting` with their symbol packages to nuget.org, and creates the
+GitHub release with that section as its notes. A version with a `-` is
+marked as a prerelease. Pushing needs the `NUGET_API_KEY` secret of the
+repository: an API key of nuget.org allowed to push `Oriel*` packages.
+
+At 1.0, move the lines of each `PublicAPI.Unshipped.txt` to
+`PublicAPI.Shipped.txt`.
+
 ## Where to start
 
 The [roadmap](docs/roadmap.md) lists what is planned, from small, well
