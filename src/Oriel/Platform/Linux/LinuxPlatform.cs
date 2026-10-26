@@ -11,14 +11,12 @@ namespace Oriel.Platform.Linux;
 /// </summary>
 /// <remarks>
 /// WebKitGTK cannot serve a custom https host, so the app's files are
-/// served at <c>oriel://app.oriel/</c>. The rest of Oriel keeps seeing
-/// <see cref="Frontend.AppOrigin"/>: the window maps one to the other
-/// (<see cref="ToPage"/>, <see cref="FromPage"/>).
+/// served at <c>oriel://app.oriel/</c> (<see cref="AppScheme"/>).
 /// </remarks>
 [SupportedOSPlatform("linux")]
 internal sealed unsafe class LinuxPlatform : IPlatform
 {
-    public const string Scheme = "oriel";
+    public const string Scheme = AppScheme.Scheme;
 
     private static LinuxPlatform? s_running;
 
@@ -157,16 +155,6 @@ internal sealed unsafe class LinuxPlatform : IPlatform
         return window;
     }
 
-    /// <summary>The URL the webview loads for <paramref name="uri"/>: the app's files at oriel://, anything else as is.</summary>
-    public static string ToPage(Uri uri) =>
-        uri.Scheme == "https" && uri.IsDefaultPort && string.Equals(uri.Host, Frontend.AppHost, StringComparison.OrdinalIgnoreCase)
-            ? Scheme + "://" + Frontend.AppHost + uri.PathAndQuery + uri.Fragment
-            : uri.AbsoluteUri;
-
-    /// <summary>The URL Oriel knows for <paramref name="uri"/>, one of the webview's: https://app.oriel for the app's files.</summary>
-    public static string FromPage(string uri) =>
-        uri.StartsWith(Scheme + "://", StringComparison.OrdinalIgnoreCase) ? "https://" + uri[(Scheme.Length + 3)..] : uri;
-
     /// <summary>
     /// Serves the app's files at oriel://app.oriel/. Every window of an app
     /// shows the same frontend, and the scheme belongs to the webview's
@@ -203,10 +191,8 @@ internal sealed unsafe class LinuxPlatform : IPlatform
 
     private void Serve(nint request)
     {
-        var path = Gtk.Text(Gtk.webkit_uri_scheme_request_get_path(request)) ?? "/";
-        if (path.Length == 0 || path.EndsWith('/'))
-            path += "index.html";
-        var file = Read(path);
+        var path = AppScheme.FilePath(Gtk.Text(Gtk.webkit_uri_scheme_request_get_path(request)) ?? "/");
+        var file = AppScheme.Read(path, _assetsFolder, _embedded);
         Tracing.Write($"serves {path}{(file is null ? ": not found" : "")}");
         // A missing file is a 404, as from a server, rather than a failed load.
         var body = file ?? "Not Found"u8.ToArray();
@@ -228,20 +214,5 @@ internal sealed unsafe class LinuxPlatform : IPlatform
         Gtk.g_object_unref(response);
         Gtk.g_object_unref(stream);
         Gtk.g_bytes_unref(bytes);
-    }
-
-    /// <summary>The app's file at <paramref name="path"/>, from the executable or the folder; null when there is none.</summary>
-    private byte[]? Read(string path)
-    {
-        if (_embedded is not null)
-            return _embedded.Read(path);
-        if (_assetsFolder is null)
-            return null;
-        var root = Path.GetFullPath(_assetsFolder);
-        var full = Path.GetFullPath(Path.Combine(root, Uri.UnescapeDataString(path).TrimStart('/')));
-        // Nothing outside the folder, whatever the path says.
-        if (!full.StartsWith(root.TrimEnd('/') + "/", StringComparison.Ordinal) || !File.Exists(full))
-            return null;
-        return File.ReadAllBytes(full);
     }
 }

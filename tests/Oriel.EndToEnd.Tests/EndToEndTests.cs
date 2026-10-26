@@ -5,10 +5,14 @@ using Oriel.Platform;
 
 namespace Oriel.EndToEnd.Tests;
 
-/// <summary>A test that opens windows: it runs when ORIEL_E2E=1, on Windows, and on Linux when <see cref="Linux"/> says so.</summary>
+/// <summary>
+/// A test that opens windows: it runs when ORIEL_E2E=1, on Windows, on
+/// Linux when <see cref="Linux"/> says so, and on macOS when <see cref="MacOS"/> does.
+/// </summary>
 public sealed class EndToEndFactAttribute : FactAttribute
 {
     private bool _linux;
+    private bool _macOS;
 
     public EndToEndFactAttribute() => Decide();
 
@@ -23,14 +27,27 @@ public sealed class EndToEndFactAttribute : FactAttribute
         }
     }
 
+    /// <summary>Whether the macOS backend has what the test uses.</summary>
+    public bool MacOS
+    {
+        get => _macOS;
+        set
+        {
+            _macOS = value;
+            Decide();
+        }
+    }
+
     private void Decide()
     {
         if (Environment.GetEnvironmentVariable("ORIEL_E2E") != "1")
             Skip = "opens windows; set ORIEL_E2E=1 to run";
         else if (OperatingSystem.IsLinux())
             Skip = _linux ? null : "uses what the Linux backend does not have yet";
+        else if (OperatingSystem.IsMacOS())
+            Skip = _macOS ? null : "uses what the macOS backend does not have yet";
         else if (!OperatingSystem.IsWindows())
-            Skip = "Oriel runs on Windows and Linux for now";
+            Skip = "Oriel runs on Windows, Linux and macOS";
         else
             Skip = null;
     }
@@ -39,8 +56,8 @@ public sealed class EndToEndFactAttribute : FactAttribute
 /// <summary>What differs between the systems for the test pages.</summary>
 public static class Pages
 {
-    /// <summary>The origin of the app's pages, as they see it: WebKitGTK serves them at oriel://.</summary>
-    public static string Origin => OperatingSystem.IsLinux() ? "oriel://app.oriel" : "https://app.oriel";
+    /// <summary>The origin of the app's pages, as they see it: WebKit serves them at oriel://.</summary>
+    public static string Origin => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() ? "oriel://app.oriel" : "https://app.oriel";
 }
 
 /// <summary>An error the test pages tell apart.</summary>
@@ -184,7 +201,7 @@ public sealed class EndToEndTests : IDisposable
         return (report, app, window!, probe);
     }
 
-    [EndToEndFact(Linux = true)]
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task PagesCallServicesAndListenToTheirEvents()
     {
         var (report, _, window, _) = await RunPage("""
@@ -295,7 +312,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.True(done(), what);
     }
 
-    [EndToEndFact] // Linux: maximizing needs a window manager, which Xvfb has not
+    [EndToEndFact(MacOS = true)] // Linux: maximizing needs a window manager, which Xvfb has not
     public async Task APlacementComesBackAcrossRuns()
     {
         var options = new WindowOptions { Width = 500, Height = 400, StateKey = "main" };
@@ -330,7 +347,7 @@ public sealed class EndToEndTests : IDisposable
         });
     }
 
-    [EndToEndFact]
+    [EndToEndFact(MacOS = true)]
     public async Task FullScreenComesBackWhereItWas()
     {
         await RunWindow(new WindowOptions { Width = 500, Height = 400, X = 200, Y = 150 }, async (_, window) =>
@@ -348,7 +365,7 @@ public sealed class EndToEndTests : IDisposable
         });
     }
 
-    [EndToEndFact]
+    [EndToEndFact(MacOS = true)]
     public async Task AFramelessWindowFillsItselfWithThePage()
     {
         await RunWindow(new WindowOptions { Width = 500, Height = 400, Frameless = true, Center = true, Menu = new Menu(new MenuItem("&File")) }, async (_, window) =>
@@ -410,7 +427,7 @@ public sealed class EndToEndTests : IDisposable
         }
     }
 
-    [EndToEndFact]
+    [EndToEndFact(MacOS = true)]
     public async Task EditingRolesEditThePage()
     {
         var (report, _, _, _) = await RunPage("""
@@ -436,7 +453,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal("""{"selected":9,"deleted":"","undone":"some text"}""", report);
     }
 
-    [EndToEndFact(Linux = true)]
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task ReloadingCancelsTheCallsOfThePreviousPage()
     {
         var (report, _, _, probe) = await RunPage("""
@@ -453,7 +470,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.True(await probe.HangCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
-    [EndToEndFact]
+    [EndToEndFact(MacOS = true)]
     public async Task ReloadsThePageWhenItsRendererIsKilled()
     {
         File.WriteAllText(Path.Combine(_assets, "index.html"), """<script type="module">await oriel.call("E2E.Loaded", []);</script>""");
@@ -484,6 +501,8 @@ public sealed class EndToEndTests : IDisposable
     /// </summary>
     private static int KillRenderers()
     {
+        if (OperatingSystem.IsMacOS())
+            return KillWebContentProcesses();
         var script = $$"""
             $all = Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'"
             $browsers = $all | Where-Object ParentProcessId -eq {{Environment.ProcessId}} | ForEach-Object ProcessId
@@ -500,7 +519,33 @@ public sealed class EndToEndTests : IDisposable
         return int.TryParse(output.Trim(), out var n) ? n : 0;
     }
 
-    [EndToEndFact(Linux = true)]
+    /// <summary>
+    /// Kills WebKit's web content processes started after this process, on
+    /// macOS, where launchd starts them, not the app: those of this test's
+    /// webviews, on a machine that runs nothing else in WebKit meanwhile.
+    /// </summary>
+    private static int KillWebContentProcesses()
+    {
+        using var pgrep = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("pgrep", ["-f", "com.apple.WebKit.WebContent"])
+        {
+            RedirectStandardOutput = true,
+        })!;
+        var output = pgrep.StandardOutput.ReadToEnd();
+        pgrep.WaitForExit();
+        var started = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+        var killed = 0;
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(int.Parse(line.Trim(), System.Globalization.CultureInfo.InvariantCulture));
+            if (process.StartTime < started)
+                continue;
+            process.Kill();
+            killed++;
+        }
+        return killed;
+    }
+
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task KeepsTheWindowOnTheAppAndPagesWithoutPermissions()
     {
         File.WriteAllText(Path.Combine(_assets, "second.html"), "<!doctype html><title>Second</title>");
@@ -661,7 +706,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(("792", "612"), (pages[1][1].Value, pages[1][2].Value));
     }
 
-    [EndToEndFact(Linux = true)]
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task ServesTheAppsFilesBesideThePage()
     {
         File.WriteAllText(Path.Combine(_assets, "data.json"), """{"served":true}""");
@@ -673,7 +718,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal("""{"served":true}""", report);
     }
 
-    [EndToEndFact(Linux = true)]
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task ServesAFrontendEmbeddedInTheExecutable()
     {
         // The test assembly embeds Embedded/ as OrielEmbedFrontend would: no folder at all.

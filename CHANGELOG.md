@@ -6,7 +6,8 @@ minor version may change the public API, and says so here.
 
 ## 0.1.0-preview.1
 
-The first release, for Windows 10 1809 and later.
+The first release, for Windows 10 1809 and later, with first versions of
+Linux and macOS.
 
 - **Services and the TypeScript client.** Classes marked `[Service]` are
   callable from pages through a client generated at compile time: methods,
