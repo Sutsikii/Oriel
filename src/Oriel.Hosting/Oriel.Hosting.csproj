@@ -7,6 +7,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Oriel apps on the .NET Generic Host: services from dependency injection, per call or per window, ILogger, configuration and hosted services.</Description>
     <PackageTags>desktop;webview;webview2;hosting;dependency-injection</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- OrielApp.CallFailed (ORIEL901) is logged here, and changes with it. -->
     <NoWarn>$(NoWarn);ORIEL901</NoWarn>
   </PropertyGroup>
@@ -15,6 +16,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
     <AdditionalFiles Include="PublicAPI.Shipped.txt;PublicAPI.Unshipped.txt" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
   <ItemGroup>
