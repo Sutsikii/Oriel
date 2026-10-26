@@ -17,6 +17,8 @@ internal static unsafe class WebView2
     public static readonly Guid IID_ICoreWebView2Environment6 = new("E59EE362-ACBD-4857-9A8E-D3644D9459A9");
     public static readonly Guid IID_ICoreWebView2Settings9 = new("0528a73b-e92d-49f4-927a-e547dddaa37d");
     public static readonly Guid IID_ICoreWebView2AcceleratorKeyPressedEventArgs2 = new("03b2c8c8-7799-4e34-bd66-ed26aa85f2bf");
+    public static readonly Guid IID_ICoreWebView2WebMessageReceivedEventArgs2 = new("06fc7ab7-c90c-4297-9389-33ca01cf6d5e");
+    public static readonly Guid IID_ICoreWebView2File = new("f2c19559-6bc1-4583-a757-90021be9afec");
 
     // Handlers Oriel implements.
     public static readonly Guid IID_EnvironmentCompletedHandler = new("4e8a3389-c9d8-4bd2-b6b5-124fee6cc14d");
@@ -537,6 +539,55 @@ internal static unsafe class WebView2
             nint message;
             var hr = ((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(a, 5))(a, &message);
             return hr < 0 ? null : Com.TakeString(message);
+        }
+
+        // ICoreWebView2WebMessageReceivedEventArgs2, 6: get_AdditionalObjects(ICoreWebView2ObjectCollectionView**),
+        // whose 3: get_Count(UINT32*) and 4: GetValueAtIndex(UINT32, IUnknown**);
+        // ICoreWebView2File, 3: get_Path(LPWSTR*).
+        /// <summary>The paths of the <c>File</c> objects the page sent with the message; none from an older runtime.</summary>
+        public static List<string> GetFilePaths(nint a)
+        {
+            var paths = new List<string>();
+            var a2 = Com.QueryInterface(a, IID_ICoreWebView2WebMessageReceivedEventArgs2);
+            if (a2 == 0)
+                return paths;
+            nint view = 0;
+            try
+            {
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(a2, 6))(a2, &view), "get_AdditionalObjects");
+                if (view == 0)
+                    return paths;
+                uint count;
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, uint*, int>)Com.Slot(view, 3))(view, &count), "get_Count");
+                for (uint i = 0; i < count; i++)
+                {
+                    nint item;
+                    Com.Check(((delegate* unmanaged[Stdcall]<nint, uint, nint*, int>)Com.Slot(view, 4))(view, i, &item), "GetValueAtIndex");
+                    if (item == 0)
+                        continue;
+                    var file = Com.QueryInterface(item, IID_ICoreWebView2File);
+                    Com.Release(item);
+                    if (file == 0)
+                        continue; // not a File
+                    try
+                    {
+                        nint path;
+                        Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(file, 3))(file, &path), "get_Path");
+                        if (Com.TakeString(path) is { Length: > 0 } p)
+                            paths.Add(p);
+                    }
+                    finally
+                    {
+                        Com.Release(file);
+                    }
+                }
+                return paths;
+            }
+            finally
+            {
+                Com.Release(view);
+                Com.Release(a2);
+            }
         }
     }
 }

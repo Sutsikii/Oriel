@@ -131,3 +131,14 @@ export const Greeter = {
     return call("Greeter.Delete", default_, new_);
   },
 } as const;
+
+// ---- Window ----
+
+/**
+ * Fires when files are dropped on this window, with their full paths and where they were
+ * dropped, in CSS pixels of the page; the page's own drop event has their File objects.
+ * Returns a function that stops listening.
+ */
+export function onFilesDropped(listener: (drop: { paths: string[]; x: number; y: number }) => void): () => void {
+  return bridge().on("oriel:filesDropped", listener as (payload: unknown) => void);
+}

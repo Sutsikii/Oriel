@@ -58,6 +58,21 @@ are not sent.
 The runtime sees keys before the page's listeners, and sends them once
 they all ran.
 
+### `drop`
+
+Files were dropped on the page, at `x` and `y`, its `clientX` and
+`clientY`. The runtime sends it with `postMessageWithAdditionalObjects`, the
+dropped `File` objects attached, and the backend reads their paths: the
+message itself has none. A runtime without that function sends nothing.
+
+```json
+{ "t": "drop", "k": "3f9a…", "x": 120, "y": 80 }
+```
+
+The runtime lets dragged files be dropped anywhere on the page, and keeps
+the webview from opening a dropped file in place of the page; the page's
+own `dragover` and `drop` listeners still run.
+
 ## Messages from the app
 
 ### `result`
@@ -96,6 +111,14 @@ page that is there.
 
 ```json
 { "t": "event", "n": "Clock.Tick", "v": "2026-10-21T12:00:00+02:00" }
+```
+
+The window sends one event of its own, `oriel:filesDropped`, to its page
+after a `drop`: the paths, and where the files were dropped. No service
+event has that name, since C# names have no colon.
+
+```json
+{ "t": "event", "n": "oriel:filesDropped", "v": { "paths": ["C:\Users\ada\notes.txt"], "x": 120, "y": 80 } }
 ```
 
 ## Who may send messages

@@ -112,7 +112,8 @@ public sealed class EndToEndTests : IDisposable
     }
 
     /// <summary>Runs an app showing a page of <paramref name="script"/>, until the page reports; then closes it.</summary>
-    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null, Menu? menu = null)
+    /// <remarks><paramref name="drive"/> acts on the page from outside while it runs; its failure ends the test at once.</remarks>
+    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null, Menu? menu = null, Func<OrielWindow, Task>? drive = null)
     {
         File.WriteAllText(Path.Combine(_assets, "index.html"), $$"""
             <!doctype html>
@@ -139,7 +140,17 @@ public sealed class EndToEndTests : IDisposable
             setUp?.Invoke(window);
         }));
 
+        var driving = drive is null ? null : Task.Run(async () =>
+        {
+            while (window is null)
+                await Task.Delay(10);
+            await drive(window);
+        });
+        if (driving is not null && await Task.WhenAny(probe.Reported.Task, driving).WaitAsync(TimeSpan.FromSeconds(30)) == driving)
+            await driving; // throws what failed
         var report = await probe.Reported.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        if (driving is not null)
+            await driving;
         Assert.Empty(errors);
         foreach (var open in app.Windows)
             open.Close();
@@ -322,6 +333,55 @@ public sealed class EndToEndTests : IDisposable
             window.Restore();
             await Until(() => window.State == WindowState.Normal && window.Bounds is { Width: 500, Height: 400 }, $"restored, at {window.Bounds}");
         });
+    }
+
+    [EndToEndFact]
+    public async Task DroppedFilesReachTheAppAndThePageWithTheirPaths()
+    {
+        var files = new[] { Path.Combine(_assets, "dropped one.txt"), Path.Combine(_assets, "dropped-two.csv") };
+        foreach (var file in files)
+            File.WriteAllText(file, "dropped");
+        var dropped = new List<FilesDroppedEventArgs>();
+        var (report, _, _, _) = await RunPage("""
+            const results = {};
+            document.addEventListener("drop", (e) => { results.pageFiles = Array.from(e.dataTransfer.files, (f) => f.name); });
+            const drop = await new Promise((resolve) => {
+              oriel.on("oriel:filesDropped", resolve);
+              document.title = "Ready";
+            });
+            Object.assign(results, drop);
+            await oriel.call("E2E.Report", [JSON.stringify(results)]);
+            """,
+            window => window.FilesDropped += (_, e) => dropped.Add(e),
+            drive: window => DragFiles(window, files, x: 120, y: 80));
+
+        using var results = JsonDocument.Parse(report);
+        var root = results.RootElement;
+        Assert.Equal(files, root.GetProperty("paths").EnumerateArray().Select(p => p.GetString()));
+        Assert.Equal(120, root.GetProperty("x").GetDouble());
+        Assert.Equal(80, root.GetProperty("y").GetDouble());
+        Assert.Equal(["dropped one.txt", "dropped-two.csv"], root.GetProperty("pageFiles").EnumerateArray().Select(p => p.GetString()));
+        var drop = Assert.Single(dropped);
+        Assert.Equal(files, drop.Paths);
+        Assert.Equal((120.0, 80.0), (drop.X, drop.Y));
+    }
+
+    /// <summary>
+    /// Drags <paramref name="files"/> onto the page, once its title says it
+    /// is ready, as the system would: through the DevTools protocol of the
+    /// webview.
+    /// </summary>
+    private static async Task DragFiles(OrielWindow window, string[] files, double x, double y)
+    {
+        for (var i = 0; i < 200 && window.Title != "Ready"; i++)
+            await Task.Delay(50);
+        Assert.Equal("Ready", window.Title);
+        var data = new Dictionary<string, object> { ["items"] = Array.Empty<object>(), ["files"] = files, ["dragOperationsMask"] = 1 };
+        foreach (var type in new[] { "dragEnter", "dragOver", "drop" })
+        {
+            var parameters = JsonSerializer.Serialize(new Dictionary<string, object> { ["type"] = type, ["x"] = x, ["y"] = y, ["data"] = data });
+            await window.CallDevToolsAsync("Input.dispatchDragEvent", parameters).WaitAsync(TimeSpan.FromSeconds(10));
+        }
     }
 
     [EndToEndFact]

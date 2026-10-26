@@ -42,6 +42,7 @@ public sealed class OrielWindow : IPlatformWindowEvents
         Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch, showExceptionMessages: app.IsDev);
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
         Connection.KeyPressed += chord => app.Dispatch(() => PressKey(chord));
+        Connection.FilesDropped += drop => app.Dispatch(() => DropFiles(drop));
         Connection.MessageRefused += reason =>
             app.ReportError(new InvalidDataException($"The page of the window \"{Title}\" sent {reason}."));
     }
@@ -192,6 +193,14 @@ public sealed class OrielWindow : IPlatformWindowEvents
         }
     }
 
+    /// <summary>
+    /// Raised on the UI thread when files were dropped on the
+    /// page, with their full paths. The page gets them too, with
+    /// <c>onFilesDropped</c> of its client, besides the <c>File</c> objects
+    /// of its own <c>drop</c> event.
+    /// </summary>
+    public event EventHandler<FilesDroppedEventArgs>? FilesDropped;
+
     /// <summary>Raised on the UI thread when the window moved.</summary>
     public event EventHandler? Moved;
 
@@ -339,11 +348,11 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _native = platform.OpenWindow(options, this);
     }
 
-    void IPlatformWindowEvents.MessageReceived(string source, string message)
+    void IPlatformWindowEvents.MessageReceived(string source, string message, IReadOnlyList<string>? files)
     {
         if (!_app.Frontend.IsTrusted(source))
             return; // a page of another origin, which may not call services
-        var received = Connection.ReceiveAsync(message);
+        var received = Connection.ReceiveAsync(message, files);
         if (!received.IsCompleted)
             received.ContinueWith(t => _app.ReportError(t.Exception!), TaskContinuationOptions.OnlyOnFaulted);
     }
@@ -431,6 +440,58 @@ public sealed class OrielWindow : IPlatformWindowEvents
     void IPlatformWindowEvents.MenuItemClicked(MenuItem item) => Run(item);
 
     bool IPlatformWindowEvents.IsAccelerator(KeyChord chord) => Accelerated(chord) is not null;
+
+    /// <summary>
+    /// Calls <paramref name="method"/> of the DevTools protocol on the page:
+    /// the tests drive pages this way, as the system would. WebView2 only.
+    /// </summary>
+    internal Task<string> CallDevToolsAsync(string method, string parameters)
+    {
+        var done = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _app.Dispatch(() =>
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763) || _native is not Platform.Windows.WindowsWebWindow native)
+            {
+                done.TrySetException(new PlatformNotSupportedException("The DevTools protocol is reached through WebView2 only."));
+                return;
+            }
+            native.CallDevTools(method, parameters, (hr, json) =>
+            {
+                if (hr < 0)
+                    done.TrySetException(new InvalidOperationException($"{method} failed with 0x{hr:X8}: {json}"));
+                else
+                    done.TrySetResult(json ?? "{}");
+            });
+        });
+        return done.Task;
+    }
+
+    /// <summary>Files dropped on the page: the app's handlers first, then the page's listeners.</summary>
+    private void DropFiles(FilesDroppedEventArgs drop)
+    {
+        if (_closed)
+            return;
+        Tracing.Write($"{drop.Paths.Count} files dropped at {drop.X}, {drop.Y}");
+        try
+        {
+            FilesDropped?.Invoke(this, drop);
+        }
+        catch (Exception e)
+        {
+            _app.ReportError(e);
+        }
+        Connection.Send(Protocol.EventMessage(Protocol.FilesDroppedEvent, w =>
+        {
+            w.WriteStartObject();
+            w.WriteStartArray("paths");
+            foreach (var path in drop.Paths)
+                w.WriteStringValue(path);
+            w.WriteEndArray();
+            w.WriteNumber("x", drop.X);
+            w.WriteNumber("y", drop.Y);
+            w.WriteEndObject();
+        }));
+    }
 
     /// <summary>A key the page left alone: it runs an item of the bar, or opens the bar as Alt and a letter, or F10, do.</summary>
     private void PressKey(KeyChord chord)

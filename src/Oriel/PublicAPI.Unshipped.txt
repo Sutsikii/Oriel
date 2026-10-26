@@ -30,6 +30,10 @@ Oriel.FileFilter
 Oriel.FileFilter.FileFilter(string! name, params string![]! patterns) -> void
 Oriel.FileFilter.Name.get -> string!
 Oriel.FileFilter.Patterns.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Oriel.FilesDroppedEventArgs
+Oriel.FilesDroppedEventArgs.Paths.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Oriel.FilesDroppedEventArgs.X.get -> double
+Oriel.FilesDroppedEventArgs.Y.get -> double
 Oriel.FolderOptions
 Oriel.FolderOptions.Directory.get -> string?
 Oriel.FolderOptions.Directory.init -> void
@@ -154,6 +158,7 @@ Oriel.OrielWindow.Center() -> void
 Oriel.OrielWindow.Close() -> void
 Oriel.OrielWindow.Closed -> System.EventHandler?
 Oriel.OrielWindow.Dialogs.get -> Oriel.Dialogs!
+Oriel.OrielWindow.FilesDropped -> System.EventHandler<Oriel.FilesDroppedEventArgs!>?
 Oriel.OrielWindow.Focus() -> void
 Oriel.OrielWindow.FocusChanged -> System.EventHandler?
 Oriel.OrielWindow.Id.get -> int

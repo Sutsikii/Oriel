@@ -1,8 +1,8 @@
 # Windows
 
 What a window can do besides showing its page: move, resize, minimize,
-maximize, go full screen, stay on top, open without a frame, and remember
-where it was.
+maximize, go full screen, stay on top, open without a frame, remember where
+it was, and take files dropped on it.
 
 ## Opening
 
@@ -74,6 +74,38 @@ public class Shell
     public void Close(OrielWindow window) => window.Close();
 }
 ```
+
+## Dropped files
+
+Files dropped on a window come with their full paths, which the page's
+`File` objects lack, to open documents in place. The app gets them first,
+on the UI thread:
+
+```csharp
+window.FilesDropped += (_, e) =>
+{
+    foreach (var path in e.Paths)
+        documents.Open(path);
+};
+```
+
+then the page, through its client, with where they were dropped in CSS
+pixels of the page:
+
+```ts
+import { onFilesDropped } from "./oriel";
+
+onFilesDropped(({ paths, x, y }) => {
+  const target = document.elementFromPoint(x, y);
+  // ...
+});
+```
+
+The page's own `drop` event still fires, with the `File` objects, before
+either. Oriel lets files be dropped anywhere on the page, and keeps the
+webview from opening a dropped file in place of the page. A page that
+refuses a drop somewhere sets `dataTransfer.dropEffect = "none"` in its
+`dragover` listener there.
 
 ## Remembering the placement
 

@@ -349,6 +349,29 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         }
     }
 
+    /// <summary>
+    /// Calls <paramref name="method"/> of the DevTools protocol on the page,
+    /// for the tests: <paramref name="done"/> gets the HRESULT and the result's JSON.
+    /// </summary>
+    internal void CallDevTools(string method, string parameters, Action<int, string?> done)
+    {
+        if (_webview == 0)
+        {
+            done(-1, null);
+            return;
+        }
+        var handler = ComCallback.ForResult(WebView2.IID_CallDevToolsProtocolMethodCompletedHandler,
+            (hr, json) => done(hr, Marshal.PtrToStringUni(json)));
+        try
+        {
+            WebView2.WebView.CallDevToolsProtocolMethod(_webview, method, parameters, handler);
+        }
+        finally
+        {
+            Com.Release(handler);
+        }
+    }
+
     public void PrintToPdf(string path, PdfOptions? options, Action<bool> done)
     {
         if (_webview == 0)
@@ -617,8 +640,13 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         {
             var message = WebView2.WebMessageReceivedEventArgs.TryGetString(args);
             Tracing.Write($"window {Hwnd:X} received {message}");
-            if (message is not null)
-                _events.MessageReceived(WebView2.WebMessageReceivedEventArgs.GetSource(args), message);
+            if (message is null)
+                return;
+            // Only a drop carries files; other messages skip the lookup.
+            var files = message.StartsWith("{\"t\":\"drop\"", StringComparison.Ordinal)
+                ? WebView2.WebMessageReceivedEventArgs.GetFilePaths(args)
+                : null;
+            _events.MessageReceived(WebView2.WebMessageReceivedEventArgs.GetSource(args), message, files);
         });
         Subscribe(WebView2.IID_DocumentTitleChangedEventHandler, WebView2.WebView.AddDocumentTitleChanged, (sender, _) =>
             _events.TitleChanged(WebView2.WebView.GetDocumentTitle(sender)));

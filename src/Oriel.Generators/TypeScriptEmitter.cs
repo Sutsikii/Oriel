@@ -46,6 +46,10 @@ internal static class TypeScriptEmitter
             w.Line();
             Service(w, service, names);
         }
+
+        w.Line();
+        w.Line("// ---- Window ----");
+        Window(w);
         return w.ToString();
     }
 
@@ -112,6 +116,21 @@ internal static class TypeScriptEmitter
             CallHelper(w);
         if (project.Services.Any(s => s.Events.Count > 0))
             OnHelper(w);
+    }
+
+    /// <summary>What the page's window tells it, besides the services' events.</summary>
+    private static void Window(SourceWriter w)
+    {
+        w.Line();
+        w.Line("/**");
+        w.Line(" * Fires when files are dropped on this window, with their full paths and where they were");
+        w.Line(" * dropped, in CSS pixels of the page; the page's own drop event has their File objects.");
+        w.Line(" * Returns a function that stops listening.");
+        w.Line(" */");
+        w.Line("export function onFilesDropped(listener: (drop: { paths: string[]; x: number; y: number }) => void): () => void {");
+        using (w.Indent())
+            w.Line("return bridge().on(\"oriel:filesDropped\", listener as (payload: unknown) => void);");
+        w.Line("}");
     }
 
     private static void OnHelper(SourceWriter w)
