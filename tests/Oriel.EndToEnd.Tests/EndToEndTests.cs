@@ -382,31 +382,46 @@ public sealed class EndToEndTests : IDisposable
     /// </summary>
     private static async Task DragFiles(int port, string[] files, double x, double y)
     {
-        using var http = new HttpClient();
+        var step = "finding the page";
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        try
+        {
+            await DragFiles(port, files, x, y, s => step = s, timeout.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException($"dragging the files timed out while {step}");
+        }
+    }
+
+    private static async Task DragFiles(int port, string[] files, double x, double y, Action<string> step, CancellationToken cancellation)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         string? socketUrl = null;
         var seen = "nothing";
-        for (var i = 0; i < 200 && socketUrl is null; i++)
+        while (socketUrl is null)
         {
             try
             {
-                seen = await http.GetStringAsync($"http://127.0.0.1:{port}/json");
+                seen = await http.GetStringAsync($"http://127.0.0.1:{port}/json", cancellation);
                 using var targets = JsonDocument.Parse(seen);
                 socketUrl = targets.RootElement.EnumerateArray()
                     .Where(t => t.GetProperty("type").GetString() == "page" && t.GetProperty("title").GetString() == "Ready")
                     .Select(t => t.GetProperty("webSocketDebuggerUrl").GetString())
                     .FirstOrDefault();
             }
-            catch (HttpRequestException e)
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancellation.IsCancellationRequested)
             {
                 seen = e.Message;
             }
+            step($"finding the page titled Ready on port {port}; last seen: {seen}");
             if (socketUrl is null)
-                await Task.Delay(100);
+                await Task.Delay(100, cancellation);
         }
-        Assert.True(socketUrl is not null, $"no page titled Ready on the DevTools port {port}; last seen: {seen}");
 
         using var socket = new System.Net.WebSockets.ClientWebSocket();
-        await socket.ConnectAsync(new Uri(socketUrl!), CancellationToken.None);
+        step("connecting to " + socketUrl);
+        await socket.ConnectAsync(new Uri(socketUrl), cancellation);
         var id = 0;
         foreach (var type in new[] { "dragEnter", "dragOver", "drop" })
         {
@@ -422,12 +437,14 @@ public sealed class EndToEndTests : IDisposable
                     ["data"] = new Dictionary<string, object> { ["items"] = Array.Empty<object>(), ["files"] = files, ["dragOperationsMask"] = 1 },
                 },
             });
-            await socket.SendAsync(System.Text.Encoding.UTF8.GetBytes(command), System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+            step($"sending {type}");
+            await socket.SendAsync(System.Text.Encoding.UTF8.GetBytes(command), System.Net.WebSockets.WebSocketMessageType.Text, true, cancellation);
             // Each command is answered with its id; wait for it before the next.
             var buffer = new byte[64 * 1024];
             while (true)
             {
-                var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+                step($"waiting for the answer to {type}");
+                var received = await socket.ReceiveAsync(buffer, cancellation);
                 var text = System.Text.Encoding.UTF8.GetString(buffer, 0, received.Count);
                 if (text.Contains($"\"id\":{id},", StringComparison.Ordinal) || text.Contains($"\"id\":{id}}}", StringComparison.Ordinal))
                 {
@@ -436,6 +453,7 @@ public sealed class EndToEndTests : IDisposable
                 }
             }
         }
+        step("waiting for the page");
     }
 
     [EndToEndFact]
