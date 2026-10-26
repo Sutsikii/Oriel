@@ -159,16 +159,25 @@ public sealed class OrielApp : IEventSink
     /// <summary>
     /// Runs the app until it quits: calls <paramref name="ready"/> on the UI
     /// thread once it can open windows, then handles events. Windows run on a
-    /// UI thread of Oriel's, not on the calling thread.
+    /// UI thread of Oriel's, not on the calling thread; on macOS, where AppKit
+    /// runs on the main thread only, on the calling thread, which must be the
+    /// main one: call Run from <c>Main</c>, before any <c>await</c>.
     /// </summary>
     /// <returns>The exit code, 0.</returns>
     /// <exception cref="WebViewUnavailableException">The system webview is missing.</exception>
+    /// <exception cref="InvalidOperationException">On macOS, the calling thread is not the main one.</exception>
     public int Run(Action? ready = null)
     {
         if (Environment.GetEnvironmentVariable(GenerateVariable) is { Length: > 0 } path)
             return WriteTypeScript(path);
         if (Interlocked.Exchange(ref _running, 1) == 1)
             throw new InvalidOperationException("The app is already running.");
+
+        if (RunsOnCallingThread)
+        {
+            _platform.Run(() => ready?.Invoke());
+            return 0;
+        }
 
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -193,6 +202,9 @@ public sealed class OrielApp : IEventSink
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
         return 0;
     }
+
+    /// <summary>Whether <see cref="Run"/> runs the app on the calling thread: on macOS.</summary>
+    internal bool RunsOnCallingThread => _platform.RunsOnCallingThread;
 
     /// <summary>Opens a window. Any thread may call it; the window opens on the UI thread.</summary>
     /// <exception cref="InvalidOperationException">A window of <see cref="WindowOptions.Name"/> is open already.</exception>

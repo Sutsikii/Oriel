@@ -74,6 +74,27 @@ jobs:
           ORIEL_E2E: "1"
         run: xvfb-run -a dbus-run-session -- dotnet test tests/Oriel.EndToEnd.Tests -c Release
 
+  macos:
+    name: Test in real windows on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Test the library
+        run: dotnet test tests/Oriel.Tests -c Release
+
+      # AppKit runs on the main thread only, which dotnet test keeps: the
+      # project's own Main runs the tests, and the apps' loops on it.
+      - name: Test in real windows
+        env:
+          ORIEL_E2E: "1"
+        timeout-minutes: 15
+        run: dotnet run --project tests/Oriel.EndToEnd.Tests -c Release
+
   example:
     name: Publish the example and its installer
     runs-on: windows-latest

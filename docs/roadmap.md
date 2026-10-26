@@ -57,8 +57,12 @@ self-contained piece of work.
 
 ### Platforms
 
-- **Linux**: GTK and WebKitGTK, through `NativeLibrary` and function
-  pointers, as the Windows backend does with COM.
-- **macOS**: AppKit and WKWebView, through the Objective-C runtime.
+- **Linux**: GTK and WebKitGTK, through `LibraryImport` of the system's
+  libraries. The core is there ([linux.md](linux.md)); dialogs, menus,
+  printing and dropped files' paths are next.
+- **macOS**: AppKit and WKWebView, through the Objective-C runtime. The
+  core is there ([macos.md](macos.md)), tested in CI only; the same
+  features are next, then app bundles, signing and notarization. Help from
+  Mac users is wanted.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) to pick one up.

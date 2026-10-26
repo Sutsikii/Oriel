@@ -107,7 +107,7 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
             Gtk.webkit_web_view_load_html(_webview, errorPage, null);
             return;
         }
-        var url = LinuxPlatform.ToPage(_options.Url);
+        var url = AppScheme.ToPage(_options.Url);
         Tracing.Write($"window navigates to {url}");
         Gtk.webkit_web_view_load_uri(_webview, url);
     }
@@ -196,7 +196,7 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
     {
         var message = Gtk.TakeText(Gtk.jsc_value_to_string(Gtk.webkit_javascript_result_get_js_value(result)));
         // The handler is the top frame's only, where the bridge runs: its document is the view's.
-        var source = LinuxPlatform.FromPage(Gtk.Text(Gtk.webkit_web_view_get_uri(w._webview)) ?? "");
+        var source = AppScheme.FromPage(Gtk.Text(Gtk.webkit_web_view_get_uri(w._webview)) ?? "");
         Tracing.Write($"window received {message}");
         if (message is not null)
             w._events.MessageReceived(source, message);
@@ -215,7 +215,7 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
         Guard(self, w =>
         {
             var action = Gtk.webkit_navigation_policy_decision_get_navigation_action(decision);
-            var uri = LinuxPlatform.FromPage(Gtk.Text(Gtk.webkit_uri_request_get_uri(Gtk.webkit_navigation_action_get_request(action))) ?? "");
+            var uri = AppScheme.FromPage(Gtk.Text(Gtk.webkit_uri_request_get_uri(Gtk.webkit_navigation_action_get_request(action))) ?? "");
             var user = Gtk.webkit_navigation_action_is_user_gesture(action) != 0;
             if (type == Gtk.WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION)
             {
@@ -242,7 +242,7 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
     {
         Guard(self, w =>
         {
-            var uri = LinuxPlatform.FromPage(Gtk.Text(Gtk.webkit_uri_request_get_uri(Gtk.webkit_navigation_action_get_request(action))) ?? "");
+            var uri = AppScheme.FromPage(Gtk.Text(Gtk.webkit_uri_request_get_uri(Gtk.webkit_navigation_action_get_request(action))) ?? "");
             w._events.NewWindowRequested(uri, Gtk.webkit_navigation_action_is_user_gesture(action) != 0);
         });
         return 0;

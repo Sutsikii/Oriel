@@ -21,8 +21,11 @@ cd oriel
 dotnet build
 ```
 
-Windows is the only platform for now: the Linux and macOS backends are on
-the [roadmap](docs/roadmap.md).
+Oriel is developed on Windows. The Linux backend is tested on any system
+with Docker ([linux.md](docs/linux.md)); the macOS one only in CI so far,
+since the maintainers have no Mac. If you have one, trying apps there and
+reporting what you see is one of the most useful contributions right now
+([macos.md](docs/macos.md), [#31](https://github.com/Sutsikii/Oriel/issues/31)).
 
 ## Run the tests
 
@@ -32,6 +35,7 @@ the [roadmap](docs/roadmap.md).
 | Page runtime (`bridge.js`) | `node --test "tests/bridge/*.test.cjs"` |
 | Generated TypeScript (type-checked with `tsc --strict`, then run) | `cd tests/typescript && npm ci && npm test` |
 | Real windows | `ORIEL_E2E=1 dotnet test tests/Oriel.EndToEnd.Tests` |
+| Real windows, on macOS | `ORIEL_E2E=1 dotnet run --project tests/Oriel.EndToEnd.Tests` |
 | Load and leaks, in real windows, for minutes | `ORIEL_STRESS=1 dotnet test tests/Oriel.Stress.Tests` (every night in CI) |
 | What a call costs | see [benchmarks/README.md](benchmarks/README.md) (in CI too) |
 | The `dotnet new` template | see below |
