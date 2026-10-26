@@ -31,6 +31,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      id-token: write # Trusted Publishing: GitHub's token, traded for a nuget.org key
     steps:
       - uses: actions/checkout@v4
 
@@ -85,11 +86,21 @@ jobs:
           name: packages
           path: artifacts/packages
 
+      # Trusted Publishing: nuget.org trusts this workflow of this repository
+      # (a policy of the account named by NUGET_USER) and gives it a key
+      # valid for an hour. No key is stored.
+      - name: Log in to nuget.org
+        if: github.ref_type == 'tag'
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Publish to nuget.org
         if: github.ref_type == 'tag'
         shell: bash
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
         run: |
           dotnet nuget push "artifacts/packages/*.nupkg" \
             --api-key "$NUGET_API_KEY" \

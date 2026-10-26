@@ -185,8 +185,11 @@ git push origin v0.2.0
 The release workflow builds and tests at that version, pushes `Oriel` and
 `Oriel.Hosting` with their symbol packages to nuget.org, and creates the
 GitHub release with that section as its notes. A version with a `-` is
-marked as a prerelease. Pushing needs the `NUGET_API_KEY` secret of the
-repository: an API key of nuget.org allowed to push `Oriel*` packages.
+marked as a prerelease. Pushing uses nuget.org's Trusted Publishing, with
+no stored key: the nuget.org account that owns the packages has a policy
+trusting the workflow `release.yml` of `Sutsikii/Oriel`, and the
+repository variable `NUGET_USER` names that account (its profile name,
+not its email).
 
 At 1.0, move the lines of each `PublicAPI.Unshipped.txt` to
 `PublicAPI.Shipped.txt`.
