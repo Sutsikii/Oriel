@@ -101,11 +101,15 @@ jobs:
         shell: bash
         env:
           NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
+        # Bash expands the paths: on Windows, NuGet finds no file for a
+        # wildcard written with slashes. Each .snupkg goes with its .nupkg.
         run: |
-          dotnet nuget push "artifacts/packages/*.nupkg" \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          for package in artifacts/packages/*.nupkg; do
+            dotnet nuget push "$package" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
 
       - name: Create the GitHub release
         if: github.ref_type == 'tag'
