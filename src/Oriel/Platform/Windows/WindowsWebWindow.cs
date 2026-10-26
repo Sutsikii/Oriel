@@ -349,6 +349,29 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         }
     }
 
+    /// <summary>
+    /// Calls <paramref name="method"/> of the DevTools protocol on the page,
+    /// for the tests: <paramref name="done"/> gets the HRESULT and the result's JSON.
+    /// </summary>
+    internal void CallDevTools(string method, string parameters, Action<int, string?> done)
+    {
+        if (_webview == 0)
+        {
+            done(-1, null);
+            return;
+        }
+        var handler = ComCallback.ForResult(WebView2.IID_CallDevToolsProtocolMethodCompletedHandler,
+            (hr, json) => done(hr, Marshal.PtrToStringUni(json)));
+        try
+        {
+            WebView2.WebView.CallDevToolsProtocolMethod(_webview, method, parameters, handler);
+        }
+        finally
+        {
+            Com.Release(handler);
+        }
+    }
+
     public void PrintToPdf(string path, PdfOptions? options, Action<bool> done)
     {
         if (_webview == 0)

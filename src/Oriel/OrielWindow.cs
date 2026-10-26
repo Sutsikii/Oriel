@@ -441,6 +441,31 @@ public sealed class OrielWindow : IPlatformWindowEvents
 
     bool IPlatformWindowEvents.IsAccelerator(KeyChord chord) => Accelerated(chord) is not null;
 
+    /// <summary>
+    /// Calls <paramref name="method"/> of the DevTools protocol on the page:
+    /// the tests drive pages this way, as the system would. WebView2 only.
+    /// </summary>
+    internal Task<string> CallDevToolsAsync(string method, string parameters)
+    {
+        var done = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _app.Dispatch(() =>
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763) || _native is not Platform.Windows.WindowsWebWindow native)
+            {
+                done.TrySetException(new PlatformNotSupportedException("The DevTools protocol is reached through WebView2 only."));
+                return;
+            }
+            native.CallDevTools(method, parameters, (hr, json) =>
+            {
+                if (hr < 0)
+                    done.TrySetException(new InvalidOperationException($"{method} failed with 0x{hr:X8}: {json}"));
+                else
+                    done.TrySetResult(json ?? "{}");
+            });
+        });
+        return done.Task;
+    }
+
     /// <summary>Files dropped on the page: the app's handlers first, then the page's listeners.</summary>
     private void DropFiles(FilesDroppedEventArgs drop)
     {

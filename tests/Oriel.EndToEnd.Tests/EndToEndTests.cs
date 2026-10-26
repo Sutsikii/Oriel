@@ -342,118 +342,46 @@ public sealed class EndToEndTests : IDisposable
         foreach (var file in files)
             File.WriteAllText(file, "dropped");
         var dropped = new List<FilesDroppedEventArgs>();
-        var port = Random.Shared.Next(20000, 40000);
-        Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", $"--remote-debugging-port={port}");
-        try
-        {
-            var (report, _, _, _) = await RunPage("""
-                const results = {};
-                document.addEventListener("drop", (e) => { results.pageFiles = Array.from(e.dataTransfer.files, (f) => f.name); });
-                const drop = await new Promise((resolve) => {
-                  oriel.on("oriel:filesDropped", resolve);
-                  document.title = "Ready";
-                });
-                Object.assign(results, drop);
-                await oriel.call("E2E.Report", [JSON.stringify(results)]);
-                """,
-                window => window.FilesDropped += (_, e) => dropped.Add(e),
-                drive: _ => DragFiles(port, files, x: 120, y: 80));
+        var (report, _, _, _) = await RunPage("""
+            const results = {};
+            document.addEventListener("drop", (e) => { results.pageFiles = Array.from(e.dataTransfer.files, (f) => f.name); });
+            const drop = await new Promise((resolve) => {
+              oriel.on("oriel:filesDropped", resolve);
+              document.title = "Ready";
+            });
+            Object.assign(results, drop);
+            await oriel.call("E2E.Report", [JSON.stringify(results)]);
+            """,
+            window => window.FilesDropped += (_, e) => dropped.Add(e),
+            drive: window => DragFiles(window, files, x: 120, y: 80));
 
-            using var results = JsonDocument.Parse(report);
-            var root = results.RootElement;
-            Assert.Equal(files, root.GetProperty("paths").EnumerateArray().Select(p => p.GetString()));
-            Assert.Equal(120, root.GetProperty("x").GetDouble());
-            Assert.Equal(80, root.GetProperty("y").GetDouble());
-            Assert.Equal(["dropped one.txt", "dropped-two.csv"], root.GetProperty("pageFiles").EnumerateArray().Select(p => p.GetString()));
-            var drop = Assert.Single(dropped);
-            Assert.Equal(files, drop.Paths);
-            Assert.Equal((120.0, 80.0), (drop.X, drop.Y));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", null);
-        }
+        using var results = JsonDocument.Parse(report);
+        var root = results.RootElement;
+        Assert.Equal(files, root.GetProperty("paths").EnumerateArray().Select(p => p.GetString()));
+        Assert.Equal(120, root.GetProperty("x").GetDouble());
+        Assert.Equal(80, root.GetProperty("y").GetDouble());
+        Assert.Equal(["dropped one.txt", "dropped-two.csv"], root.GetProperty("pageFiles").EnumerateArray().Select(p => p.GetString()));
+        var drop = Assert.Single(dropped);
+        Assert.Equal(files, drop.Paths);
+        Assert.Equal((120.0, 80.0), (drop.X, drop.Y));
     }
 
     /// <summary>
     /// Drags <paramref name="files"/> onto the page, once its title says it
     /// is ready, as the system would: through the DevTools protocol of the
-    /// webview, on <paramref name="port"/>.
+    /// webview.
     /// </summary>
-    private static async Task DragFiles(int port, string[] files, double x, double y)
+    private static async Task DragFiles(OrielWindow window, string[] files, double x, double y)
     {
-        var step = "finding the page";
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        try
-        {
-            await DragFiles(port, files, x, y, s => step = s, timeout.Token);
-        }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            throw new TimeoutException($"dragging the files timed out while {step}");
-        }
-    }
-
-    private static async Task DragFiles(int port, string[] files, double x, double y, Action<string> step, CancellationToken cancellation)
-    {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        string? socketUrl = null;
-        var seen = "nothing";
-        while (socketUrl is null)
-        {
-            try
-            {
-                seen = await http.GetStringAsync($"http://127.0.0.1:{port}/json", cancellation);
-                using var targets = JsonDocument.Parse(seen);
-                socketUrl = targets.RootElement.EnumerateArray()
-                    .Where(t => t.GetProperty("type").GetString() == "page" && t.GetProperty("title").GetString() == "Ready")
-                    .Select(t => t.GetProperty("webSocketDebuggerUrl").GetString())
-                    .FirstOrDefault();
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancellation.IsCancellationRequested)
-            {
-                seen = e.Message;
-            }
-            step($"finding the page titled Ready on port {port}; last seen: {seen}");
-            if (socketUrl is null)
-                await Task.Delay(100, cancellation);
-        }
-
-        using var socket = new System.Net.WebSockets.ClientWebSocket();
-        step("connecting to " + socketUrl);
-        await socket.ConnectAsync(new Uri(socketUrl), cancellation);
-        var id = 0;
+        for (var i = 0; i < 200 && window.Title != "Ready"; i++)
+            await Task.Delay(50);
+        Assert.Equal("Ready", window.Title);
+        var data = new Dictionary<string, object> { ["items"] = Array.Empty<object>(), ["files"] = files, ["dragOperationsMask"] = 1 };
         foreach (var type in new[] { "dragEnter", "dragOver", "drop" })
         {
-            var command = JsonSerializer.Serialize(new Dictionary<string, object>
-            {
-                ["id"] = ++id,
-                ["method"] = "Input.dispatchDragEvent",
-                ["params"] = new Dictionary<string, object>
-                {
-                    ["type"] = type,
-                    ["x"] = x,
-                    ["y"] = y,
-                    ["data"] = new Dictionary<string, object> { ["items"] = Array.Empty<object>(), ["files"] = files, ["dragOperationsMask"] = 1 },
-                },
-            });
-            step($"sending {type}");
-            await socket.SendAsync(System.Text.Encoding.UTF8.GetBytes(command), System.Net.WebSockets.WebSocketMessageType.Text, true, cancellation);
-            // Each command is answered with its id; wait for it before the next.
-            var buffer = new byte[64 * 1024];
-            while (true)
-            {
-                step($"waiting for the answer to {type}");
-                var received = await socket.ReceiveAsync(buffer, cancellation);
-                var text = System.Text.Encoding.UTF8.GetString(buffer, 0, received.Count);
-                if (text.Contains($"\"id\":{id},", StringComparison.Ordinal) || text.Contains($"\"id\":{id}}}", StringComparison.Ordinal))
-                {
-                    Assert.DoesNotContain("\"error\"", text);
-                    break;
-                }
-            }
+            var parameters = JsonSerializer.Serialize(new Dictionary<string, object> { ["type"] = type, ["x"] = x, ["y"] = y, ["data"] = data });
+            await window.CallDevToolsAsync("Input.dispatchDragEvent", parameters).WaitAsync(TimeSpan.FromSeconds(10));
         }
-        step("waiting for the page");
     }
 
     [EndToEndFact]
