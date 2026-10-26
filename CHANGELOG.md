@@ -19,8 +19,15 @@ Linux and macOS.
   them, position, size, states, full screen, frameless windows and
   placements remembered across runs. Windows recover when a process of
   their webview fails.
-- **Native features.** Dialogs modal to a window, the menu bar, context
-  menus and accelerators, printing and saving pages as PDF.
+- **Linux and macOS, first versions.** GTK 3 and WebKitGTK on Linux,
+  AppKit and WKWebView on macOS, both without a native library of
+  Oriel's own. They have the core (services, events, the app's files,
+  navigation rules, window control) and not yet dialogs, menus, printing
+  or dropped files' paths. The macOS backend is tested in CI only: help
+  from Mac users is welcome
+  ([docs/macos.md](https://github.com/Sutsikii/Oriel/blob/main/docs/macos.md)).
+- **Native features, on Windows.** Dialogs modal to a window, the menu
+  bar, context menus and accelerators, printing and saving pages as PDF.
 - **Safety.** Only the app's own pages call services; calls of a page that
   navigated away are canceled; messages are limited in size, depth and
   number; pages get no permission by default.
