@@ -617,8 +617,13 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
         {
             var message = WebView2.WebMessageReceivedEventArgs.TryGetString(args);
             Tracing.Write($"window {Hwnd:X} received {message}");
-            if (message is not null)
-                _events.MessageReceived(WebView2.WebMessageReceivedEventArgs.GetSource(args), message);
+            if (message is null)
+                return;
+            // Only a drop carries files; other messages skip the lookup.
+            var files = message.StartsWith("{\"t\":\"drop\"", StringComparison.Ordinal)
+                ? WebView2.WebMessageReceivedEventArgs.GetFilePaths(args)
+                : null;
+            _events.MessageReceived(WebView2.WebMessageReceivedEventArgs.GetSource(args), message, files);
         });
         Subscribe(WebView2.IID_DocumentTitleChangedEventHandler, WebView2.WebView.AddDocumentTitleChanged, (sender, _) =>
             _events.TitleChanged(WebView2.WebView.GetDocumentTitle(sender)));

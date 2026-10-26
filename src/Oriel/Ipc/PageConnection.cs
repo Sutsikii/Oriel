@@ -70,12 +70,17 @@ internal sealed class PageConnection : IDisposable
     /// </summary>
     public event Action<KeyChord>? KeyPressed;
 
+    /// <summary>The current page reported files dropped on it, with their paths: see <see cref="Protocol.Drop"/>.</summary>
+    public event Action<FilesDroppedEventArgs>? FilesDropped;
+
     /// <summary>
     /// Handles a message from the page. Calls run on the thread pool; the task
     /// completes once the reply, if any, is posted. Messages that are not JSON
     /// or break a limit are refused, other malformed ones ignored.
+    /// <paramref name="files"/> are the paths of the files the page sent
+    /// with the message, which only a drop uses.
     /// </summary>
-    public Task ReceiveAsync(string message)
+    public Task ReceiveAsync(string message, IReadOnlyList<string>? files = null)
     {
         if (message.Length > _limits.MaxMessageLength)
         {
@@ -147,6 +152,15 @@ internal sealed class PageConnection : IDisposable
             && !cancellation.IsCancellationRequested)
         {
             KeyPressed?.Invoke(new KeyChord(key, (KeyModifiers)modifiers & (KeyModifiers.Ctrl | KeyModifiers.Shift | KeyModifiers.Alt)));
+        }
+
+        if (type == Protocol.Drop
+            && files is { Count: > 0 }
+            && root.TryGetProperty("x", out var x) && x.ValueKind == JsonValueKind.Number
+            && root.TryGetProperty("y", out var y) && y.ValueKind == JsonValueKind.Number
+            && !cancellation.IsCancellationRequested)
+        {
+            FilesDropped?.Invoke(new FilesDroppedEventArgs(files, x.GetDouble(), y.GetDouble()));
         }
 
         doc.Dispose(); // a hello, or a message of a later protocol

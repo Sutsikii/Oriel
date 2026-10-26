@@ -325,6 +325,110 @@ public sealed class EndToEndTests : IDisposable
     }
 
     [EndToEndFact]
+    public async Task DroppedFilesReachTheAppAndThePageWithTheirPaths()
+    {
+        var files = new[] { Path.Combine(_assets, "dropped one.txt"), Path.Combine(_assets, "dropped-two.csv") };
+        foreach (var file in files)
+            File.WriteAllText(file, "dropped");
+        var dropped = new List<FilesDroppedEventArgs>();
+        var port = Random.Shared.Next(20000, 40000);
+        Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", $"--remote-debugging-port={port}");
+        try
+        {
+            Task? drag = null;
+            var (report, _, _, _) = await RunPage("""
+                const results = {};
+                document.addEventListener("drop", (e) => { results.pageFiles = Array.from(e.dataTransfer.files, (f) => f.name); });
+                const drop = await new Promise((resolve) => {
+                  oriel.on("oriel:filesDropped", resolve);
+                  document.title = "Ready";
+                });
+                Object.assign(results, drop);
+                await oriel.call("E2E.Report", [JSON.stringify(results)]);
+                """, window =>
+            {
+                window.FilesDropped += (_, e) => dropped.Add(e);
+                drag = DragFiles(port, files, x: 120, y: 80);
+            });
+            await drag!;
+
+            using var results = JsonDocument.Parse(report);
+            var root = results.RootElement;
+            Assert.Equal(files, root.GetProperty("paths").EnumerateArray().Select(p => p.GetString()));
+            Assert.Equal(120, root.GetProperty("x").GetDouble());
+            Assert.Equal(80, root.GetProperty("y").GetDouble());
+            Assert.Equal(["dropped one.txt", "dropped-two.csv"], root.GetProperty("pageFiles").EnumerateArray().Select(p => p.GetString()));
+            var drop = Assert.Single(dropped);
+            Assert.Equal(files, drop.Paths);
+            Assert.Equal((120.0, 80.0), (drop.X, drop.Y));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", null);
+        }
+    }
+
+    /// <summary>
+    /// Drags <paramref name="files"/> onto the page, once its title says it
+    /// is ready, as the system would: through the DevTools protocol of the
+    /// webview, on <paramref name="port"/>.
+    /// </summary>
+    private static async Task DragFiles(int port, string[] files, double x, double y)
+    {
+        using var http = new HttpClient();
+        string? socketUrl = null;
+        for (var i = 0; i < 100 && socketUrl is null; i++)
+        {
+            try
+            {
+                using var targets = JsonDocument.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/json"));
+                socketUrl = targets.RootElement.EnumerateArray()
+                    .Where(t => t.GetProperty("type").GetString() == "page" && t.GetProperty("title").GetString() == "Ready")
+                    .Select(t => t.GetProperty("webSocketDebuggerUrl").GetString())
+                    .FirstOrDefault();
+            }
+            catch (HttpRequestException)
+            {
+            }
+            if (socketUrl is null)
+                await Task.Delay(100);
+        }
+        Assert.NotNull(socketUrl);
+
+        using var socket = new System.Net.WebSockets.ClientWebSocket();
+        await socket.ConnectAsync(new Uri(socketUrl), CancellationToken.None);
+        var id = 0;
+        foreach (var type in new[] { "dragEnter", "dragOver", "drop" })
+        {
+            var command = JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["id"] = ++id,
+                ["method"] = "Input.dispatchDragEvent",
+                ["params"] = new Dictionary<string, object>
+                {
+                    ["type"] = type,
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["data"] = new Dictionary<string, object> { ["items"] = Array.Empty<object>(), ["files"] = files, ["dragOperationsMask"] = 1 },
+                },
+            });
+            await socket.SendAsync(System.Text.Encoding.UTF8.GetBytes(command), System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+            // Each command is answered with its id; wait for it before the next.
+            var buffer = new byte[64 * 1024];
+            while (true)
+            {
+                var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+                var text = System.Text.Encoding.UTF8.GetString(buffer, 0, received.Count);
+                if (text.Contains($"\"id\":{id},", StringComparison.Ordinal) || text.Contains($"\"id\":{id}}}", StringComparison.Ordinal))
+                {
+                    Assert.DoesNotContain("\"error\"", text);
+                    break;
+                }
+            }
+        }
+    }
+
+    [EndToEndFact]
     public async Task EditingRolesEditThePage()
     {
         var (report, _, _, _) = await RunPage("""

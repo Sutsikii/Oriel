@@ -155,8 +155,12 @@ internal sealed record MessageRequest(string Title, string Text, MessageKind Kin
 /// <summary>What a backend window tells Oriel. Called on the UI thread.</summary>
 internal interface IPlatformWindowEvents
 {
-    /// <summary>The page sent <paramref name="message"/>; <paramref name="source"/> is the URL of the document that sent it.</summary>
-    void MessageReceived(string source, string message);
+    /// <summary>
+    /// The page sent <paramref name="message"/>; <paramref name="source"/> is
+    /// the URL of the document that sent it, and <paramref name="files"/> the
+    /// full paths of the files it sent with the message, if any.
+    /// </summary>
+    void MessageReceived(string source, string message, IReadOnlyList<string>? files = null);
 
     /// <summary>The page's title changed.</summary>
     void TitleChanged(string title);

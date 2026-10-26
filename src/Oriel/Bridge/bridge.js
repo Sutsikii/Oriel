@@ -10,11 +10,12 @@
   "use strict";
 
   /**
-   * Creates the runtime of one page. `post` delivers a string to the app;
+   * Creates the runtime of one page. `post` delivers a string to the app,
+   * and `postFiles`, when the webview has it, a string with File objects;
    * the returned `receive` takes the app's messages. Free of DOM access, so
    * that it can be tested on its own.
    */
-  function createRuntime(post) {
+  function createRuntime(post, postFiles) {
     // A token per page: the app drops the work of a page whose token it no
     // longer sees, and replies meant for a previous page are ignored here.
     const token = randomToken();
@@ -102,8 +103,38 @@
       });
     }
 
+    /**
+     * Lets files dragged over the page be dropped, as the page's own
+     * listeners may refuse them later (dropEffect "none"). Seen first, in
+     * the capture phase. Other drags are the page's.
+     */
+    function dragOver(e) {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+
+    /**
+     * Sends the files dropped on the page to the app, which reads their
+     * paths: the page's own listeners still get the File objects. Keeps the
+     * webview from opening the file in place of the page.
+     */
+    function drop(e) {
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      if (!postFiles) return;
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length === 0) return;
+      postFiles(JSON.stringify({ t: "drop", k: token, x: e.clientX, y: e.clientY }), files);
+    }
+
     send({ t: "hello", k: token });
-    return { runtime: Object.freeze({ call, on }), receive, keyDown, token };
+    return { runtime: Object.freeze({ call, on }), receive, keyDown, dragOver, drop, token };
+  }
+
+  /** Whether a drag carries files from the system, rather than text or an element of the page. */
+  function hasFiles(transfer) {
+    return !!transfer && Array.from(transfer.types || []).includes("Files");
   }
 
   /** Shift, Ctrl, Alt and the Windows keys: pressed alone, they are no shortcut. */
@@ -152,8 +183,14 @@
   // Only the top document of an Oriel window talks to the app.
   const webview = root.chrome && root.chrome.webview;
   if (!webview || root.oriel || root.top !== root) return;
-  const { runtime, receive, keyDown } = createRuntime((message) => webview.postMessage(message));
+  const postFiles =
+    typeof webview.postMessageWithAdditionalObjects === "function"
+      ? (message, files) => webview.postMessageWithAdditionalObjects(message, files)
+      : null; // an older runtime: drops reach the page only
+  const { runtime, receive, keyDown, dragOver, drop } = createRuntime((message) => webview.postMessage(message), postFiles);
   webview.addEventListener("message", (e) => receive(e.data));
   root.addEventListener("keydown", keyDown, true);
+  root.addEventListener("dragover", dragOver, true);
+  root.addEventListener("drop", drop, true);
   Object.defineProperty(root, "oriel", { value: runtime, enumerable: true });
 })(globalThis);

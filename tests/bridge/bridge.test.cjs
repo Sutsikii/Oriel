@@ -188,3 +188,63 @@ test("leaves the keys the page handled, plain keys and AltGr to the page", async
   await turn();
   assert.equal(sent.length, 1);
 });
+
+/** A drag event carrying `types`, and `files` for a drop. */
+function drag(types, files = []) {
+  return {
+    dataTransfer: { types, files, dropEffect: "none" },
+    clientX: 12,
+    clientY: 34,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+  };
+}
+
+test("lets files be dropped anywhere, and leaves other drags to the page", () => {
+  const { dragOver } = setup();
+  const files = drag(["Files"]);
+  dragOver(files);
+  assert.equal(files.defaultPrevented, true);
+  assert.equal(files.dataTransfer.dropEffect, "copy");
+  const text = drag(["text/plain"]);
+  dragOver(text);
+  assert.equal(text.defaultPrevented, false);
+  assert.equal(text.dataTransfer.dropEffect, "none");
+});
+
+test("sends dropped files with where they were dropped", () => {
+  const withFiles = [];
+  const page = createRuntime(() => {}, (message, files) => withFiles.push([JSON.parse(message), files]));
+  const a = { name: "a.txt" };
+  const b = { name: "b.png" };
+  const e = drag(["Files"], [a, b]);
+  page.drop(e);
+  assert.equal(e.defaultPrevented, true); // the webview does not open the file instead of the page
+  assert.deepEqual(withFiles, [[{ t: "drop", k: page.token, x: 12, y: 34 }, [a, b]]]);
+});
+
+test("ignores drops without files, and drops on a runtime that cannot send files", () => {
+  const withFiles = [];
+  const page = createRuntime(() => {}, (message, files) => withFiles.push(files));
+  const text = drag(["text/plain"]);
+  page.drop(text);
+  assert.equal(text.defaultPrevented, false);
+  page.drop(drag(["Files"], []));
+  assert.equal(withFiles.length, 0);
+
+  const old = setup(); // no postFiles: an older runtime
+  const e = drag(["Files"], [{ name: "a.txt" }]);
+  old.drop(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(old.sent.length, 1); // the hello only
+});
+
+test("gives the page the paths of dropped files, as an event", () => {
+  const { runtime, receive } = setup();
+  const drops = [];
+  runtime.on("oriel:filesDropped", (drop) => drops.push(drop));
+  receive(JSON.stringify({ t: "event", n: "oriel:filesDropped", v: { paths: ["C:\a.txt"], x: 1, y: 2 } }));
+  assert.deepEqual(drops, [{ paths: ["C:\a.txt"], x: 1, y: 2 }]);
+});

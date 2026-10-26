@@ -23,6 +23,12 @@ internal static class Protocol
     /// </summary>
     public const string Key = "key";
 
+    /// <summary>
+    /// Files were dropped on the page: <c>{"t":"drop","k":token,"x":clientX,"y":clientY}</c>,
+    /// sent with the dropped <c>File</c> objects, whose paths the backend reads.
+    /// </summary>
+    public const string Drop = "drop";
+
     /// <summary>A call returned: <c>{"t":"result","id":1,"k":token,"v":value}</c>, without <c>v</c> for nothing.</summary>
     public const string Result = "result";
 
@@ -34,6 +40,13 @@ internal static class Protocol
 
     /// <summary>The app emits an event: <c>{"t":"event","n":"Clock.Tick","v":value}</c>.</summary>
     public const string Event = "event";
+
+    /// <summary>
+    /// The event of a window's page for files dropped on it:
+    /// <c>{"paths":[...],"x":clientX,"y":clientY}</c>. No service has this
+    /// name, since a C# name has no colon.
+    /// </summary>
+    public const string FilesDroppedEvent = "oriel:filesDropped";
 
     public static string ResultMessage(long id, string token, ValueWriter? value) =>
         Write(w =>
