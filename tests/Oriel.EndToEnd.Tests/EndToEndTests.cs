@@ -112,7 +112,8 @@ public sealed class EndToEndTests : IDisposable
     }
 
     /// <summary>Runs an app showing a page of <paramref name="script"/>, until the page reports; then closes it.</summary>
-    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null, Menu? menu = null)
+    /// <remarks><paramref name="drive"/> acts on the page from outside while it runs; its failure ends the test at once.</remarks>
+    private async Task<(string Report, OrielApp App, OrielWindow Window, Probe Probe)> RunPage(string script, Action<OrielWindow>? setUp = null, Menu? menu = null, Func<OrielWindow, Task>? drive = null)
     {
         File.WriteAllText(Path.Combine(_assets, "index.html"), $$"""
             <!doctype html>
@@ -139,7 +140,17 @@ public sealed class EndToEndTests : IDisposable
             setUp?.Invoke(window);
         }));
 
+        var driving = drive is null ? null : Task.Run(async () =>
+        {
+            while (window is null)
+                await Task.Delay(10);
+            await drive(window);
+        });
+        if (driving is not null && await Task.WhenAny(probe.Reported.Task, driving).WaitAsync(TimeSpan.FromSeconds(30)) == driving)
+            await driving; // throws what failed
         var report = await probe.Reported.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        if (driving is not null)
+            await driving;
         Assert.Empty(errors);
         foreach (var open in app.Windows)
             open.Close();
@@ -335,7 +346,6 @@ public sealed class EndToEndTests : IDisposable
         Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", $"--remote-debugging-port={port}");
         try
         {
-            Task? drag = null;
             var (report, _, _, _) = await RunPage("""
                 const results = {};
                 document.addEventListener("drop", (e) => { results.pageFiles = Array.from(e.dataTransfer.files, (f) => f.name); });
@@ -345,12 +355,9 @@ public sealed class EndToEndTests : IDisposable
                 });
                 Object.assign(results, drop);
                 await oriel.call("E2E.Report", [JSON.stringify(results)]);
-                """, window =>
-            {
-                window.FilesDropped += (_, e) => dropped.Add(e);
-                drag = DragFiles(port, files, x: 120, y: 80);
-            });
-            await drag!;
+                """,
+                window => window.FilesDropped += (_, e) => dropped.Add(e),
+                drive: _ => DragFiles(port, files, x: 120, y: 80));
 
             using var results = JsonDocument.Parse(report);
             var root = results.RootElement;
@@ -377,26 +384,29 @@ public sealed class EndToEndTests : IDisposable
     {
         using var http = new HttpClient();
         string? socketUrl = null;
-        for (var i = 0; i < 100 && socketUrl is null; i++)
+        var seen = "nothing";
+        for (var i = 0; i < 200 && socketUrl is null; i++)
         {
             try
             {
-                using var targets = JsonDocument.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/json"));
+                seen = await http.GetStringAsync($"http://127.0.0.1:{port}/json");
+                using var targets = JsonDocument.Parse(seen);
                 socketUrl = targets.RootElement.EnumerateArray()
                     .Where(t => t.GetProperty("type").GetString() == "page" && t.GetProperty("title").GetString() == "Ready")
                     .Select(t => t.GetProperty("webSocketDebuggerUrl").GetString())
                     .FirstOrDefault();
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException e)
             {
+                seen = e.Message;
             }
             if (socketUrl is null)
                 await Task.Delay(100);
         }
-        Assert.NotNull(socketUrl);
+        Assert.True(socketUrl is not null, $"no page titled Ready on the DevTools port {port}; last seen: {seen}");
 
         using var socket = new System.Net.WebSockets.ClientWebSocket();
-        await socket.ConnectAsync(new Uri(socketUrl), CancellationToken.None);
+        await socket.ConnectAsync(new Uri(socketUrl!), CancellationToken.None);
         var id = 0;
         foreach (var type in new[] { "dragEnter", "dragOver", "drop" })
         {
