@@ -5,16 +5,42 @@ using Oriel.Platform;
 
 namespace Oriel.EndToEnd.Tests;
 
-/// <summary>A test that opens windows: it runs when ORIEL_E2E=1.</summary>
+/// <summary>A test that opens windows: it runs when ORIEL_E2E=1, on Windows, and on Linux when <see cref="Linux"/> says so.</summary>
 public sealed class EndToEndFactAttribute : FactAttribute
 {
-    public EndToEndFactAttribute()
+    private bool _linux;
+
+    public EndToEndFactAttribute() => Decide();
+
+    /// <summary>Whether the Linux backend has what the test uses.</summary>
+    public bool Linux
+    {
+        get => _linux;
+        set
+        {
+            _linux = value;
+            Decide();
+        }
+    }
+
+    private void Decide()
     {
         if (Environment.GetEnvironmentVariable("ORIEL_E2E") != "1")
             Skip = "opens windows; set ORIEL_E2E=1 to run";
+        else if (OperatingSystem.IsLinux())
+            Skip = _linux ? null : "uses what the Linux backend does not have yet";
         else if (!OperatingSystem.IsWindows())
-            Skip = "Oriel runs on Windows for now";
+            Skip = "Oriel runs on Windows and Linux for now";
+        else
+            Skip = null;
     }
+}
+
+/// <summary>What differs between the systems for the test pages.</summary>
+public static class Pages
+{
+    /// <summary>The origin of the app's pages, as they see it: WebKitGTK serves them at oriel://.</summary>
+    public static string Origin => OperatingSystem.IsLinux() ? "oriel://app.oriel" : "https://app.oriel";
 }
 
 /// <summary>An error the test pages tell apart.</summary>
@@ -158,7 +184,7 @@ public sealed class EndToEndTests : IDisposable
         return (report, app, window!, probe);
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task PagesCallServicesAndListenToTheirEvents()
     {
         var (report, _, window, _) = await RunPage("""
@@ -193,7 +219,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal("refused refused on purpose {\"attempts\":3}", root.GetProperty("refused").GetString());
         Assert.Equal("pong", root.GetProperty("event").GetString());
         Assert.Equal("/index.html", root.GetProperty("url").GetString());
-        Assert.Equal("https://app.oriel", root.GetProperty("origin").GetString());
+        Assert.Equal(Pages.Origin, root.GetProperty("origin").GetString());
         Assert.Equal("Done", window.Title);
         Assert.True(window.IsClosed);
     }
@@ -269,7 +295,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.True(done(), what);
     }
 
-    [EndToEndFact]
+    [EndToEndFact] // Linux: maximizing needs a window manager, which Xvfb has not
     public async Task APlacementComesBackAcrossRuns()
     {
         var options = new WindowOptions { Width = 500, Height = 400, StateKey = "main" };
@@ -410,7 +436,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal("""{"selected":9,"deleted":"","undone":"some text"}""", report);
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task ReloadingCancelsTheCallsOfThePreviousPage()
     {
         var (report, _, _, probe) = await RunPage("""
@@ -474,7 +500,7 @@ public sealed class EndToEndTests : IDisposable
         return int.TryParse(output.Trim(), out var n) ? n : 0;
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task KeepsTheWindowOnTheAppAndPagesWithoutPermissions()
     {
         File.WriteAllText(Path.Combine(_assets, "second.html"), "<!doctype html><title>Second</title>");
@@ -500,7 +526,7 @@ public sealed class EndToEndTests : IDisposable
             });
 
         using var results = System.Text.Json.JsonDocument.Parse(report);
-        Assert.Equal("https://app.oriel/index.html", results.RootElement.GetProperty("stayed").GetString());
+        Assert.Equal(Pages.Origin + "/index.html", results.RootElement.GetProperty("stayed").GetString());
         Assert.Equal("denied", results.RootElement.GetProperty("notifications").GetString());
         Assert.Contains((new Uri("https://example.com/"), false, NavigationAction.OpenExternally), navigations);
         Assert.Contains((new Uri("https://app.oriel/second.html"), true, NavigationAction.Allow), navigations);
@@ -635,7 +661,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(("792", "612"), (pages[1][1].Value, pages[1][2].Value));
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task ServesTheAppsFilesBesideThePage()
     {
         File.WriteAllText(Path.Combine(_assets, "data.json"), """{"served":true}""");
@@ -647,7 +673,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal("""{"served":true}""", report);
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task ServesAFrontendEmbeddedInTheExecutable()
     {
         // The test assembly embeds Embedded/ as OrielEmbedFrontend would: no folder at all.
@@ -676,6 +702,6 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(404, results.RootElement.GetProperty("missing").GetInt32());
         Assert.True(results.RootElement.GetProperty("wasm").GetBoolean());
         Assert.Equal("rgb(1, 2, 3)", results.RootElement.GetProperty("color").GetString());
-        Assert.Equal("https://app.oriel", results.RootElement.GetProperty("origin").GetString());
+        Assert.Equal(Pages.Origin, results.RootElement.GetProperty("origin").GetString());
     }
 }

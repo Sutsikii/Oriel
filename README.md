@@ -87,7 +87,9 @@ most of an app's footprint, as in every webview-based framework.
 ## Status
 
 Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
-Runtime; Linux and macOS are planned. The calls, events, generator, Windows
+Runtime, and on **Linux** with GTK 3 and WebKitGTK, which has the core and
+not yet dialogs, menus or printing ([linux.md](docs/linux.md)); macOS is
+planned. The calls, events, generator, Windows
 backend, window control, dialogs, menus and installers are done and tested;
 tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/roadmap.md).
 
@@ -110,6 +112,7 @@ tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/
   loop, publishing.
 - [WebView2](docs/webview2.md): the runtime apps need, its updates, and
   machines without it.
+- [Linux](docs/linux.md): what the Linux backend has, and how it differs.
 - [Generator diagnostics](docs/diagnostics.md): ORIEL001 to ORIEL006, and
   the experimental APIs.
 - [The page protocol](docs/protocol.md): the messages under the client.

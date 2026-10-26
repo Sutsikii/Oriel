@@ -30,7 +30,7 @@ public class WebView2RuntimeTests
         Assert.Equal(new WebView2Runtime.Found(@"C:\EdgeWebView\155.0.1", IsFixed: false), found);
     }
 
-    [Fact]
+    [WindowsFact] // the version is the last part of a Windows path
     public void PrefersTheNewerOfTheMachineAndUserRuntimes()
     {
         var found = Find(
@@ -101,5 +101,15 @@ public class WebView2RuntimeTests
         // CI machines and developer machines of Windows have the runtime.
         var found = WebView2Runtime.Find();
         Assert.NotNull(WebView2Runtime.ClientLibraryPath(found.Directory, File.Exists, WebView2Runtime.Architecture()));
+    }
+}
+
+/// <summary>A test of what only Windows does: skipped elsewhere.</summary>
+public sealed class WindowsFactAttribute : FactAttribute
+{
+    public WindowsFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows())
+            Skip = "Windows only";
     }
 }
