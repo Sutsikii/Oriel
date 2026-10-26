@@ -1,8 +1,9 @@
 name: Release
 
-# Pushing a tag v0.1.0-preview.1 tests, packs Oriel and Oriel.Hosting at
-# version 0.1.0-preview.1, publishes them to nuget.org and creates the
-# GitHub release, with that version's section of CHANGELOG.md as its notes.
+# Pushing a tag v0.1.0-preview.1 tests, packs Oriel, Oriel.Hosting and
+# Oriel.Templates at version 0.1.0-preview.1, publishes them to nuget.org
+# and creates the GitHub release, with that version's section of
+# CHANGELOG.md as its notes.
 # On pull requests that touch the release, it runs up to the packages and
 # their notes, and publishes nothing.
 
@@ -15,6 +16,7 @@ on:
       - CHANGELOG.md
       - Directory.Build.props
       - src/*/*.csproj
+      - templates/**
 
 permissions:
   contents: read
@@ -76,6 +78,7 @@ jobs:
         run: |
           dotnet pack src/Oriel -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
           dotnet pack src/Oriel.Hosting -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
+          dotnet pack templates/Oriel.Templates -c Release -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:

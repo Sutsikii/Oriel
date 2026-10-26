@@ -34,6 +34,7 @@ the [roadmap](docs/roadmap.md).
 | Real windows | `ORIEL_E2E=1 dotnet test tests/Oriel.EndToEnd.Tests` |
 | Load and leaks, in real windows, for minutes | `ORIEL_STRESS=1 dotnet test tests/Oriel.Stress.Tests` (every night in CI) |
 | What a call costs | see [benchmarks/README.md](benchmarks/README.md) (in CI too) |
+| The `dotnet new` template | see below |
 
 All of them run in CI. The end-to-end tests open windows for a few seconds
 each, so they are skipped unless `ORIEL_E2E=1`.
@@ -55,6 +56,24 @@ BRIDGE_FUZZ_SEED=<seed> node --test tests/bridge/bridge.fuzz.test.cjs
 
 To search longer, set `CsCheck_Time=60` (seconds per property) or
 `BRIDGE_FUZZ_RUNS=100000`.
+
+### The template
+
+`templates/Oriel.Templates` holds the `dotnet new oriel` template as an
+app has it; packing stamps the version of the Oriel package in its project.
+CI packs both, creates an app from them outside the repository and builds
+it. To try a change by hand, without touching your installed templates:
+
+```sh
+dotnet pack src/Oriel -c Release -p:Version=0.0.1-dev -o ../packages
+dotnet pack templates/Oriel.Templates -c Release -p:Version=0.0.1-dev -o ../packages
+dotnet new install ../packages/Oriel.Templates.0.0.1-dev.nupkg --debug:custom-hive ../hive
+dotnet new oriel -o ../MyApp --debug:custom-hive ../hive
+```
+
+then add `../packages` as a package source of the app. The template ships
+`frontend/src/oriel.ts`, so that its frontend builds before the first
+build of the app writes it; CI checks that it is what the generator writes.
 
 ### Snapshot of the TypeScript client
 

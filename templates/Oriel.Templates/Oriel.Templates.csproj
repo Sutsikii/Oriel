@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The dotnet new templates: dotnet new install Oriel.Templates, then
+    dotnet new oriel. content/ holds each template as an app would have it,
+    with the version of the Oriel package stamped in at pack time.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageType>Template</PackageType>
+    <PackageId>Oriel.Templates</PackageId>
+    <Description>dotnet new templates for Oriel: desktop apps in C#, with a web frontend calling C# through a generated TypeScript client.</Description>
+    <PackageTags>dotnet-new;templates;desktop;webview;webview2;typescript</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- No lib/ folder: a template package holds content only. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <TemplateContent Include="content/**" Exclude="content/**/bin/**;content/**/obj/**;content/**/node_modules/**;content/**/dist/**" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <!-- Copies the templates and writes the package's version where they reference Oriel. -->
+  <Target Name="OrielStampTemplates" BeforeTargets="_GetPackageFiles">
+    <PropertyGroup>
+      <StampedContent>$(MSBuildProjectDirectory)/obj/stamped/</StampedContent>
+    </PropertyGroup>
+    <RemoveDir Directories="$(StampedContent)" />
+    <Copy SourceFiles="@(TemplateContent)" DestinationFiles="@(TemplateContent->'$(StampedContent)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <PropertyGroup>
+      <_OrielProject>$(StampedContent)oriel/OrielTemplate.csproj</_OrielProject>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_OrielProject)"
+                      Lines="$([MSBuild]::Escape($([System.IO.File]::ReadAllText('$(_OrielProject)').Replace('$OrielVersion$', '$(PackageVersion)'))))"
+                      Overwrite="true" />
+    <ItemGroup>
+      <None Include="$(StampedContent)**" Pack="true" PackagePath="content/" />
+    </ItemGroup>
+  </Target>
+
+</Project>

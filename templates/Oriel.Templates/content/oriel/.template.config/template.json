@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Oriel contributors",
+  "classifications": ["Desktop", "Windows", "Web", "TypeScript"],
+  "identity": "Oriel.App.CSharp",
+  "groupIdentity": "Oriel.App",
+  "name": "Oriel app",
+  "description": "A desktop app in C#, with a Vite and TypeScript frontend calling C# through a generated client.",
+  "shortName": "oriel",
+  "tags": { "language": "C#", "type": "project" },
+  "sourceName": "OrielTemplate",
+  "preferNameDirectory": true,
+  "guids": ["7F3C2A51-0B6E-4D8A-9C1F-5E2B8A4D6C90"],
+  "sources": [{ "modifiers": [{ "exclude": ["frontend/node_modules/**", "frontend/dist/**", "bin/**", "obj/**"] }] }],
+  "primaryOutputs": [{ "path": "OrielTemplate.csproj" }],
+  "postActions": [
+    {
+      "description": "Next steps.",
+      "manualInstructions": [{ "text": "cd frontend, then: npm install, and npm run dev" }],
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true
+    }
+  ]
+}
