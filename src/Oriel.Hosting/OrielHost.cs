@@ -114,8 +114,43 @@ public sealed class OrielHost : IHost, IAsyncDisposable
     /// them. Stopping the host (<see cref="IHostApplicationLifetime.StopApplication"/>,
     /// Ctrl+C in a console) or <paramref name="cancellation"/> quits the app.
     /// </summary>
+    /// <remarks>
+    /// On macOS, where AppKit runs on the main thread only, the app runs on
+    /// the calling thread, which must be the main one, and the task is
+    /// complete when this returns: await it from <c>Main</c>, first.
+    /// </remarks>
     /// <returns>The exit code, 0.</returns>
-    public async Task<int> RunAsync(CancellationToken cancellation = default)
+    public Task<int> RunAsync(CancellationToken cancellation = default)
+    {
+        if (!App.RunsOnCallingThread)
+            return RunOnItsThreadAsync(cancellation);
+        try
+        {
+            return Task.FromResult(RunHere(cancellation));
+        }
+        catch (Exception e)
+        {
+            return Task.FromException<int>(e);
+        }
+    }
+
+    private int RunHere(CancellationToken cancellation)
+    {
+        _host.StartAsync(cancellation).GetAwaiter().GetResult();
+        try
+        {
+            var lifetime = Services.GetRequiredService<IHostApplicationLifetime>();
+            using var stopping = lifetime.ApplicationStopping.Register(App.Quit);
+            using var canceled = cancellation.Register(App.Quit);
+            return App.Run();
+        }
+        finally
+        {
+            _host.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+    }
+
+    private async Task<int> RunOnItsThreadAsync(CancellationToken cancellation)
     {
         await _host.StartAsync(cancellation).ConfigureAwait(false);
         int exit;

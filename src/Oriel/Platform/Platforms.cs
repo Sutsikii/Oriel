@@ -1,4 +1,5 @@
 using Oriel.Platform.Linux;
+using Oriel.Platform.MacOS;
 using Oriel.Platform.Windows;
 
 namespace Oriel.Platform;
@@ -12,6 +13,8 @@ internal static class Platforms
             return new WindowsPlatform();
         if (OperatingSystem.IsLinux())
             return new LinuxPlatform();
+        if (OperatingSystem.IsMacOS())
+            return new MacPlatform();
         return new UnsupportedPlatform();
     }
 }
@@ -20,7 +23,7 @@ internal static class Platforms
 internal sealed class UnsupportedPlatform : IPlatform
 {
     public void Run(Action started) =>
-        throw new PlatformNotSupportedException("Oriel runs on Windows 10 (1809) and later, and Linux, for now; macOS is planned.");
+        throw new PlatformNotSupportedException("Oriel runs on Windows 10 (1809) and later, Linux and macOS.");
 
     public void Post(Action action)
     {

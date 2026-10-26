@@ -76,6 +76,10 @@ runs the app until it quits, then stops them. The host's own shutdown
 quits the app: `IHostApplicationLifetime.StopApplication`, or Ctrl+C in a
 console. The token given to `RunAsync` quits it too.
 
+On macOS, the app runs on the main thread, which AppKit needs: make
+`await app.RunAsync()` the first `await` of `Main`, as above, or call
+`app.Run()` ([macos.md](macos.md)).
+
 `DisposeAsync` disposes the windows' scopes and the container, and with
 it the singletons it made. In the chess example, that stops Stockfish.
 

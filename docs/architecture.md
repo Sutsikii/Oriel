@@ -34,6 +34,8 @@ src/
     Platform/
       IPlatform.cs          the contract of a backend
       Windows/              Win32 and WebView2
+      Linux/                GTK 3 and WebKitGTK
+      MacOS/                AppKit and WKWebView, through the Objective-C runtime
     build/                  MSBuild props and targets, shipped in the package
   Oriel.Hosting/            apps on the .NET Generic Host: DI, ILogger, hosted services
   Oriel.Generators/         the source generator (netstandard2.0)
@@ -101,7 +103,9 @@ processes and the app.
 - **The UI thread** is Oriel's own (`OrielApp.Run` starts it, in a
   single-threaded COM apartment as WebView2 requires). Backends call into
   Oriel on it, and every `IPlatform`/`IPlatformWindow` member but `Post` is
-  only called on it.
+  only called on it. On macOS, AppKit runs on the process's main thread
+  only, so the backend says `RunsOnCallingThread` and `OrielApp.Run` runs
+  it on the calling thread, which must be the main one.
 - **Calls** run on the thread pool, so services never block the UI.
 - **`OrielApp.Dispatch`** runs an action on the UI thread; `OrielWindow`'s
   members use it, so they can be called from any thread.
@@ -274,6 +278,30 @@ page comes back.
   through a `GCHandle`, freed on an idle callback after the window's
   `destroy`, since the view still signals while it is destroyed.
 
+## The macOS backend
+
+[`Platform/MacOS`](../src/Oriel/Platform/MacOS) drives AppKit and WebKit
+through the Objective-C runtime ([`ObjC.cs`](../src/Oriel/Platform/MacOS/ObjC.cs)):
+`objc_msgSend` is declared once per signature it is called with, and
+`NSRect`s come back through `objc_msgSend_stret` on x64.
+
+- **`MacPlatform`** runs `NSApplication`'s loop, posts with
+  `dispatch_async_f` on the main queue, and sets the menu bar once per
+  process: Hide and Quit, and the Edit menu, without which WKWebView gets
+  no Cmd+C or Cmd+V. `Run` must be called on the main thread. A program
+  whose main thread is busy otherwise can serve apps run on other threads
+  from it with `ServeMainThread`: the end-to-end tests' `Main` does, since
+  `dotnet test` keeps the main thread for itself.
+- **`MacWebWindow`** is an `NSWindow` holding a `WKWebView`. One object of
+  a class made at run time, `OrielWebWindow`, is all the delegates: of the
+  window, of the view's navigations and UI, its script message handler,
+  its `oriel` scheme handler and the observer of its title. Its methods are
+  `UnmanagedCallersOnly` functions that find their window in a dictionary.
+  The bridge, the `oriel` message handler, `__orielReceive` and the
+  `oriel://app.oriel` origin are those of Linux (`AppScheme`). AppKit's
+  positions start at the bottom left of the main screen; the window turns
+  them into Oriel's, from the top left.
+
 ## Adding a platform
 
 A backend implements `IPlatform` and `IPlatformWindow`
@@ -281,7 +309,8 @@ A backend implements `IPlatform` and `IPlatformWindow`
 own, and `Platforms.Current` picks it. It must:
 
 - run its event loop on the thread that calls `Run`, and run `Post`ed actions
-  on it;
+  on it (or say `RunsOnCallingThread`, when the system wants the loop on a
+  thread of its choice, as macOS does);
 - open a window showing `PlatformWindowOptions.Url`, with
   `BridgeScript` injected at document start in the top frame;
 - give the page a message channel bridge.js knows (`findTransport` there):

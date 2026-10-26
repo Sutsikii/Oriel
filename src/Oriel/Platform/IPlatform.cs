@@ -16,6 +16,13 @@ internal interface IPlatform
     /// </summary>
     void Run(Action started);
 
+    /// <summary>
+    /// Whether <see cref="Run"/> runs on the thread that calls
+    /// <see cref="OrielApp.Run"/>, rather than on a thread of Oriel's: on
+    /// macOS, where AppKit takes the process's main thread.
+    /// </summary>
+    bool RunsOnCallingThread => false;
+
     /// <summary>Runs <paramref name="action"/> on the UI thread, soon. Any thread may call it, before <see cref="Run"/> too.</summary>
     void Post(Action action);
 
