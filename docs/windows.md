@@ -34,6 +34,7 @@ window's size includes its frame.
 | `IsFullScreen` | Fills the monitor, without frame, menu bar or taskbar; set it back to false to return where it was |
 | `IsAlwaysOnTop` | Stays over the other windows |
 | `IsFocused`, `Focus()` | Whether it is the active window; makes it so |
+| `IsVisible`, `Hide()`, `Show()` | Hides it from the screen and the taskbar, open still, with its page; shows it again, in front |
 
 The methods and setters can be called from any thread, and take effect on
 the UI thread. The events are raised on the UI thread:
@@ -44,12 +45,62 @@ the UI thread. The events are raised on the UI thread:
 | `Resized` | It was resized |
 | `StateChanged` | It was minimized, maximized or restored |
 | `FocusChanged` | It became the active window, or stopped being it |
+| `Closing` | The person asked to close it, with its close button or Alt+F4: `e.Cancel = true` keeps it open. Not raised for `Close()`, which always closes |
 
 Minimizing, maximizing and full screen leave `Bounds` as they were: they
 are where the window goes back to.
 
 `Focus` cannot always take the keyboard from another app: Windows then
 flashes the window in the taskbar instead.
+
+## Tray icons
+
+`OrielApp.AddTrayIcon` shows an icon of the app in the notification area
+of the taskbar, for apps that keep running with their windows hidden: a
+sync client, a chat, a recorder.
+
+```csharp
+var app = new OrielApp(new AppOptions { Name = "Notes", QuitWhenLastWindowCloses = true });
+var tray = app.AddTrayIcon(new TrayIconOptions
+{
+    Tooltip = "Notes",
+    Menu = new Menu(new MenuItem("&Open"), MenuItem.Separator(), new MenuItem("&Quit")),
+});
+app.Run(() =>
+{
+    var window = app.OpenWindow();
+    // The close button hides the window; the icon brings it back.
+    window.Closing += (_, e) =>
+    {
+        e.Cancel = true;
+        window.Hide();
+    };
+    tray.Clicked += (_, _) => window.Show();
+    tray.MenuItemClicked += (_, e) =>
+    {
+        if (e.Item.Text == "&Open")
+            window.Show();
+        else
+            app.Quit();
+    };
+});
+```
+
+- `Clicked` is raised for a click on the icon, or its choice with the
+  keyboard. A right click opens `Menu`, and an item picked raises
+  `MenuItemClicked`. The items' own `Clicked` do not run: a tray menu has
+  no window.
+- `TrayIconOptions.Icon` is the path of an `.ico` file; by default, the
+  icon of the executable (its `ApplicationIcon`).
+- `Tooltip` and `Menu` can change at any time, from any thread; dispose
+  the icon to remove it. Icons go when the app quits, and come back if
+  Explorer restarts.
+- A hidden window is still open, so the app does not quit when it hides
+  the last one.
+
+Tray icons are in the Windows backend; elsewhere `AddTrayIcon` throws
+`NotSupportedException` for now. `Closing`, `Hide` and `Show` work on every
+backend.
 
 ## From the page
 

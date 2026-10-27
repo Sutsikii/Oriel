@@ -425,3 +425,31 @@ Oriel.Clipboard.SetHtmlAsync(string! html, string? text = null) -> System.Thread
 Oriel.Clipboard.SetImageAsync(byte[]! png) -> System.Threading.Tasks.Task!
 Oriel.Clipboard.SetTextAsync(string! text) -> System.Threading.Tasks.Task!
 Oriel.OrielApp.Clipboard.get -> Oriel.Clipboard!
+Oriel.OrielWindow.Closing -> System.EventHandler<Oriel.WindowClosingEventArgs!>?
+Oriel.OrielWindow.Hide() -> void
+Oriel.OrielWindow.IsVisible.get -> bool
+Oriel.OrielWindow.Show() -> void
+Oriel.WindowClosingEventArgs
+Oriel.WindowClosingEventArgs.Cancel.get -> bool
+Oriel.WindowClosingEventArgs.Cancel.set -> void
+Oriel.WindowClosingEventArgs.WindowClosingEventArgs() -> void
+Oriel.OrielApp.AddTrayIcon(Oriel.TrayIconOptions? options = null) -> Oriel.TrayIcon!
+Oriel.TrayIcon
+Oriel.TrayIcon.Clicked -> System.EventHandler?
+Oriel.TrayIcon.Dispose() -> void
+Oriel.TrayIcon.Menu.get -> Oriel.Menu?
+Oriel.TrayIcon.Menu.set -> void
+Oriel.TrayIcon.MenuItemClicked -> System.EventHandler<Oriel.TrayMenuItemClickedEventArgs!>?
+Oriel.TrayIcon.Tooltip.get -> string?
+Oriel.TrayIcon.Tooltip.set -> void
+Oriel.TrayIconOptions
+Oriel.TrayIconOptions.Icon.get -> string?
+Oriel.TrayIconOptions.Icon.init -> void
+Oriel.TrayIconOptions.Menu.get -> Oriel.Menu?
+Oriel.TrayIconOptions.Menu.init -> void
+Oriel.TrayIconOptions.Tooltip.get -> string?
+Oriel.TrayIconOptions.Tooltip.init -> void
+Oriel.TrayIconOptions.TrayIconOptions() -> void
+Oriel.TrayMenuItemClickedEventArgs
+Oriel.TrayMenuItemClickedEventArgs.Item.get -> Oriel.MenuItem!
+Oriel.TrayMenuItemClickedEventArgs.TrayMenuItemClickedEventArgs(Oriel.MenuItem! item) -> void

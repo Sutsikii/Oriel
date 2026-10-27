@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Tray icons.** `OrielApp.AddTrayIcon` shows an icon in the notification
+  area, with a tooltip and a menu (Windows). Windows gain `Hide`, `Show`,
+  `IsVisible`, and `Closing`, raised when the person closes one, which
+  can keep it open: close to the tray.
+
 - **The clipboard.** `OrielApp.Clipboard` gets and sets text, HTML,
   images (PNG, screenshots included) and files, on Windows.
 

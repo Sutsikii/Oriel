@@ -44,6 +44,43 @@ internal sealed class FakePlatform : IPlatform
         Windows.Enqueue(window);
         return window;
     }
+
+    public bool SupportsTrayIcons { get; set; } = true;
+
+    public ConcurrentQueue<FakeTrayIcon> TrayIcons { get; } = new();
+
+    public IPlatformTrayIcon AddTrayIcon(TrayIconSpec spec, IPlatformTrayIconEvents events)
+    {
+        var icon = new FakeTrayIcon(spec, events);
+        TrayIcons.Enqueue(icon);
+        return icon;
+    }
+}
+
+/// <summary>A tray icon that records what it gets; its menu picks <see cref="Pick"/>.</summary>
+internal sealed class FakeTrayIcon(TrayIconSpec spec, IPlatformTrayIconEvents events) : IPlatformTrayIcon
+{
+    public TrayIconSpec Spec { get; } = spec;
+
+    public IPlatformTrayIconEvents Events { get; } = events;
+
+    public string? Tooltip { get; private set; } = spec.Tooltip;
+
+    public Func<Menu, MenuItem?> Pick { get; set; } = _ => null;
+
+    public ConcurrentQueue<Menu> Menus { get; } = new();
+
+    public bool Removed { get; private set; }
+
+    public void SetTooltip(string? tooltip) => Tooltip = tooltip;
+
+    public MenuItem? ShowMenu(Menu menu)
+    {
+        Menus.Enqueue(menu);
+        return Pick(menu);
+    }
+
+    public void Remove() => Removed = true;
 }
 
 internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowEvents events) : IPlatformWindow
@@ -63,6 +100,10 @@ internal sealed class FakeWindow(PlatformWindowOptions options, IPlatformWindowE
     public void OpenDevTools() => DevToolsOpened++;
 
     public void Close() => Events.Closed();
+
+    public bool Visible { get; private set; } = true;
+
+    public void SetVisible(bool visible) => Visible = visible;
 
     public int Reloads { get; private set; }
 

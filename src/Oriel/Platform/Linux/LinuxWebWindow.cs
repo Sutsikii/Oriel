@@ -70,6 +70,7 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
         Gtk.gtk_container_add(_window, _webview);
 
         Connect(_window, "destroy", (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnDestroy, self);
+        Connect(_window, "delete-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDeleteEvent, self);
         Connect(_window, "configure-event", (nint)(delegate* unmanaged[Cdecl]<nint, Gtk.GdkEventConfigure*, nint, int>)&OnConfigure, self);
         Connect(_window, "window-state-event", (nint)(delegate* unmanaged[Cdecl]<nint, Gtk.GdkEventWindowState*, nint, int>)&OnWindowState, self);
         Connect(_content, "script-message-received::oriel", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, void>)&OnScriptMessage, self);
@@ -283,8 +284,31 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
 
     public void Close()
     {
-        if (!_destroyed)
-            Gtk.gtk_window_close(_window);
+        if (_destroyed)
+            return;
+        _closing = true; // the app's choice: the person is not asked
+        Gtk.gtk_window_close(_window);
+    }
+
+    private bool _closing;
+
+    public void SetVisible(bool visible)
+    {
+        if (_destroyed)
+            return;
+        if (visible)
+            Gtk.gtk_widget_show(_window);
+        else
+            Gtk.gtk_widget_hide(_window);
+    }
+
+    /// <summary>The close button, or gtk_window_close: nonzero keeps the window.</summary>
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static int OnDeleteEvent(nint widget, nint e, nint data)
+    {
+        var keep = false;
+        Guard(data, w => keep = !w._closing && !w._events.CloseRequested());
+        return keep ? 1 : 0;
     }
 
     public void Reload() => Gtk.webkit_web_view_reload(_webview);
