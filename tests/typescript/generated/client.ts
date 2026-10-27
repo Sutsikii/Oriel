@@ -31,6 +31,7 @@ export const CallError = CallErrorBase as unknown as {
 interface Bridge {
   call(method: string, args: unknown[]): Promise<unknown>;
   on(event: string, listener: (payload: unknown) => void): () => void;
+  stream(method: string, args: unknown[]): AsyncIterable<unknown>;
 }
 
 function bridge(): Bridge {
@@ -51,6 +52,32 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
     }
     throw err;
   }
+}
+
+function stream<T>(method: string, ...args: unknown[]): AsyncIterable<T> {
+  // Arguments left out stay out, so that C# uses its defaults.
+  while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<T> {
+      const items = bridge().stream(method, args)[Symbol.asyncIterator]();
+      return {
+        async next(): Promise<IteratorResult<T>> {
+          try {
+            return (await items.next()) as IteratorResult<T>;
+          } catch (err) {
+            if (err instanceof Error && err.name === "CallError") {
+              const { code, data } = err as { code?: string | null; data?: unknown };
+              throw new CallError(method, err.message, code ?? null, data);
+            }
+            throw err;
+          }
+        },
+        async return(): Promise<IteratorResult<T>> {
+          return (await items.return!()) as IteratorResult<T>;
+        },
+      };
+    },
+  };
 }
 
 function on<T>(event: string, listener: (payload: T) => void): () => void {
@@ -112,6 +139,10 @@ export const Decks = {
   },
   raw(value: unknown): Promise<unknown> {
     return call("Decks.Raw", value);
+  },
+  /** The slides of the deck at path, as they are read. */
+  slides(path: string): AsyncIterable<Slide> {
+    return stream("Decks.Slides", path);
   },
   /**
    * Fires when a deck changed on disk.

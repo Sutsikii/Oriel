@@ -45,6 +45,94 @@
       });
     }
 
+    /**
+     * Calls `method`, which returns a stream, with `args`; returns an async
+     * iterable of its items. The call starts when iteration does. The app
+     * sends no more items than the page is ready for, and stops the stream
+     * when the page stops iterating.
+     */
+    function stream(method, args) {
+      return { [Symbol.asyncIterator]: () => iterate(method, args) };
+    }
+
+    function iterate(method, args) {
+      const id = ++seq;
+      const items = []; // arrived, not taken yet
+      const waiting = []; // next() calls waiting for an item
+      let ended = false; // nothing more arrives
+      let failure = null; // the error next() rejects with once the items are taken
+      let taken = 0; // items taken since the last pull
+
+      function end(err) {
+        if (ended) return;
+        ended = true;
+        pending.delete(id);
+        if (waiting.length === 0) failure = err;
+        for (const w of waiting.splice(0)) {
+          if (err) w.reject(err);
+          else w.resolve({ value: undefined, done: true });
+          err = null; // one rejection, then the end
+        }
+      }
+
+      // Grants the items taken once half the window is, so that the app
+      // keeps a few on their way.
+      function took() {
+        if (++taken < STREAM_WINDOW / 2 || ended) return;
+        send({ t: "pull", id, k: token, n: taken });
+        taken = 0;
+      }
+
+      pending.set(id, {
+        method,
+        item(v) {
+          if (ended) return;
+          const w = waiting.shift();
+          if (w) {
+            w.resolve({ value: v, done: false });
+            took();
+          } else {
+            items.push(v);
+          }
+        },
+        resolve: () => end(null),
+        reject: (err) => end(err),
+      });
+      try {
+        send({ t: "call", id, k: token, m: method, a: args === undefined ? [] : args, w: STREAM_WINDOW });
+      } catch (err) {
+        end(err);
+      }
+
+      return {
+        next() {
+          if (items.length > 0) {
+            const value = items.shift();
+            took();
+            return Promise.resolve({ value, done: false });
+          }
+          if (ended) {
+            const err = failure;
+            failure = null;
+            return err ? Promise.reject(err) : Promise.resolve({ value: undefined, done: true });
+          }
+          return new Promise((resolve, reject) => waiting.push({ resolve, reject }));
+        },
+        return() {
+          if (!ended) {
+            send({ t: "cancel", id, k: token });
+            end(null);
+          }
+          items.length = 0;
+          failure = null;
+          return Promise.resolve({ value: undefined, done: true });
+        },
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+      };
+    }
+
     /** Listens to the event `name`; returns a function that stops listening. */
     function on(name, listener) {
       let set = listeners.get(name);
@@ -74,6 +162,12 @@
           pending.delete(message.id);
           if (message.t === "result") p.resolve(message.v);
           else p.reject(callError(p.method, errorMessage(p.method, message.e), message.c, message.d));
+          return;
+        }
+        case "item": {
+          if (message.k !== token) return;
+          const p = pending.get(message.id);
+          if (p && p.item) p.item(message.v);
           return;
         }
         case "event": {
@@ -148,13 +242,16 @@
     }
 
     send({ t: "hello", k: token });
-    return { runtime: Object.freeze({ call, on }), receive, keyDown, dragOver, drop, token };
+    return { runtime: Object.freeze({ call, on, stream }), receive, keyDown, dragOver, drop, token };
   }
 
   /** Whether a drag carries files from the system, rather than text or an element of the page. */
   function hasFiles(transfer) {
     return !!transfer && Array.from(transfer.types || []).includes("Files");
   }
+
+  /** The items a stream may send ahead of the page. */
+  const STREAM_WINDOW = 16;
 
   /** Shift, Ctrl, Alt and the Windows keys: pressed alone, they are no shortcut. */
   const MODIFIER_KEYS = new Set([16, 17, 18, 91, 92, 93]);

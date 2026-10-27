@@ -36,6 +36,24 @@ internal static class Protocol
     /// </summary>
     public const string Ack = "ack";
 
+    /// <summary>
+    /// The page is ready for <c>n</c> more items of the stream of call <c>id</c>:
+    /// <c>{"t":"pull","id":1,"k":token,"n":8}</c>.
+    /// </summary>
+    public const string Pull = "pull";
+
+    /// <summary>
+    /// The page stopped iterating the stream of call <c>id</c>:
+    /// <c>{"t":"cancel","id":1,"k":token}</c>.
+    /// </summary>
+    public const string Cancel = "cancel";
+
+    /// <summary>
+    /// An item of the stream of call <c>id</c>: <c>{"t":"item","id":1,"k":token,"v":value}</c>.
+    /// A <see cref="Result"/> ends the stream, an <see cref="Error"/> fails it.
+    /// </summary>
+    public const string Item = "item";
+
     /// <summary>A call returned: <c>{"t":"result","id":1,"k":token,"v":value}</c>, without <c>v</c> for nothing.</summary>
     public const string Result = "result";
 
@@ -69,6 +87,16 @@ internal static class Protocol
                 w.WritePropertyName("v");
                 value(w);
             }
+        });
+
+    public static string ItemMessage(long id, string token, ValueWriter value) =>
+        Write(w =>
+        {
+            w.WriteString("t", Item);
+            w.WriteNumber("id", id);
+            w.WriteString("k", token);
+            w.WritePropertyName("v");
+            value(w);
         });
 
     public static string ErrorMessage(long id, string token, string message, string? code = null, ValueWriter? data = null) =>

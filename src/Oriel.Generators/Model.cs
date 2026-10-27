@@ -132,6 +132,9 @@ internal enum Returns
     Value,
     Task,
     TaskOfValue,
+
+    /// <summary><c>IAsyncEnumerable&lt;T&gt;</c>: items the page iterates; the result is the item type.</summary>
+    Stream,
 }
 
 internal sealed record MethodDef(string CSharp, string TypeScript, Doc Doc, EquatableArray<ParamDef> Params, Returns Returns, TypeRef? Result);

@@ -151,14 +151,15 @@ internal static class ServiceParser
             parameters.Add(new ParamDef(parameter.Name, type, null, defaultValue));
         }
 
-        var (returns, result) = Result(method, mapper, $"the result of {service}.{method.Name}", ref ok);
+        var (returns, result) = Result(method, mapper, $"{service}.{method.Name}", ref ok);
         if (!ok)
             return null;
         return new MethodDef(method.Name, Names.Camel(method.Name), DocComments.Of(method, cancellation), parameters.ToEquatableArray(), returns, result);
     }
 
     /// <summary>What a method returns once awaited.</summary>
-    private static (Returns, TypeRef?) Result(IMethodSymbol method, TypeMapper mapper, string what, ref bool ok)
+    /// <param name="name">The method, as <c>Service.Method</c>.</param>
+    private static (Returns, TypeRef?) Result(IMethodSymbol method, TypeMapper mapper, string name, ref bool ok)
     {
         if (method.ReturnsVoid)
             return (Returns.Void, null);
@@ -167,12 +168,17 @@ internal static class ServiceParser
         if (definition is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
             return (Returns.Task, null);
         var returns = Returns.Value;
-        if (definition is "System.Threading.Tasks.Task<TResult>" or "System.Threading.Tasks.ValueTask<TResult>")
+        if (definition == "System.Collections.Generic.IAsyncEnumerable<T>")
+        {
+            type = ((INamedTypeSymbol)type).TypeArguments[0];
+            returns = Returns.Stream;
+        }
+        else if (definition is "System.Threading.Tasks.Task<TResult>" or "System.Threading.Tasks.ValueTask<TResult>")
         {
             type = ((INamedTypeSymbol)type).TypeArguments[0];
             returns = Returns.TaskOfValue;
         }
-        var mapped = mapper.Map(type, method, what);
+        var mapped = mapper.Map(type, method, returns == Returns.Stream ? $"the items of {name}" : $"the result of {name}");
         if (mapped is null)
             ok = false;
         return (returns, mapped);

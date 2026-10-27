@@ -172,7 +172,7 @@ internal sealed class TypeMapper
             }
         }
         if (definition.StartsWith("System.Collections.Generic.IAsyncEnumerable<", StringComparison.Ordinal))
-            reason = "streams (IAsyncEnumerable) are not supported yet";
+            reason = "streams (IAsyncEnumerable) can only be returned, not nested";
         else if (definition.StartsWith("System.Tuple<", StringComparison.Ordinal))
             reason = "tuples have no property names; use a record";
         else if (definition.StartsWith("System.Threading.Tasks.", StringComparison.Ordinal))

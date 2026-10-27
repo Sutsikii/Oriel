@@ -100,6 +100,8 @@ internal static class TypeScriptEmitter
         {
             w.Line("call(method: string, args: unknown[]): Promise<unknown>;");
             w.Line("on(event: string, listener: (payload: unknown) => void): () => void;");
+            if (HasStreams(project))
+                w.Line("stream(method: string, args: unknown[]): AsyncIterable<unknown>;");
         }
         w.Line("}");
         w.Line();
@@ -112,8 +114,10 @@ internal static class TypeScriptEmitter
         }
         w.Line("}");
         // Only the helpers the services use, for projects that refuse unused code.
-        if (project.Services.Any(s => s.Methods.Count > 0))
+        if (project.Services.Any(s => s.Methods.Any(m => m.Returns != Returns.Stream)))
             CallHelper(w);
+        if (HasStreams(project))
+            StreamHelper(w);
         if (project.Services.Any(s => s.Events.Count > 0))
             OnHelper(w);
     }
@@ -166,6 +170,62 @@ internal static class TypeScriptEmitter
                 w.Line("throw err;");
             }
             w.Line("}");
+        }
+        w.Line("}");
+    }
+
+    private static bool HasStreams(Project project) =>
+        project.Services.Any(s => s.Methods.Any(m => m.Returns == Returns.Stream));
+
+    private static void StreamHelper(SourceWriter w)
+    {
+        w.Line();
+        w.Line("function stream<T>(method: string, ...args: unknown[]): AsyncIterable<T> {");
+        using (w.Indent())
+        {
+            w.Line("// Arguments left out stay out, so that C# uses its defaults.");
+            w.Line("while (args.length > 0 && args[args.length - 1] === undefined) args.pop();");
+            w.Line("return {");
+            using (w.Indent())
+            {
+                w.Line("[Symbol.asyncIterator](): AsyncIterator<T> {");
+                using (w.Indent())
+                {
+                    w.Line("const items = bridge().stream(method, args)[Symbol.asyncIterator]();");
+                    w.Line("return {");
+                    using (w.Indent())
+                    {
+                        w.Line("async next(): Promise<IteratorResult<T>> {");
+                        using (w.Indent())
+                        {
+                            w.Line("try {");
+                            using (w.Indent())
+                                w.Line("return (await items.next()) as IteratorResult<T>;");
+                            w.Line("} catch (err) {");
+                            using (w.Indent())
+                            {
+                                w.Line("if (err instanceof Error && err.name === \"CallError\") {");
+                                using (w.Indent())
+                                {
+                                    w.Line("const { code, data } = err as { code?: string | null; data?: unknown };");
+                                    w.Line("throw new CallError(method, err.message, code ?? null, data);");
+                                }
+                                w.Line("}");
+                                w.Line("throw err;");
+                            }
+                            w.Line("}");
+                        }
+                        w.Line("},");
+                        w.Line("async return(): Promise<IteratorResult<T>> {");
+                        using (w.Indent())
+                            w.Line("return (await items.return!()) as IteratorResult<T>;");
+                        w.Line("},");
+                    }
+                    w.Line("};");
+                }
+                w.Line("},");
+            }
+            w.Line("};");
         }
         w.Line("}");
     }
@@ -243,9 +303,10 @@ internal static class TypeScriptEmitter
                 var parameters = page.Select(p => $"{Parameter(p.Name)}{(p.IsOptional ? "?" : "")}: {Type(p.Type!, names)}");
                 var result = method.Result is null ? "void" : Type(method.Result, names);
                 var arguments = new[] { Quote(service.Name + "." + method.CSharp) }.Concat(page.Select(p => Parameter(p.Name)));
-                w.Line($"{method.TypeScript}({string.Join(", ", parameters)}): Promise<{result}> {{");
+                var (returned, helper) = method.Returns == Returns.Stream ? ("AsyncIterable", "stream") : ("Promise", "call");
+                w.Line($"{method.TypeScript}({string.Join(", ", parameters)}): {returned}<{result}> {{");
                 using (w.Indent())
-                    w.Line($"return call({string.Join(", ", arguments)});");
+                    w.Line($"return {helper}({string.Join(", ", arguments)});");
                 w.Line("},");
             }
             foreach (var e in service.Events)

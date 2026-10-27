@@ -167,6 +167,63 @@ test("ignores coalesced events without a name", () => {
   assert.equal(frames.length, 0);
 });
 
+test("streams start when iterated, with a window of items", async () => {
+  const { runtime, receive, sent, token } = setup();
+  const items = runtime.stream("Logs.Tail", ["app"]);
+  assert.equal(sent.length, 1); // not iterated yet
+  const it = items[Symbol.asyncIterator]();
+  assert.deepEqual(sent[1], { t: "call", id: 1, k: token, m: "Logs.Tail", a: ["app"], w: 16 });
+
+  receive({ t: "item", id: 1, k: "another page", v: "x" }); // not this page's
+  receive({ t: "item", id: 1, k: token, v: "a" });
+  receive({ t: "item", id: 1, k: token, v: "b" });
+  assert.deepEqual(await it.next(), { value: "a", done: false });
+  const waiting = [it.next(), it.next()];
+  receive({ t: "item", id: 1, k: token, v: "c" });
+  receive({ t: "result", id: 1, k: token });
+  assert.deepEqual(await Promise.all(waiting), [
+    { value: "b", done: false },
+    { value: "c", done: false },
+  ]);
+  assert.deepEqual(await it.next(), { value: undefined, done: true });
+  assert.equal(sent.length, 2); // fewer than half the window taken: no pull
+});
+
+test("streams grant the items taken, half a window at a time", async () => {
+  const { runtime, receive, sent, token } = setup();
+  const it = runtime.stream("Logs.Tail")[Symbol.asyncIterator]();
+  for (let i = 0; i < 16; i++) receive({ t: "item", id: 1, k: token, v: i });
+  for (let i = 0; i < 16; i++) await it.next();
+  assert.deepEqual(sent.slice(2), [
+    { t: "pull", id: 1, k: token, n: 8 },
+    { t: "pull", id: 1, k: token, n: 8 },
+  ]);
+});
+
+test("a stream fails after the items that came before the error", async () => {
+  const { runtime, receive, token } = setup();
+  const it = runtime.stream("Logs.Tail")[Symbol.asyncIterator]();
+  receive({ t: "item", id: 1, k: token, v: "a" });
+  receive({ t: "error", id: 1, k: token, e: "disk gone" });
+  assert.deepEqual(await it.next(), { value: "a", done: false });
+  await assert.rejects(it.next(), (err) => err.name === "CallError" && err.message === "disk gone");
+  assert.deepEqual(await it.next(), { value: undefined, done: true });
+});
+
+test("a stream the page stops iterating is canceled", async () => {
+  const { runtime, receive, sent, token } = setup();
+  const it = runtime.stream("Logs.Tail")[Symbol.asyncIterator]();
+  receive({ t: "item", id: 1, k: token, v: "a" });
+  receive({ t: "item", id: 1, k: token, v: "b" });
+  assert.deepEqual(await it.next(), { value: "a", done: false });
+  assert.deepEqual(await it.return(), { value: undefined, done: true }); // as a break does
+  assert.deepEqual(sent.at(-1), { t: "cancel", id: 1, k: token });
+  receive({ t: "item", id: 1, k: token, v: "late" });
+  assert.deepEqual(await it.next(), { value: undefined, done: true });
+  await it.return();
+  assert.equal(sent.filter((m) => m.t === "cancel").length, 1);
+});
+
 test("the runtime cannot be changed by pages", () => {
   const { runtime } = setup();
   assert.ok(Object.isFrozen(runtime));
