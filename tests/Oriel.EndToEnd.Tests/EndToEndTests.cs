@@ -100,6 +100,15 @@ public sealed class Probe
         return shared.Url;
     }
 
+    /// <summary>0, 0.5, 1… as binary data.</summary>
+    public ReadOnlyMemory<float> Ramp(int count)
+    {
+        var values = new float[count];
+        for (var i = 0; i < count; i++)
+            values[i] = i * 0.5f;
+        return values;
+    }
+
     /// <summary>Shares Media/count.mp4: six seconds, a key frame every second.</summary>
     public string ShareVideo(OrielWindow window) =>
         window.App.ShareFile(Path.Combine(AppContext.BaseDirectory, "Media", "count.mp4")).Url;
@@ -367,6 +376,21 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(416, root.GetProperty("past").GetInt32());
         Assert.Equal("[200,100000]", root.GetProperty("unseekable").GetRawText()); // no ranges: the whole stream
         Assert.Equal(404, root.GetProperty("gone").GetInt32());
+    }
+
+    [EndToEndFact(Linux = true, MacOS = true)]
+    public async Task PagesGetBinaryResultsAsTypedArrays()
+    {
+        var (report, _, _, _) = await RunPage("""
+            const ramp = await oriel.call("E2E.Ramp", [2500000]);
+            const empty = await oriel.call("E2E.Ramp", [0]);
+            let ok = true;
+            for (let i = 0; i < ramp.length; i++) if (ramp[i] !== i * 0.5) { ok = false; break; }
+            ramp[0] = 42; // the page may write it
+            await oriel.call("E2E.Report", [JSON.stringify({ type: ramp.constructor.name, length: ramp.length, ok, first: ramp[0], empty: empty.length })]);
+            """);
+
+        Assert.Equal("""{"type":"Float32Array","length":2500000,"ok":true,"first":42,"empty":0}""", report);
     }
 
     [EndToEndFact(MacOS = true)] // Linux: the container has no GStreamer codecs

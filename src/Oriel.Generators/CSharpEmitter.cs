@@ -127,6 +127,10 @@ internal static class CSharpEmitter
                 w.Line($"await {call}.ConfigureAwait(false);");
                 w.Line("return null;");
                 break;
+            case Returns.Value or Returns.TaskOfValue when method.Result!.Kind == TypeKind.Binary:
+                w.Line(method.Returns == Returns.Value ? $"var result = {call};" : $"var result = await {call}.ConfigureAwait(false);");
+                w.Line($"return context.Return<{method.Result.CSharp}>(result, {Names.Literal(method.Result.TypeScript)});");
+                break;
             case Returns.Value:
                 w.Line($"var result = {call};");
                 w.Line($"return writer => {{ {WriteStatement(method.Result!, "writer", "result", 0)} }};");

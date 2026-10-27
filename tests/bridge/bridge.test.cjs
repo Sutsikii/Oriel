@@ -224,6 +224,59 @@ test("a stream the page stops iterating is canceled", async () => {
   assert.equal(sent.filter((m) => m.t === "cancel").length, 1);
 });
 
+test("resolves binary results with typed arrays of the shared buffer", async () => {
+  const { runtime, receive, token } = setup();
+  const result = runtime.call("Audio.Levels");
+  const buffer = new Float32Array([0.5, -1, 2]).buffer;
+  receive({ t: "result", id: 1, k: token, b: "Float32Array", n: 8 }, buffer); // the buffer may be longer
+  const levels = await result;
+  assert.ok(levels instanceof Float32Array);
+  assert.deepEqual([...levels], [0.5, -1]);
+  assert.equal(levels.buffer, buffer); // not copied
+
+  const empty = runtime.call("Audio.Levels");
+  receive({ t: "result", id: 2, k: token, b: "Uint8Array", n: 0 });
+  assert.equal((await empty).length, 0);
+});
+
+test("fetches binary results that come at a URL", async () => {
+  const { runtime, receive, token } = setup();
+  const fetched = [];
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    fetched.push(url);
+    return url === "oriel://app.oriel/x" ? new Response(new Uint16Array([1, 513]).buffer) : new Response("", { status: 404 });
+  };
+  try {
+    const found = runtime.call("Audio.Raw");
+    receive({ t: "result", id: 1, k: token, b: "Uint16Array", n: 4, u: "oriel://app.oriel/x" });
+    assert.deepEqual([...(await found)], [1, 513]);
+
+    const gone = runtime.call("Audio.Raw");
+    receive({ t: "result", id: 2, k: token, b: "Uint16Array", n: 4, u: "oriel://app.oriel/gone" });
+    await assert.rejects(gone, (err) => err.name === "CallError" && /could not be fetched: HTTP 404/.test(err.message));
+  } finally {
+    globalThis.fetch = fetch;
+  }
+  assert.deepEqual(fetched, ["oriel://app.oriel/x", "oriel://app.oriel/gone"]);
+});
+
+test("rejects binary results that do not fit", async () => {
+  const { runtime, receive, token } = setup();
+  const cases = [
+    { b: "Function", n: 4 },
+    { b: "toString", n: 4 },
+    { b: "Float64Array", n: 4 }, // not a whole number of doubles
+    { b: "Uint8Array", n: -1 },
+    { b: "Uint8Array", n: 4 }, // no buffer, no URL
+  ];
+  for (const [i, c] of cases.entries()) {
+    const call = runtime.call("A.B");
+    receive({ t: "result", id: i + 1, k: token, ...c }, c.b === "Uint8Array" && c.n === 4 ? new ArrayBuffer(2) : undefined);
+    await assert.rejects(call, (err) => err.name === "CallError");
+  }
+});
+
 test("the runtime cannot be changed by pages", () => {
   const { runtime } = setup();
   assert.ok(Object.isFrozen(runtime));
@@ -349,7 +402,7 @@ function webView2Page({ withFiles = true } = {}) {
     p.chrome = {
       webview: {
         postMessage: (m) => posted.push(JSON.parse(m)),
-        addEventListener: (type, f) => (p.webviewListener = { type, f }),
+        addEventListener: (type, f) => ((p.webviewListeners ??= {})[type] = f),
       },
     };
     if (withFiles) p.chrome.webview.postMessageWithAdditionalObjects = (m, files) => posted.push({ ...JSON.parse(m), files });
@@ -371,10 +424,17 @@ test("starts in a WebView2 page: posts through chrome.webview, receives its mess
   start(page);
   assert.equal(typeof page.oriel.call, "function");
   assert.equal(posted[0].t, "hello");
-  assert.equal(page.webviewListener.type, "message");
+  assert.deepEqual(Object.keys(page.webviewListeners).sort(), ["message", "sharedbufferreceived"]);
   const result = page.oriel.call("Greeter.Greet", ["Ada"]);
-  page.webviewListener.f({ data: JSON.stringify({ t: "result", id: 1, k: posted[0].k, v: "Hello" }) });
+  page.webviewListeners.message({ data: JSON.stringify({ t: "result", id: 1, k: posted[0].k, v: "Hello" }) });
   assert.equal(await result, "Hello");
+  const levels = page.oriel.call("Audio.Levels", []);
+  const buffer = new Int32Array([7]).buffer;
+  page.webviewListeners.sharedbufferreceived({
+    additionalData: { t: "result", id: 2, k: posted[0].k, b: "Int32Array", n: 4 },
+    getBuffer: () => buffer,
+  });
+  assert.deepEqual([...(await levels)], [7]);
   assert.deepEqual(Object.keys(page.listeners).sort(), ["dragover", "drop", "keydown"]);
   assert.ok(Object.values(page.listeners).every((l) => l.capture));
 });

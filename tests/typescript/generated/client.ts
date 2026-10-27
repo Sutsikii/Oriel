@@ -140,6 +140,13 @@ export const Decks = {
   raw(value: unknown): Promise<unknown> {
     return call("Decks.Raw", value);
   },
+  /** The thumbnail's pixels, as RGBA bytes. */
+  pixels(path: string): Promise<Uint8Array> {
+    return call("Decks.Pixels", path);
+  },
+  levels(): Promise<Float32Array> {
+    return call("Decks.Levels");
+  },
   /** The slides of the deck at path, as they are read. */
   slides(path: string): AsyncIterable<Slide> {
     return stream("Decks.Slides", path);

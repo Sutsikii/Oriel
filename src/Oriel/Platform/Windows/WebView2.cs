@@ -15,6 +15,8 @@ internal static unsafe class WebView2
     public static readonly Guid IID_ICoreWebView2_7 = new("79C24D83-09A3-45AE-9418-487F32A58740");
     public static readonly Guid IID_ICoreWebView2_16 = new("0EB34DC9-9F91-41E1-8639-95CD5943906B");
     public static readonly Guid IID_ICoreWebView2Environment6 = new("E59EE362-ACBD-4857-9A8E-D3644D9459A9");
+    public static readonly Guid IID_ICoreWebView2Environment12 = new("F503DB9B-739F-48DD-B151-FDFCF253F54E");
+    public static readonly Guid IID_ICoreWebView2_17 = new("702E75D4-FD44-434D-9D70-1A68A6B1192A");
     public static readonly Guid IID_ICoreWebView2Settings9 = new("0528a73b-e92d-49f4-927a-e547dddaa37d");
     public static readonly Guid IID_ICoreWebView2AcceleratorKeyPressedEventArgs2 = new("03b2c8c8-7799-4e34-bd66-ed26aa85f2bf");
     public static readonly Guid IID_ICoreWebView2WebMessageReceivedEventArgs2 = new("06fc7ab7-c90c-4297-9389-33ca01cf6d5e");
@@ -82,6 +84,46 @@ internal static unsafe class WebView2
             fixed (char* h = headers)
                 Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, int, char*, char*, nint*, int>)Com.Slot(env, 4))(env, content, status, r, h, &response), "CreateWebResourceResponse");
             return response;
+        }
+    }
+
+    /// <summary>Buffers shared with pages: ICoreWebView2Environment12 and ICoreWebView2SharedBuffer.</summary>
+    public static class SharedBuffer
+    {
+        public const int AccessReadWrite = 1;
+
+        /// <summary>
+        /// Posts <paramref name="bytes"/> to the page of <paramref name="w"/> in
+        /// a new shared buffer, with <paramref name="message"/> as its
+        /// additional data; false when the runtime is too old for it.
+        /// </summary>
+        public static bool Post(nint env, nint w, string message, ReadOnlySpan<byte> bytes)
+        {
+            var env12 = Com.QueryInterface(env, IID_ICoreWebView2Environment12);
+            var w17 = Com.QueryInterface(w, IID_ICoreWebView2_17);
+            nint buffer = 0;
+            try
+            {
+                if (env12 == 0 || w17 == 0)
+                    return false;
+                // Environment12, 24: CreateSharedBuffer(UINT64 size, ICoreWebView2SharedBuffer**)
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, ulong, nint*, int>)Com.Slot(env12, 24))(env12, (ulong)bytes.Length, &buffer), "CreateSharedBuffer");
+                // SharedBuffer, 4: get_Buffer(BYTE**)
+                byte* memory;
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, byte**, int>)Com.Slot(buffer, 4))(buffer, &memory), "get_Buffer");
+                bytes.CopyTo(new Span<byte>(memory, bytes.Length));
+                // ICoreWebView2_17, 116: PostSharedBufferToScript(buffer, access, LPCWSTR additionalDataAsJson)
+                fixed (char* m = message)
+                    Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, int, char*, int>)Com.Slot(w17, 116))(w17, buffer, AccessReadWrite, m), "PostSharedBufferToScript");
+                return true;
+            }
+            finally
+            {
+                // The page's ArrayBuffer keeps the memory until it is collected.
+                Com.Release(buffer);
+                Com.Release(w17);
+                Com.Release(env12);
+            }
         }
     }
 

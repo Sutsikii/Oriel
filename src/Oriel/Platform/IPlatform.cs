@@ -42,6 +42,13 @@ internal interface IPlatformWindow
     /// <summary>Delivers a message to the page; dropped when there is no page yet.</summary>
     void PostMessage(string message);
 
+    /// <summary>
+    /// Delivers a message to the page with <paramref name="bytes"/>, in a
+    /// buffer shared with it, rather than copied through JSON. Returns false
+    /// when the webview has no such buffers; the message is not sent then.
+    /// </summary>
+    bool PostBuffer(string message, ReadOnlySpan<byte> bytes) => false;
+
     void SetTitle(string title);
 
     void OpenDevTools();

@@ -110,6 +110,30 @@ public class DispatcherTests
     }
 
     [Fact]
+    public async Task ReturnsBinaryDataThroughTheContext()
+    {
+        var service = Harness.Compile("""
+            [Service]
+            public class Samples
+            {
+                public ReadOnlyMemory<float> Levels() => new float[] { 0.5f, -1 };
+                public async Task<Memory<ushort>> Later() { await Task.Yield(); return new ushort[] { 1, 513 }; }
+            }
+            """).Bind("Samples");
+
+        using var none = JsonDocument.Parse("[]");
+        var levels = new CallContext(CancellationToken.None);
+        Assert.Null(await service.Dispatcher.InvokeAsync("Levels", none.RootElement, levels));
+        Assert.Equal("Float32Array", levels.Binary!.TypedArray);
+        Assert.Equal(new byte[] { 0, 0, 0, 0x3f, 0, 0, 0x80, 0xbf }, levels.Binary.Bytes().ToArray());
+
+        var later = new CallContext(CancellationToken.None);
+        await service.Dispatcher.InvokeAsync("Later", none.RootElement, later);
+        Assert.Equal("Uint16Array", later.Binary!.TypedArray);
+        Assert.Equal(new byte[] { 1, 0, 1, 2 }, later.Binary.Bytes().ToArray());
+    }
+
+    [Fact]
     public async Task LeavesOutTheOptionalArgumentsAPageLeftOut()
     {
         var service = Harness.Compile("""

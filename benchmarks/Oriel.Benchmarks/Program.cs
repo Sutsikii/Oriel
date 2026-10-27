@@ -9,6 +9,7 @@ using Oriel.Benchmarks;
 
 // dotnet run -c Release -- [BenchmarkDotNet arguments]      the in-process benchmarks
 // dotnet run -c Release -- roundtrip <out.json>             the round trip in a real window
+// dotnet run -c Release -- binary                          binary results against JSON, in a real window
 // dotnet run -c Release -- check <results> <roundtrip.json> <baseline.json> [--update]
 //                                                           compares with the baseline
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
@@ -17,6 +18,7 @@ CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 return args switch
 {
     ["roundtrip", var output] => await RunRoundTrip(output),
+    ["binary"] => await RunBinary(),
     ["check", var results, var roundTrip, var baseline, .. var rest] => Check(results, roundTrip, baseline, update: rest.Contains("--update")),
     _ => RunBenchmarks(args),
 };
@@ -34,6 +36,15 @@ static async Task<int> RunRoundTrip(string output)
     File.WriteAllText(output, JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
     Console.WriteLine($"Round trip: p50 {result.P50Ms:F3} ms, p99 {result.P99Ms:F3} ms, max {result.MaxMs:F3} ms over {result.Calls} calls; " +
         $"{result.CallsPerSecond:F0} calls/s with {result.Batch} in flight");
+    return 0;
+}
+
+static async Task<int> RunBinary()
+{
+    Console.WriteLine("| Size | Binary (ms) | JSON, base64 (ms) | Faster |");
+    Console.WriteLine("|---|---|---|---|");
+    foreach (var row in await BinaryResults.Run())
+        Console.WriteLine($"| {row.Megabytes} MB | {row.BinaryMs:F1} | {row.JsonMs:F1} | {row.JsonMs / row.BinaryMs:F1}x |");
     return 0;
 }
 

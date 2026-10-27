@@ -121,6 +121,18 @@ test("cancels a stream the page stops iterating, and fails one that fails", asyn
   await assert.rejects(failed, (err: unknown) => err instanceof CallError && err.method === "Decks.Slides" && err.code === "conflict");
 });
 
+test("resolves binary results with typed arrays", async () => {
+  const levels = Decks.levels();
+  await Promise.resolve();
+  const call = sent.at(-1)!;
+  (page.receive as (message: unknown, buffer?: ArrayBuffer) => void)(
+    { t: "result", id: call.id, k: page.token, b: "Float32Array", n: 4 },
+    new Float32Array([0.25]).buffer,
+  );
+  const result: Float32Array = await levels;
+  assert.deepEqual([...result], [0.25]);
+});
+
 test("says when the page is not in an Oriel window", async () => {
   delete (globalThis as { oriel?: unknown }).oriel;
   await assert.rejects(Greeter.greet("Ada"), /window\.oriel is missing/);

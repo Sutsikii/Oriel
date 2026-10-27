@@ -122,6 +122,19 @@ nothing.
 { "t": "result", "id": 1, "k": "3f9a…", "v": "Hello, Ada" }
 ```
 
+A method returning binary data (see
+[bindings.md](bindings.md#binary-data)) has no `v`: `b` is the typed array
+the page makes, `n` the number of bytes. On Windows, the reply is the
+additional data of a buffer the app shares with
+`PostSharedBufferToScript`, which the page gets in a
+`sharedbufferreceived` event. Elsewhere, it is a message with `u`, a URL
+the page fetches the bytes from, once.
+
+```json
+{ "t": "result", "id": 1, "k": "3f9a…", "b": "Float32Array", "n": 4000000 }
+{ "t": "result", "id": 1, "k": "3f9a…", "b": "Float32Array", "n": 4000000, "u": "oriel://app.oriel/.oriel/streams/9c1e…" }
+```
+
 ### `item`
 
 An item `v` of the stream of call `id`. Items come in order, and no more

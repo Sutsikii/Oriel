@@ -19,6 +19,9 @@ public class DiagnosticTests
     [InlineData("public (int, int) Get() => default;", "the result of S.Get cannot be sent between C# and pages: tuples have no property names; use a record")]
     [InlineData("public Task<IAsyncEnumerable<int>> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: streams (IAsyncEnumerable) can only be returned, not nested")]
     [InlineData("public IAsyncEnumerable<Uri> Get() => null!;", "the items of S.Get cannot be sent between C# and pages: System.Uri is not a type Oriel maps")]
+    [InlineData("public ReadOnlyMemory<string> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: binary data holds numbers that have a typed array in JavaScript, not string")]
+    [InlineData("public void Set(ReadOnlyMemory<byte> data) { }", "parameter 'data' of S.Set cannot be sent between C# and pages: binary data (ReadOnlyMemory<T>) can only be the result of a method")]
+    [InlineData("public List<Memory<float>> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: binary data (ReadOnlyMemory<T>) can only be the result of a method")]
     [InlineData("public Task<Task<int>> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: tasks can only be returned, not nested")]
     [InlineData("public void Set(Action a) { }", "parameter 'a' of S.Set cannot be sent between C# and pages: delegates cannot be sent")]
     public void ReportsUnsupportedTypes(string member, string message)

@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Binary results.** Methods returning `ReadOnlyMemory<T>` or `Memory<T>`
+  of numbers give pages typed arrays (`Float32Array`, `Uint8Array`…),
+  sent as bytes: through a buffer shared with the page on Windows, 25 to
+  57 times faster than base64 JSON from 1 to 100 MB.
+
 - **Files and large data by URL.** `OrielApp.Share` and `ShareFile` give
   a URL pages load a `Stream` from, in `<video>`, `<img>` or `fetch`,
   read as the page takes it, with range requests: videos seek.

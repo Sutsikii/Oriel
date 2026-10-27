@@ -334,6 +334,7 @@ internal static class TypeScriptEmitter
         TypeKind.NullableValue or TypeKind.NullableReference => $"{Type(t.Element!, names)} | null",
         TypeKind.Array or TypeKind.List => Wrap(Type(t.Element!, names)) + "[]",
         TypeKind.Dictionary => $"Record<string, {Type(t.Element!, names)}>",
+        TypeKind.Binary => t.TypeScript,
         _ => throw new ArgumentOutOfRangeException(nameof(t)),
     };
 

@@ -96,6 +96,9 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             WebView2.WebView.PostWebMessageAsString(_webview, message);
     }
 
+    public bool PostBuffer(string message, ReadOnlySpan<byte> bytes) =>
+        _webview != 0 && WebView2.SharedBuffer.Post(_environment, _webview, message, bytes);
+
     public void SetTitle(string title)
     {
         if (!_destroyed)

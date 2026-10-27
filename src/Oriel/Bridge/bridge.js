@@ -144,8 +144,11 @@
       };
     }
 
-    /** Handles a message from the app; ignores what it does not understand. */
-    function receive(raw) {
+    /**
+     * Handles a message from the app; ignores what it does not understand.
+     * `buffer` is the ArrayBuffer the app shared with it, if any.
+     */
+    function receive(raw, buffer) {
       let message;
       try {
         message = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -160,8 +163,9 @@
           const p = pending.get(message.id);
           if (!p) return;
           pending.delete(message.id);
-          if (message.t === "result") p.resolve(message.v);
-          else p.reject(callError(p.method, errorMessage(p.method, message.e), message.c, message.d));
+          if (message.t === "error") p.reject(callError(p.method, errorMessage(p.method, message.e), message.c, message.d));
+          else if (typeof message.b === "string") binary(p, message, buffer);
+          else p.resolve(message.v);
           return;
         }
         case "item": {
@@ -196,6 +200,36 @@
         });
       }
       acks.add(name);
+    }
+
+    /**
+     * Resolves a call returning binary data with a typed array of its bytes:
+     * those of the buffer the app shared, or fetched once from the URL `u`.
+     */
+    function binary(p, message, buffer) {
+      const Type = TYPED_ARRAYS[message.b];
+      const length = message.n;
+      if (!Type || !Number.isInteger(length) || length < 0 || length % Type.BYTES_PER_ELEMENT !== 0) {
+        p.reject(callError(p.method, `${p.method} failed`));
+        return;
+      }
+      if (length === 0) {
+        p.resolve(new Type(0));
+      } else if (buffer instanceof ArrayBuffer && buffer.byteLength >= length) {
+        p.resolve(new Type(buffer, 0, length / Type.BYTES_PER_ELEMENT));
+      } else if (typeof message.u === "string") {
+        fetch(message.u)
+          .then((r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.arrayBuffer();
+          })
+          .then(
+            (bytes) => p.resolve(new Type(bytes, 0, length / Type.BYTES_PER_ELEMENT)),
+            (err) => p.reject(callError(p.method, `${p.method}: its result could not be fetched: ${err.message}`)),
+          );
+      } else {
+        p.reject(callError(p.method, `${p.method} failed`));
+      }
     }
 
     /**
@@ -249,6 +283,21 @@
   function hasFiles(transfer) {
     return !!transfer && Array.from(transfer.types || []).includes("Files");
   }
+
+  /** The typed arrays binary results may be, by name. */
+  const TYPED_ARRAYS = Object.freeze({
+    __proto__: null,
+    Uint8Array,
+    Int8Array,
+    Int16Array,
+    Uint16Array,
+    Int32Array,
+    Uint32Array,
+    BigInt64Array,
+    BigUint64Array,
+    Float32Array,
+    Float64Array,
+  });
 
   /** The items a stream may send ahead of the page. */
   const STREAM_WINDOW = 16;
@@ -308,7 +357,11 @@
           typeof webview.postMessageWithAdditionalObjects === "function"
             ? (message, files) => webview.postMessageWithAdditionalObjects(message, files)
             : null, // an older runtime: drops reach the page only
-        listen: (receive) => webview.addEventListener("message", (e) => receive(e.data)),
+        listen: (receive) => {
+          webview.addEventListener("message", (e) => receive(e.data));
+          // Binary results come in buffers the app shares, with their reply as additional data.
+          webview.addEventListener("sharedbufferreceived", (e) => receive(e.additionalData, e.getBuffer()));
+        },
       };
     }
     // WebKit (macOS, Linux): the script message handler "oriel" the backend

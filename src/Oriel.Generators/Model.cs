@@ -30,6 +30,13 @@ internal enum TypeKind
 
     /// <summary>A dictionary with string keys: <c>Record&lt;string, T&gt;</c>.</summary>
     Dictionary,
+
+    /// <summary>
+    /// <c>ReadOnlyMemory&lt;T&gt;</c> or <c>Memory&lt;T&gt;</c> of numbers, as the
+    /// result of a method: a typed array, sent as bytes rather than JSON.
+    /// <c>CSharp</c> is the element type, <c>TypeScript</c> the typed array.
+    /// </summary>
+    Binary,
 }
 
 /// <summary>A type as it appears in a method, a property or an event.</summary>
