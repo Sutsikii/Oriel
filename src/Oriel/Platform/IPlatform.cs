@@ -254,4 +254,7 @@ internal sealed record PlatformWindowOptions(
     public bool Frameless { get; init; }
 
     public string? Placement { get; init; }
+
+    /// <summary>The app's shared streams, which the window serves (see <see cref="StreamServer.TryGetId"/>).</summary>
+    public StreamServer? Streams { get; init; }
 }

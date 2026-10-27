@@ -58,6 +58,15 @@ internal static unsafe partial class Gtk
     [LibraryImport(Gio)]
     public static partial nint g_memory_input_stream_new_from_bytes(nint bytes);
 
+    /// <summary>A stream reading the file descriptor <paramref name="fd"/>, which it closes.</summary>
+    [LibraryImport(Gio)]
+    public static partial nint g_unix_input_stream_new(int fd, int closeFd);
+
+    // ---- libc ----
+
+    [LibraryImport("libc", SetLastError = true)]
+    public static partial int pipe(int* fds);
+
     // ---- GTK ----
 
     [LibraryImport(Gtk3)]
@@ -256,6 +265,15 @@ internal static unsafe partial class Gtk
     public static partial nint webkit_uri_scheme_request_get_path(nint request);
 
     [LibraryImport(WebKit)]
+    public static partial nint webkit_uri_scheme_request_get_uri(nint request);
+
+    [LibraryImport(WebKit)]
+    public static partial nint webkit_uri_scheme_request_get_http_method(nint request);
+
+    [LibraryImport(WebKit)]
+    public static partial nint webkit_uri_scheme_request_get_http_headers(nint request);
+
+    [LibraryImport(WebKit)]
     public static partial nint webkit_uri_scheme_response_new(nint stream, long length);
 
     [LibraryImport(WebKit, StringMarshalling = StringMarshalling.Utf8)]
@@ -297,6 +315,9 @@ internal static unsafe partial class Gtk
 
     [LibraryImport(Soup, StringMarshalling = StringMarshalling.Utf8)]
     public static partial void soup_message_headers_append(nint headers, string name, string value);
+
+    [LibraryImport(Soup, StringMarshalling = StringMarshalling.Utf8)]
+    public static partial nint soup_message_headers_get_one(nint headers, string name);
 
     // ---- JavaScriptCore ----
 

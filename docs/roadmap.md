@@ -10,6 +10,8 @@ self-contained piece of work.
 - Events from services to pages, to every window or to one; windows have
   ids, and names to find them by. Coalesced events for
   high-frequency updates, once per frame at most.
+- Files and large data by URL (`OrielApp.Share`), read as pages take
+  them, with range requests for videos.
 - Streams: `IAsyncEnumerable<T>` results as async iterables in pages, with
   back-pressure and cancellation when the page stops iterating.
 - The source generator: dispatchers, JSON codecs and the TypeScript client,

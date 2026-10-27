@@ -517,6 +517,44 @@ internal static unsafe class WebView2
             }
         }
 
+        // 3: get_Request, whose 5: get_Method(LPWSTR*)
+        public static string GetMethod(nint a)
+        {
+            nint request;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(a, 3))(a, &request), "get_Request");
+            try
+            {
+                return GetString(request, 5, "get_Method");
+            }
+            finally
+            {
+                Com.Release(request);
+            }
+        }
+
+        // 3: get_Request, whose 9: get_Headers(ICoreWebView2HttpRequestHeaders**),
+        // whose 3: GetHeader(LPCWSTR name, LPWSTR* value), failing for a header not there.
+        /// <summary>The request's header <paramref name="name"/>, or null.</summary>
+        public static string? GetHeader(nint a, string name)
+        {
+            nint request, headers = 0;
+            Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(a, 3))(a, &request), "get_Request");
+            try
+            {
+                Com.Check(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(request, 9))(request, &headers), "get_Headers");
+                nint value;
+                int hr;
+                fixed (char* n = name)
+                    hr = ((delegate* unmanaged[Stdcall]<nint, char*, nint*, int>)Com.Slot(headers, 3))(headers, n, &value);
+                return hr < 0 ? null : Com.TakeString(value);
+            }
+            finally
+            {
+                Com.Release(headers);
+                Com.Release(request);
+            }
+        }
+
         // 5: put_Response(ICoreWebView2WebResourceResponse*)
         public static void SetResponse(nint a, nint response) =>
             Com.Check(((delegate* unmanaged[Stdcall]<nint, nint, int>)Com.Slot(a, 5))(a, response), "put_Response");

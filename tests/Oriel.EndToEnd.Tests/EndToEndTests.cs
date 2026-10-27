@@ -87,6 +87,29 @@ public sealed class Probe
 
     public Event<int> Moved { get; } = new() { Coalesce = true };
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SharedStream> _shared = new();
+
+    /// <summary>Shares <paramref name="length"/> bytes, byte i being i % 251; seekable or not.</summary>
+    public string ShareBytes(OrielWindow window, int length, bool seekable)
+    {
+        var bytes = new byte[length];
+        for (var i = 0; i < length; i++)
+            bytes[i] = (byte)(i % 251);
+        var shared = window.App.Share(() => seekable ? new MemoryStream(bytes, writable: false) : new ForwardOnly(new MemoryStream(bytes, writable: false)), "application/octet-stream");
+        _shared[shared.Url] = shared;
+        return shared.Url;
+    }
+
+    /// <summary>Shares Media/count.mp4: six seconds, a key frame every second.</summary>
+    public string ShareVideo(OrielWindow window) =>
+        window.App.ShareFile(Path.Combine(AppContext.BaseDirectory, "Media", "count.mp4")).Url;
+
+    public void Unshare(string url)
+    {
+        if (_shared.TryRemove(url, out var shared))
+            shared.Dispose();
+    }
+
     public TaskCompletionSource<int> Endless { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>1 to <paramref name="to"/>.</summary>
@@ -163,6 +186,38 @@ public sealed class Probe
     }
 }
 
+/// <summary>A stream that reads forward only, as from the network.</summary>
+internal sealed class ForwardOnly(Stream inner) : Stream
+{
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+    public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            inner.Dispose();
+    }
+}
+
 public sealed class EndToEndTests : IDisposable
 {
     private readonly string _assets = Path.Combine(Path.GetTempPath(), "oriel-e2e-" + Guid.NewGuid().ToString("N"));
@@ -233,6 +288,7 @@ public sealed class EndToEndTests : IDisposable
         var report = await probe.Reported.Task.WaitAsync(TimeSpan.FromSeconds(30));
         if (driving is not null)
             await driving;
+        Assert.False(report.StartsWith("page error: ", StringComparison.Ordinal), report);
         Assert.Empty(errors);
         foreach (var open in app.Windows)
             open.Close();
@@ -278,6 +334,62 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(Pages.Origin, root.GetProperty("origin").GetString());
         Assert.Equal("Done", window.Title);
         Assert.True(window.IsClosed);
+    }
+
+    [EndToEndFact(Linux = true, MacOS = true)]
+    public async Task PagesFetchSharedStreamsWithRanges()
+    {
+        var (report, _, _, _) = await RunPage("""
+            const r = {};
+            const url = await oriel.call("E2E.ShareBytes", [3000000, true]);
+            const whole = new Uint8Array(await (await fetch(url)).arrayBuffer());
+            r.length = whole.length;
+            r.intact = whole.every((b, i) => b === i % 251);
+            const part = await fetch(url, { headers: { Range: "bytes=1000-1004" } });
+            r.part = [part.status, part.headers.get("Content-Range"), [...new Uint8Array(await part.arrayBuffer())]];
+            const tail = await fetch(url, { headers: { Range: "bytes=-3" } });
+            r.tail = [tail.status, [...new Uint8Array(await tail.arrayBuffer())]];
+            r.past = (await fetch(url, { headers: { Range: "bytes=9000000-" } })).status;
+            const flowing = await oriel.call("E2E.ShareBytes", [100000, false]);
+            const unseekable = await fetch(flowing, { headers: { Range: "bytes=0-9" } });
+            r.unseekable = [unseekable.status, (await unseekable.arrayBuffer()).byteLength];
+            await oriel.call("E2E.Unshare", [url]);
+            r.gone = (await fetch(url)).status;
+            await oriel.call("E2E.Report", [JSON.stringify(r)]);
+            """);
+
+        using var results = JsonDocument.Parse(report);
+        var root = results.RootElement;
+        Assert.Equal(3000000, root.GetProperty("length").GetInt32());
+        Assert.True(root.GetProperty("intact").GetBoolean());
+        Assert.Equal("""[206,"bytes 1000-1004/3000000",[247,248,249,250,0]]""", root.GetProperty("part").GetRawText());
+        Assert.Equal($"[206,[{(2999997 % 251)},{(2999998 % 251)},{(2999999 % 251)}]]", root.GetProperty("tail").GetRawText());
+        Assert.Equal(416, root.GetProperty("past").GetInt32());
+        Assert.Equal("[200,100000]", root.GetProperty("unseekable").GetRawText()); // no ranges: the whole stream
+        Assert.Equal(404, root.GetProperty("gone").GetInt32());
+    }
+
+    [EndToEndFact(MacOS = true)] // Linux: the container has no GStreamer codecs
+    public async Task VideosOfSharedStreamsSeek()
+    {
+        var (report, _, _, _) = await RunPage("""
+            const video = document.createElement("video");
+            video.muted = true;
+            video.src = await oriel.call("E2E.ShareVideo", []);
+            document.body.append(video);
+            await new Promise((resolve, reject) => {
+              video.onloadedmetadata = resolve;
+              video.onerror = () => reject(new Error("video error " + (video.error && video.error.code)));
+            });
+            const duration = video.duration;
+            video.currentTime = 4.5;
+            await new Promise((resolve) => (video.onseeked = resolve));
+            await oriel.call("E2E.Report", [JSON.stringify({ duration, time: video.currentTime, ready: video.readyState })]);
+            """);
+
+        using var results = JsonDocument.Parse(report);
+        Assert.InRange(results.RootElement.GetProperty("duration").GetDouble(), 5.9, 6.1);
+        Assert.InRange(results.RootElement.GetProperty("time").GetDouble(), 4.4, 4.6);
     }
 
     [EndToEndFact(Linux = true, MacOS = true)]

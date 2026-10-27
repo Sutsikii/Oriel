@@ -248,9 +248,42 @@ public sealed class OrielApp : ICoalescingSink
             AlwaysOnTop = options.AlwaysOnTop,
             Frameless = options.Frameless,
             Placement = options.StateKey is null ? null : Placements.Load(options.StateKey),
+            Streams = Streams,
         };
         Dispatch(() => window.Open(_platform, native));
         return window;
+    }
+
+    /// <summary>The app's shared streams, which windows serve.</summary>
+    internal StreamServer Streams { get; } = new();
+
+    /// <summary>
+    /// Lets pages load data by URL, as from a web server: a video or a song to
+    /// play, an image, an export to <c>fetch</c>. <paramref name="open"/> is
+    /// called for each request, on any thread, and the data read as the page
+    /// takes it. When the stream it returns can seek, pages may ask for parts
+    /// of it, as videos do to seek. Any thread may call it.
+    /// </summary>
+    /// <param name="open">Opens the data, once per request; the stream is disposed after.</param>
+    /// <param name="contentType">The data's type, such as <c>video/mp4</c>.</param>
+    /// <returns>The shared stream: give its <see cref="SharedStream.Url"/> to pages, and dispose it once they are done.</returns>
+    public SharedStream Share(Func<Stream> open, string contentType) => Streams.Share(open, contentType);
+
+    /// <summary>
+    /// Lets pages load the file at <paramref name="path"/> by URL, with the
+    /// type of its extension (<c>.mp4</c> is <c>video/mp4</c>): see
+    /// <see cref="Share(Func{Stream}, string)"/>. The file is read for each
+    /// request, so pages see it as it is then.
+    /// </summary>
+    /// <param name="path">The file.</param>
+    /// <param name="contentType">The file's type, when its extension does not tell it.</param>
+    public SharedStream ShareFile(string path, string? contentType = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        var full = Path.GetFullPath(path);
+        return Streams.Share(
+            () => new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete),
+            contentType ?? EmbeddedFrontend.ContentType(full));
     }
 
     /// <summary>Quits: closes the event loop, and <see cref="Run"/> returns.</summary>

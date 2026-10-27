@@ -232,6 +232,40 @@ for await (const path of Search.find("C:\\Users\\ada\\Documents", "invoice")) {
   the page. A stream of a `Serial` service holds its turn until it ends;
   one of a `UiThread` service runs on the UI thread between its items.
 
+## Files and large data
+
+Calls carry JSON, which suits data, not a video, a song or a 200 MB export.
+`OrielApp.Share` lets pages load data by URL instead, as from a web server:
+in `<video>`, `<audio>`, `<img>`, or with `fetch`.
+
+```csharp
+[Service]
+public sealed class Media(OrielApp app)
+{
+    /// <summary>A URL the page plays the video at <paramref name="path"/> from.</summary>
+    public string Open(string path) => app.ShareFile(path).Url;
+}
+```
+
+```ts
+video.src = await Media.open("C:\\Users\\ada\\Videos\\talk.mp4");
+```
+
+- `ShareFile(path)` reads the file at each request, with the type of its
+  extension (`.mp4` is `video/mp4`). `Share(open, contentType)` calls
+  `open` at each request for any `Stream`: data made on the fly, a
+  database's blob, a download.
+- The data is read as the page takes it, never all in memory. When the
+  stream can seek, pages may ask for parts of it (HTTP range requests,
+  `Range: bytes=…`): videos seek this way. A stream that cannot seek is
+  sent whole, from the start.
+- The URL has a random part no page can guess, and lets any origin fetch
+  it, so pages of the dev server can too. Dispose the `SharedStream` once
+  pages are done: later requests get a 404.
+- The URL is `https://streams.oriel/…` on Windows, another origin than
+  the app's pages: draw an image of it on a `<canvas>` with
+  `crossorigin="anonymous"`. On Linux and macOS it is on the app's origin.
+
 ## Events
 
 An `Event<T>` property sends payloads to every page of the app:
