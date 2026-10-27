@@ -39,7 +39,7 @@ Greeter.onGreeted((name) => console.log(`greeted ${name}`));
 - **Any frontend.** Vite, React, Vue, Svelte, or plain HTML: the client is a
   dependency-free module.
 - **Small and native.** No reflection anywhere, so apps publish with
-  NativeAOT: the example is a **1.9 MB** executable. No browser engine is
+  NativeAOT: the example is a **2.5 MB** executable. No browser engine is
   bundled, and no native library of Oriel's own: WebView2 is driven directly
   through COM.
 - **Safe by default.** Only the app's own pages can call services; calls of a
@@ -76,10 +76,10 @@ The [hello example](examples/hello), published with NativeAOT, on Windows 11:
 
 | | |
 |---|---|
-| Executable | 1.9 MB, plus 5 KB of frontend |
+| Executable | 2.5 MB, plus 5 KB of frontend |
 | Window shown | at once; page loaded and calling C# after about 0.4 s |
-| Memory, the app's process | 19 MB working set, 5 MB private |
-| Memory, with the 6 WebView2 processes | 318 MB working set, 150 MB private |
+| Memory, the app's process | 22 MB working set, 5 MB private |
+| Memory, with the 6 WebView2 processes | 334 MB working set, 162 MB private |
 
 The second memory line is the one to compare: the webview's processes are
 most of an app's footprint, as in every webview-based framework.

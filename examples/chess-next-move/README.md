@@ -50,10 +50,11 @@ dotnet run
 squares, without the engine or a window.
 `CHESS_ENGINE` points the app at another UCI engine.
 
-`dotnet publish -c Release -r win-x64` gives a native executable of 2.6 MB,
-with Stockfish next to it in `engine/` (its neural networks are built into
-it), then the installer: `bin/installer/Chess-Next-Move-Setup-1.0.0.exe`, of
-about 64 MB. It needs [Inno Setup 6](https://jrsoftware.org/isinfo.php) and,
+`dotnet publish -c Release -r win-x64` gives a native executable of 5.4 MB
+(larger than the hello example's 2.5 MB: it runs on the Generic Host, with
+its configuration, logging and dependency injection), with Stockfish next
+to it in `engine/` (its neural networks are built into it), then the
+installer: `bin/installer/Chess-Next-Move-Setup-1.0.0.exe`, of about 65 MB. It needs [Inno Setup 6](https://jrsoftware.org/isinfo.php) and,
 for NativeAOT, the C++ build tools of Visual Studio.
 
 Stockfish (GPL-3.0) and the lichess piece sets (GPL-2.0+, CC BY-SA 4.0 for
