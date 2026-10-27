@@ -12,6 +12,7 @@
   <Folder Name="/src/plugins/">
     <Project Path="src/plugins/Oriel.SecureStorage/Oriel.SecureStorage.csproj" />
     <Project Path="src/plugins/Oriel.Sqlite/Oriel.Sqlite.csproj" />
+    <Project Path="src/plugins/Oriel.Updates/Oriel.Updates.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Oriel.Build.Tests/Oriel.Build.Tests.csproj" />

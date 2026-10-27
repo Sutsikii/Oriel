@@ -4,6 +4,7 @@ using System.Text.Json;
 using Oriel.Generated;
 using Oriel.SecureStorage;
 using Oriel.Sqlite;
+using Oriel.Updates;
 
 namespace Oriel.Plugins.Tests;
 
@@ -126,6 +127,30 @@ public sealed class PluginTests : IDisposable
         await Assert.ThrowsAsync<MethodNotFoundException>(() => Call(db, "Dispose", "[]"));
     }
 
+    [Theory]
+    [InlineData("https://github.com/Sutsikii/Oriel", "GithubSource")]
+    [InlineData("https://example.com/releases", "SimpleWebSource")]
+    [InlineData(@"\server
+eleases", "SimpleFileSource")]
+    [InlineData("releases", "SimpleFileSource")]
+    public void FindsUpdatesWhereTheSourceSays(string source, string kind) =>
+        Assert.Equal(kind, Updates.Updates.Source(source).GetType().Name);
+
+    [Fact]
+    public async Task DoesNotUpdateAnAppRunFromABuild()
+    {
+        Updates.Updates.Run(); // as Main does first; in a test host, it finds no hook to run
+        var updates = new Updates.Updates(_folder);
+        Assert.Equal(new UpdateStatus(false, null, null), updates.Status());
+        await Assert.ThrowsAsync<NotInstalledException>(updates.Check);
+        await Assert.ThrowsAsync<NotInstalledException>(() => updates.Download());
+        Assert.Throws<NotInstalledException>(updates.Restart);
+        // Pages get its code: "not-installed".
+        var e = await Assert.ThrowsAsync<NotInstalledException>(() => Call(updates, "Check", "[]"));
+        Assert.True(ServiceRegistry.TryGetError(e, out var code, out _));
+        Assert.Equal("not-installed", code);
+    }
+
     [Fact]
     public void ShipTheirTypeScriptClients()
     {
@@ -133,6 +158,10 @@ public sealed class PluginTests : IDisposable
         Assert.Contains("export const Sqlite = {", sqlite);
         Assert.Contains("query(sql: string, parameters?: unknown | null): Promise<unknown[]> {", sqlite);
         Assert.DoesNotContain("dispose(", sqlite);
+        var updates = TypeScriptClient.For(typeof(Updates.Updates).Assembly)!;
+        Assert.Contains("check(): Promise<AvailableUpdate | null> {", updates);
+        Assert.Contains("onProgress(listener: (payload: number) => void): () => void {", updates);
+        Assert.DoesNotContain("run(", updates);
         var storage = TypeScriptClient.For(typeof(SecureStorage.SecureStorage).Assembly)!;
         Assert.Contains("export const SecureStorage = {", storage);
         Assert.Contains("get(key: string): Promise<string | null> {", storage);

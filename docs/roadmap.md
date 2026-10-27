@@ -14,6 +14,8 @@ self-contained piece of work.
 - Templates for vanilla TypeScript, React, Vue and Svelte frontends
   (`dotnet new oriel --framework`), and the `oriel` command: `oriel doctor`
   and `oriel dev`.
+- Updates with Velopack (`Oriel.Updates`): check, download with progress,
+  restart into the new version; tested from one installed version to the next.
 - Signing of the executable, the installer and the uninstaller with any
   command: signtool and a certificate, or Azure Trusted Signing.
 - Examples of what Oriel is for: a back office, a 3D viewer and a
@@ -68,7 +70,6 @@ self-contained piece of work.
 ### Tooling
 
 - **MSIX** packages, for the Microsoft Store.
-- **Auto-updates**, signed.
 
 ### Platforms
 

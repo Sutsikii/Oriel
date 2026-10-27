@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Updates.** The `Oriel.Updates` package wires Velopack: the service
+  `Updates` checks for a newer version, downloads it with progress, and
+  restarts the app into it, from C# or from pages. docs/updates.md says how
+  to make releases with `vpk`.
+
 - **Signing.** `OrielSignCommand` signs the published executable, the
   installer and its uninstaller: signtool, Azure Trusted Signing, or any
   command. Installers of NativeAOT apps now take the executable after it is

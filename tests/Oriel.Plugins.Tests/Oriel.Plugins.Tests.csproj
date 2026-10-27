@@ -16,6 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\plugins\Oriel.SecureStorage\Oriel.SecureStorage.csproj" />
     <ProjectReference Include="..\..\src\plugins\Oriel.Sqlite\Oriel.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\plugins\Oriel.Updates\Oriel.Updates.csproj" />
   </ItemGroup>
 
   <ItemGroup>
