@@ -1009,7 +1009,8 @@ public sealed class EndToEndTests : IDisposable
             {
                 var answered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 app.Dispatch(() => answered.SetResult(answer()));
-                if (await answered.Task)
+                // Bounded: an action the main thread never runs fails the test rather than hang it.
+                if (await answered.Task.WaitAsync(TimeSpan.FromSeconds(5)))
                     return;
                 await Task.Delay(100);
             }
