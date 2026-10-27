@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Oriel.Sqlite</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>An Oriel plugin: a SQLite database of the app, queried from C# and from pages through a generated TypeScript client.</Description>
+    <PackageTags>desktop;webview;oriel-plugin;sqlite;database</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- As a plugin's package references Oriel's, all of whose assets flow to apps: the generator writes the services' dispatcher and client. -->
+    <ProjectReference Include="../../Oriel/Oriel.csproj" PrivateAssets="none" />
+    <ProjectReference Include="../../Oriel.Generators/Oriel.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <InternalsVisibleTo Include="Oriel.Plugins.Tests" />
+  </ItemGroup>
+
+</Project>
