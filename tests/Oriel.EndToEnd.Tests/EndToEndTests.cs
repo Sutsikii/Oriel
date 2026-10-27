@@ -988,6 +988,54 @@ public sealed class EndToEndTests : IDisposable
         Assert.Empty(errors);
     }
 
+    /// <summary>The AppKit panels and alerts, answered on the main thread as a person would.</summary>
+    [EndToEndFact(MacOS = true, Windows = false)]
+    [System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    public async Task ShowsAppKitDialogsModalToTheApp()
+    {
+        File.WriteAllText(Path.Combine(_assets, "index.html"), """<script type="module">await oriel.call("E2E.Loaded", []);</script>""");
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var probe = new Probe();
+        app.Bind(probe);
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        OrielWindow? window = null;
+        var run = Task.Run(() => app.Run(() => window = app.OpenWindow(new WindowOptions { Title = "Dialogs", Width = 600, Height = 400 })));
+        await probe.FirstLoad.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        async Task Answer(Func<bool> answer, string what)
+        {
+            for (var i = 0; i < 100; i++)
+            {
+                var answered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                app.Dispatch(() => answered.SetResult(answer()));
+                if (await answered.Task)
+                    return;
+                await Task.Delay(100);
+            }
+            throw new TimeoutException($"no {what} showed");
+        }
+
+        var open = window!.Dialogs.OpenFileAsync(new() { Title = "Oriel open test", Filters = [new("Text", "*.txt")], Directory = _assets });
+        await Answer(() => Oriel.Platform.MacOS.MacDialogs.AnswerPanel(ok: false), "open panel");
+        Assert.Null(await open.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // Accepted as proposed: the name in the folder, with the filter's extension.
+        var save = window.Dialogs.SaveFileAsync(new() { Title = "Oriel save test", FileName = Path.Combine(_assets, "notes"), Filters = [new("Text", "*.txt")] });
+        await Answer(() => Oriel.Platform.MacOS.MacDialogs.AnswerPanel(ok: true), "save panel");
+        var saved = await save.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.NotNull(saved);
+        Assert.Equal("notes.txt", Path.GetFileName(saved)); // macOS may name the folder through /private
+
+        var message = window.Dialogs.MessageAsync(new() { Text = "Keep going?", Kind = MessageKind.Question, Buttons = MessageButtons.YesNo });
+        await Answer(() => Oriel.Platform.MacOS.MacDialogs.ClickAlert(1), "alert"); // No, the second button
+        Assert.Equal(MessageResult.No, await message.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        window.Close();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Empty(errors);
+    }
+
     /// <summary>The GTK menu bar and a context menu, clicked on the UI thread as a person would.</summary>
     [EndToEndFact(Linux = true, Windows = false)]
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
