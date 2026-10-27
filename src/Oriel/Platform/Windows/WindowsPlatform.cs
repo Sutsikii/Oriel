@@ -87,6 +87,16 @@ internal sealed unsafe class WindowsPlatform : IPlatform
 
     public void Quit() => Win32.PostQuitMessage(0);
 
+    public string? GetClipboardText() => WinClipboard.GetText(_dispatchWindow);
+
+    public string? GetClipboardHtml() => WinClipboard.GetHtml(_dispatchWindow);
+
+    public byte[]? GetClipboardImage() => WinClipboard.GetImage(_dispatchWindow);
+
+    public IReadOnlyList<string>? GetClipboardFiles() => WinClipboard.GetFiles(_dispatchWindow);
+
+    public void SetClipboard(ClipboardContent content) => WinClipboard.Set(_dispatchWindow, content);
+
     public void OpenExternally(Uri uri)
     {
         // ShellExecute returns a value above 32 when it succeeds.

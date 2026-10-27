@@ -378,6 +378,48 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(404, root.GetProperty("gone").GetInt32());
     }
 
+    [EndToEndFact] // the clipboard is in the Windows backend only
+    public async Task CopiesAndPastesThroughTheClipboard()
+    {
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = Task.Run(() => app.Run(started.SetResult));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var clipboard = app.Clipboard;
+        var saved = await clipboard.GetTextAsync(); // the person's, put back after
+        try
+        {
+            await clipboard.SetTextAsync("Oriel ✓");
+            Assert.Equal("Oriel ✓", await clipboard.GetTextAsync());
+
+            await clipboard.SetHtmlAsync("<b>bold</b>", "bold");
+            Assert.Equal("<b>bold</b>", await clipboard.GetHtmlAsync());
+            Assert.Equal("bold", await clipboard.GetTextAsync());
+            Assert.Null(await clipboard.GetImageAsync());
+
+            var rgba = new byte[] { 255, 0, 0, 255, 0, 0, 255, 128 };
+            var png = Oriel.Platform.Png.Encode(2, 1, rgba);
+            await clipboard.SetImageAsync(png);
+            Assert.Equal(png, await clipboard.GetImageAsync());
+
+            var file = Path.Combine(_assets, "copied.txt");
+            File.WriteAllText(file, "x");
+            await clipboard.SetFilesAsync([file]);
+            Assert.Equal([file], await clipboard.GetFilesAsync());
+
+            await clipboard.ClearAsync();
+            Assert.Null(await clipboard.GetTextAsync());
+            Assert.Null(await clipboard.GetFilesAsync());
+        }
+        finally
+        {
+            if (saved is not null)
+                await clipboard.SetTextAsync(saved);
+            app.Quit();
+            await run.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+    }
+
     [EndToEndFact(Linux = true, MacOS = true)]
     public async Task PagesGetBinaryResultsAsTypedArrays()
     {

@@ -34,6 +34,23 @@ internal interface IPlatform
 
     /// <summary>Opens a window showing a page. UI thread only.</summary>
     IPlatformWindow OpenWindow(PlatformWindowOptions options, IPlatformWindowEvents events);
+
+    // ---- The clipboard, UI thread only (see Clipboard) ----
+
+    string? GetClipboardText() => throw ClipboardNotYet();
+
+    string? GetClipboardHtml() => throw ClipboardNotYet();
+
+    /// <summary>The image on the clipboard, as a PNG file's bytes.</summary>
+    byte[]? GetClipboardImage() => throw ClipboardNotYet();
+
+    IReadOnlyList<string>? GetClipboardFiles() => throw ClipboardNotYet();
+
+    /// <summary>Empties the clipboard, then puts each format of <paramref name="content"/> there.</summary>
+    void SetClipboard(ClipboardContent content) => throw ClipboardNotYet();
+
+    private static NotSupportedException ClipboardNotYet() =>
+        new("The clipboard is in the Windows backend only, for now.");
 }
 
 /// <summary>A window of a backend. Every member is called on the UI thread.</summary>

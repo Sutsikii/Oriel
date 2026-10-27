@@ -414,3 +414,14 @@ Oriel.SharedStream
 Oriel.SharedStream.ContentType.get -> string!
 Oriel.SharedStream.Dispose() -> void
 Oriel.SharedStream.Url.get -> string!
+Oriel.Clipboard
+Oriel.Clipboard.ClearAsync() -> System.Threading.Tasks.Task!
+Oriel.Clipboard.GetFilesAsync() -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>?>!
+Oriel.Clipboard.GetHtmlAsync() -> System.Threading.Tasks.Task<string?>!
+Oriel.Clipboard.GetImageAsync() -> System.Threading.Tasks.Task<byte[]?>!
+Oriel.Clipboard.GetTextAsync() -> System.Threading.Tasks.Task<string?>!
+Oriel.Clipboard.SetFilesAsync(System.Collections.Generic.IEnumerable<string!>! paths) -> System.Threading.Tasks.Task!
+Oriel.Clipboard.SetHtmlAsync(string! html, string? text = null) -> System.Threading.Tasks.Task!
+Oriel.Clipboard.SetImageAsync(byte[]! png) -> System.Threading.Tasks.Task!
+Oriel.Clipboard.SetTextAsync(string! text) -> System.Threading.Tasks.Task!
+Oriel.OrielApp.Clipboard.get -> Oriel.Clipboard!
