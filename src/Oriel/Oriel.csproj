@@ -22,6 +22,7 @@
     <InternalsVisibleTo Include="Oriel.EndToEnd.Tests" />
     <InternalsVisibleTo Include="Oriel.Benchmarks" />
     <InternalsVisibleTo Include="Oriel.Hosting" />
+    <InternalsVisibleTo Include="Oriel.Cli" />
     <EmbeddedResource Include="Bridge/bridge.js" LogicalName="Oriel.Bridge.bridge.js" />
   </ItemGroup>
 

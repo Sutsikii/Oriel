@@ -1,0 +1,19 @@
+{
+  "name": "oriel-template-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.mjs",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "~3.5.44"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "~6.0.10",
+    "typescript": "~5.9.3",
+    "vite": "~7.3.7",
+    "vue-tsc": "~3.3.13"
+  }
+}

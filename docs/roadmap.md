@@ -11,6 +11,9 @@ self-contained piece of work.
   ids, and names to find them by. Coalesced events for
   high-frequency updates, once per frame at most.
 - The clipboard: text, HTML, images and files (Windows).
+- Templates for vanilla TypeScript, React, Vue and Svelte frontends
+  (`dotnet new oriel --framework`), and the `oriel` command: `oriel doctor`
+  and `oriel dev`.
 - Notifications with buttons (Windows).
 - One instance per user, with the arguments of later launches; links of
   the app's schemes and its files, registered by the installer.
@@ -58,8 +61,6 @@ self-contained piece of work.
 
 ### Tooling
 
-- **`oriel` CLI**: `oriel new` from templates (vanilla, React, Vue,
-  Svelte), `oriel dev` and `oriel build` without per-project scripts.
 - **Signing** of the app and its installer, from a certificate or a
   signing service.
 - **MSIX** packages, for the Microsoft Store.

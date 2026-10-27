@@ -137,8 +137,12 @@ jobs:
           path: examples/hello/bin/installer
 
   template:
-    name: Create an app with dotnet new
+    name: Create an app with dotnet new (${{ matrix.framework }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [vanilla, react, vue, svelte]
     env:
       VERSION: 0.0.0-ci.${{ github.run_number }}
     steps:
@@ -164,7 +168,7 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: |
           dotnet new install "packages/Oriel.Templates.$VERSION.nupkg"
-          dotnet new oriel -o Contoso.Notes
+          dotnet new oriel -o Contoso.Notes --framework ${{ matrix.framework }}
           dotnet new nugetconfig -o Contoso.Notes
           dotnet nuget add source "$(cygpath -w "$RUNNER_TEMP/packages")" -n local --configfile Contoso.Notes/nuget.config
           if grep -rn OrielTemplate Contoso.Notes; then
@@ -179,6 +183,8 @@ jobs:
           npm install
           cd ..
           dotnet build -c Release
+          cd frontend
+          npm run build
 
       # NuGet takes a later version when the one asked for is missing.
       - name: Check it uses the packages just made
@@ -186,6 +192,7 @@ jobs:
         run: grep -q "\"oriel/$VERSION\"" "$RUNNER_TEMP/Contoso.Notes/obj/project.assets.json"
 
       - name: Check the template's client is up to date
+        if: matrix.framework == 'vanilla'
         shell: bash
         run: |
           sed 's/Contoso\.Notes/OrielTemplate/g' "$RUNNER_TEMP/Contoso.Notes/frontend/src/oriel.ts" > "$RUNNER_TEMP/oriel.ts"
@@ -206,6 +213,7 @@ jobs:
           dotnet pack src/Oriel -c Release -o artifacts/packages
           dotnet pack src/Oriel.Hosting -c Release -o artifacts/packages
           dotnet pack templates/Oriel.Templates -c Release -o artifacts/packages
+          dotnet pack src/Oriel.Cli -c Release -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:
