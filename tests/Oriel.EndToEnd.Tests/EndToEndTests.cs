@@ -85,6 +85,15 @@ public sealed class Probe
 
     public void Ping(string payload) => Pinged.Emit(payload);
 
+    public Event<int> Moved { get; } = new() { Coalesce = true };
+
+    /// <summary>Emits <see cref="Moved"/> 1 to <paramref name="count"/>, faster than any page takes them.</summary>
+    public void Burst(int count)
+    {
+        for (var i = 1; i <= count; i++)
+            Moved.Emit(i);
+    }
+
     public string WindowUrl(OrielWindow window) => window.Url.AbsolutePath;
 
     public Task<bool> SavePdf(OrielWindow window, string path, bool landscape) =>
@@ -239,6 +248,27 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(Pages.Origin, root.GetProperty("origin").GetString());
         Assert.Equal("Done", window.Title);
         Assert.True(window.IsClosed);
+    }
+
+    [EndToEndFact(Linux = true, MacOS = true)]
+    public async Task PagesGetTheLatestPayloadOfCoalescedEvents()
+    {
+        var (report, _, _, _) = await RunPage("""
+            const got = [];
+            await new Promise((resolve) => {
+              oriel.on("E2E.Moved", (n) => {
+                got.push(n);
+                if (n === 100000) resolve();
+              });
+              oriel.call("E2E.Burst", [100000]);
+            });
+            await oriel.call("E2E.Report", [JSON.stringify(got)]);
+            """);
+
+        var got = JsonSerializer.Deserialize<int[]>(report)!;
+        Assert.Equal(100000, got[^1]);
+        Assert.InRange(got.Length, 2, 100); // the first, maybe a few, then the latest
+        Assert.Equal(got.Order(), got);
     }
 
     [EndToEndFact]

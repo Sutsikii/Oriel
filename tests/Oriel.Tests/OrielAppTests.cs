@@ -254,6 +254,31 @@ public class OrielAppTests
         await run;
     }
 
+    [Fact]
+    public async Task SendsOnlyTheLatestPayloadOfACoalescedEvent()
+    {
+        var app = App();
+        var moved = new Event<int> { Coalesce = true };
+        moved.Attach("Pointer.Moved", Json.Write, app);
+        var run = RunAsync(app, () => app.OpenWindow());
+        await WaitUntil(() => _platform.Windows.Count == 1);
+        var window = OnlyWindow();
+        Post(app, window, "https://app.oriel/", """{"t":"hello","k":"p"}""");
+        await Task.Delay(50);
+
+        for (var i = 1; i <= 100; i++)
+            moved.Emit(i);
+        Assert.Equal("""{"t":"event","n":"Pointer.Moved","v":1,"c":1}""", await NextPosted(window));
+        await Task.Delay(50);
+        Assert.Empty(window.Posted); // the page has not taken the first one yet
+
+        Post(app, window, "https://app.oriel/", """{"t":"ack","k":"p","n":["Pointer.Moved"]}""");
+        Assert.Equal("""{"t":"event","n":"Pointer.Moved","v":100,"c":1}""", await NextPosted(window));
+
+        app.Quit();
+        await run;
+    }
+
     private sealed class Release(List<string> log) : IAsyncDisposable
     {
         public ValueTask DisposeAsync()

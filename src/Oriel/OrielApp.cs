@@ -17,7 +17,7 @@ namespace Oriel;
 /// return app.Run(() =&gt; app.OpenWindow(new WindowOptions { Title = "Hello" }));
 /// </code>
 /// </example>
-public sealed class OrielApp : IEventSink
+public sealed class OrielApp : ICoalescingSink
 {
     /// <summary>
     /// The variable that makes <see cref="Run"/> write the TypeScript client to
@@ -277,6 +277,12 @@ public sealed class OrielApp : IEventSink
     {
         foreach (var window in Windows)
             window.Connection.Send(message);
+    }
+
+    void ICoalescingSink.BroadcastLatest(string name, string message)
+    {
+        foreach (var window in Windows)
+            window.Connection.SendLatest(name, message);
     }
 
     internal void WindowClosed(OrielWindow window)

@@ -12,15 +12,21 @@
   /**
    * Creates the runtime of one page. `post` delivers a string to the app,
    * and `postFiles`, when the webview has it, a string with File objects;
-   * the returned `receive` takes the app's messages. Free of DOM access, so
-   * that it can be tested on its own.
+   * the returned `receive` takes the app's messages. `frame` runs a function
+   * at the next frame (requestAnimationFrame in a page). Free of DOM access,
+   * so that it can be tested on its own.
    */
-  function createRuntime(post, postFiles) {
+  function createRuntime(post, postFiles, frame) {
     // A token per page: the app drops the work of a page whose token it no
     // longer sees, and replies meant for a previous page are ignored here.
     const token = randomToken();
     const pending = new Map();
     const listeners = new Map();
+    // The coalesced events taken since the last frame: the app sends their
+    // next payloads once the page acknowledges them, so a busy or hidden
+    // page gets the latest payload rather than a queue of them.
+    const acks = new Set();
+    const nextFrame = frame || ((f) => setTimeout(f, 16));
     let seq = 0;
 
     const send = (message) => post(JSON.stringify(message));
@@ -71,6 +77,7 @@
           return;
         }
         case "event": {
+          if (message.c === 1 && typeof message.n === "string") acknowledge(message.n);
           const set = listeners.get(message.n);
           if (!set) return;
           for (const listener of [...set]) {
@@ -83,6 +90,18 @@
           return;
         }
       }
+    }
+
+    /** Acknowledges the coalesced event `name` at the next frame, with the others taken by then. */
+    function acknowledge(name) {
+      if (acks.size === 0) {
+        nextFrame(() => {
+          const n = [...acks];
+          acks.clear();
+          send({ t: "ack", k: token, n });
+        });
+      }
+      acks.add(name);
     }
 
     /**
@@ -213,7 +232,8 @@
     // Only the top document of an Oriel window talks to the app.
     const transport = findTransport(root);
     if (!transport || root.oriel || root.top !== root) return;
-    const { runtime, receive, keyDown, dragOver, drop } = createRuntime(transport.post, transport.postFiles);
+    const frame = typeof root.requestAnimationFrame === "function" ? (f) => root.requestAnimationFrame(f) : null;
+    const { runtime, receive, keyDown, dragOver, drop } = createRuntime(transport.post, transport.postFiles, frame);
     transport.listen(receive);
     root.addEventListener("keydown", keyDown, true);
     root.addEventListener("dragover", dragOver, true);

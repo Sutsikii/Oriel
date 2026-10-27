@@ -31,6 +31,17 @@ public class EventTests
     }
 
     [Fact]
+    public void MarksCoalescedEventsForPagesToAcknowledge()
+    {
+        var moved = new Event<int> { Coalesce = true };
+        var sink = new Sink(); // not coalescing: every message goes
+        moved.Attach("Pointer.Moved", Json.Write, sink);
+        moved.Emit(1);
+        moved.Emit(2);
+        Assert.Equal(["""{"t":"event","n":"Pointer.Moved","v":1,"c":1}""", """{"t":"event","n":"Pointer.Moved","v":2,"c":1}"""], sink.Messages);
+    }
+
+    [Fact]
     public void BindsOnce()
     {
         var tick = new Event<int>();

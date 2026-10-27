@@ -73,6 +73,16 @@ The runtime lets dragged files be dropped anywhere on the page, and keeps
 the webview from opening a dropped file in place of the page; the page's
 own `dragover` and `drop` listeners still run.
 
+### `ack`
+
+The page took payloads of the coalesced events `n` (see
+[`event`](#event)), and is ready for their next ones. The runtime sends
+one at the next frame, with every coalesced event it got since the last.
+
+```json
+{ "t": "ack", "k": "3f9a…", "n": ["Tracker.PenMoved"] }
+```
+
 ## Messages from the app
 
 ### `result`
@@ -111,6 +121,16 @@ page that is there.
 
 ```json
 { "t": "event", "n": "Clock.Tick", "v": "2026-10-21T12:00:00+02:00" }
+```
+
+A coalesced event (`Coalesce = true`, see
+[bindings.md](bindings.md#coalesced-events)) has `"c": 1`. The app sends a
+page the next payload of such an event once the page acknowledges the one
+before with an [`ack`](#ack), and keeps only the latest in the meantime. A
+new page starts with no payload waiting.
+
+```json
+{ "t": "event", "n": "Tracker.PenMoved", "v": { "x": 12.5, "y": 40 }, "c": 1 }
 ```
 
 The window sends one event of its own, `oriel:filesDropped`, to its page

@@ -22,6 +22,8 @@ Oriel.Dialogs.OpenFilesAsync(Oriel.OpenFileOptions? options = null) -> System.Th
 Oriel.Dialogs.PickFolderAsync(Oriel.FolderOptions? options = null) -> System.Threading.Tasks.Task<string?>!
 Oriel.Dialogs.SaveFileAsync(Oriel.SaveFileOptions? options = null) -> System.Threading.Tasks.Task<string?>!
 Oriel.Event<T>
+Oriel.Event<T>.Coalesce.get -> bool
+Oriel.Event<T>.Coalesce.init -> void
 Oriel.Event<T>.Attach(string! name, System.Action<System.Text.Json.Utf8JsonWriter!, T>! write, Oriel.Generated.IEventSink! sink) -> void
 Oriel.Event<T>.Emit(T payload) -> void
 Oriel.Event<T>.EmitTo(Oriel.OrielWindow! window, T payload) -> void

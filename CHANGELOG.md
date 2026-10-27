@@ -4,6 +4,12 @@ What changes in each release of the `Oriel` and `Oriel.Hosting` packages.
 Versions follow [Semantic Versioning](https://semver.org); before 1.0, a
 minor version may change the public API, and says so here.
 
+## Unreleased
+
+- **Coalesced events.** `new Event<T> { Coalesce = true }` sends pages only
+  the latest payload of an event emitted faster than they take it, once
+  per frame at most, so that a busy or hidden page does not fall behind.
+
 ## 0.1.0-preview.1
 
 The first release, for Windows 10 1809 and later, with first versions of

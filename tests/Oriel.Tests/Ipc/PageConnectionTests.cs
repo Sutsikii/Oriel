@@ -316,6 +316,59 @@ public class PageConnectionTests
         Assert.Equal("late", Single());
     }
 
+    private static string Ack(string token, params string[] names) =>
+        $$"""{"t":"ack","k":"{{token}}","n":{{JsonSerializer.Serialize(names)}}}""";
+
+    [Fact]
+    public async Task HoldsTheLatestCoalescedPayloadUntilThePageTakesTheOneBefore()
+    {
+        await _page.ReceiveAsync("""{"t":"hello","k":"page1"}""");
+        _page.SendLatest("Pointer.Moved", "1");
+        _page.SendLatest("Pointer.Moved", "2");
+        _page.SendLatest("Pointer.Moved", "3");
+        _page.SendLatest("Zoom.Changed", "z"); // another event: a slot of its own
+        Assert.Equal(["1", "z"], _posted);
+        _posted.Clear();
+
+        await _page.ReceiveAsync(Ack("page1", "Pointer.Moved"));
+        Assert.Equal("3", Single());
+
+        // Nothing waits now: the next acknowledgement frees the event, and
+        // its next payload goes at once.
+        await _page.ReceiveAsync(Ack("page1", "Pointer.Moved", "Zoom.Changed"));
+        Assert.Empty(_posted);
+        _page.SendLatest("Pointer.Moved", "4");
+        Assert.Equal("4", Single());
+    }
+
+    [Fact]
+    public async Task IgnoresAcknowledgementsOfAnotherPageOrEventOrShape()
+    {
+        await _page.ReceiveAsync("""{"t":"hello","k":"page1"}""");
+        _page.SendLatest("Pointer.Moved", "1");
+        _page.SendLatest("Pointer.Moved", "2");
+        _posted.Clear();
+
+        await _page.ReceiveAsync(Ack("page1", "Other.Event"));
+        await _page.ReceiveAsync("""{"t":"ack","k":"page1","n":"Pointer.Moved"}""");
+        await _page.ReceiveAsync("""{"t":"ack","k":"page1","n":[1,null,{"a":"Pointer.Moved"}]}""");
+        await _page.ReceiveAsync("""{"t":"ack","k":"page1","n":["\ud800"]}"""); // an escaped lone surrogate
+        Assert.Empty(_posted);
+
+        // A new page: what waited was for the one before, and the event is free.
+        await _page.ReceiveAsync(Ack("page2", "Pointer.Moved"));
+        Assert.Empty(_posted);
+        _page.SendLatest("Pointer.Moved", "3");
+        Assert.Equal("3", Single());
+    }
+
+    [Fact]
+    public void SendsNoCoalescedPayloadBeforeThePageSaysHello()
+    {
+        _page.SendLatest("Pointer.Moved", "1");
+        Assert.Empty(_posted);
+    }
+
     private sealed class Slow : ServiceDispatcher
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

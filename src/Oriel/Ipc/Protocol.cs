@@ -29,6 +29,13 @@ internal static class Protocol
     /// </summary>
     public const string Drop = "drop";
 
+    /// <summary>
+    /// The page took the coalesced events <c>n</c> and is ready for their
+    /// next payloads: <c>{"t":"ack","k":token,"n":["Pointer.Moved"]}</c>,
+    /// sent once per frame at most.
+    /// </summary>
+    public const string Ack = "ack";
+
     /// <summary>A call returned: <c>{"t":"result","id":1,"k":token,"v":value}</c>, without <c>v</c> for nothing.</summary>
     public const string Result = "result";
 
@@ -38,7 +45,10 @@ internal static class Protocol
     /// </summary>
     public const string Error = "error";
 
-    /// <summary>The app emits an event: <c>{"t":"event","n":"Clock.Tick","v":value}</c>.</summary>
+    /// <summary>
+    /// The app emits an event: <c>{"t":"event","n":"Clock.Tick","v":value}</c>,
+    /// with <c>"c":1</c> when it is coalesced and the page acknowledges it with an <see cref="Ack"/>.
+    /// </summary>
     public const string Event = "event";
 
     /// <summary>
@@ -79,13 +89,15 @@ internal static class Protocol
             }
         });
 
-    public static string EventMessage(string name, ValueWriter value) =>
+    public static string EventMessage(string name, ValueWriter value, bool coalesced = false) =>
         Write(w =>
         {
             w.WriteString("t", Event);
             w.WriteString("n", name);
             w.WritePropertyName("v");
             value(w);
+            if (coalesced)
+                w.WriteNumber("c", 1);
         });
 
     /// <summary>

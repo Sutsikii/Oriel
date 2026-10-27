@@ -211,6 +211,32 @@ stop();
 `Emit` can be called from any thread. It does nothing until the service is
 bound, and reaches the pages that have loaded.
 
+### Coalesced events
+
+An event emitted faster than pages take it, such as a position at 60 to
+120 Hz or a progress, would queue messages behind a busy page, or a hidden
+one, which stops drawing frames. Mark it `Coalesce`, and pages get the
+latest payload instead:
+
+```csharp
+public sealed record Point(double X, double Y);
+
+[Service]
+public sealed class Tracker
+{
+    /// <summary>Where the pen is, as often as the tablet reports it.</summary>
+    public Event<Point> PenMoved { get; } = new() { Coalesce = true };
+}
+```
+
+Each page has at most one payload of the event on its way and one
+waiting, which the next `Emit` replaces. The page acknowledges the payloads
+it took once per frame, and gets the one waiting then: listeners run once
+per frame at most, always with a payload as recent as can be, and a hidden
+window gets the latest one when it shows again. `EmitTo` coalesces too, per
+window. Leave events where every payload counts, such as the lines of a
+log, as they are.
+
 ### Events to one window
 
 `EmitTo(window, payload)` sends to the page of one window: the window a
