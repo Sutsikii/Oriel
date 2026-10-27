@@ -243,9 +243,71 @@ public sealed class OrielApp : ICoalescingSink
         if (Interlocked.Exchange(ref _running, 1) == 1)
             throw new InvalidOperationException("The app is already running.");
 
+        var arguments = Environment.GetCommandLineArgs().Skip(1).ToList();
+        var directory = Environment.CurrentDirectory;
+        SingleInstance? instance = null;
+        if (Options.SingleInstance)
+        {
+            instance = SingleInstance.Claim(Options.Name, arguments, directory, started => Dispatch(() => SecondInstance(started)));
+            if (instance is null)
+                return 0; // the first instance has the arguments
+        }
+        try
+        {
+            return RunLoop(() =>
+            {
+                ready?.Invoke();
+                Opened(arguments, directory);
+            });
+        }
+        finally
+        {
+            instance?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Raised on the UI thread of the first instance when the app is launched
+    /// again, with <see cref="AppOptions.SingleInstance"/>: often, to bring a
+    /// window to the front.
+    /// </summary>
+    public event EventHandler<SecondInstanceEventArgs>? SecondInstanceStarted;
+
+    /// <summary>
+    /// Raised on the UI thread for each link of the app's scheme, and each
+    /// file, its command line asks to open: the launch's own, once
+    /// <c>ready</c> of <see cref="Run"/> ran, and with
+    /// <see cref="AppOptions.SingleInstance"/> those of the launches after.
+    /// The installer registers schemes and file types: see docs/build.md.
+    /// </summary>
+    public event EventHandler<OpenRequestedEventArgs>? OpenRequested;
+
+    private void SecondInstance(SecondInstanceEventArgs started)
+    {
+        SecondInstanceStarted?.Invoke(this, started);
+        Opened(started.Arguments, started.WorkingDirectory);
+    }
+
+    private void Opened(IReadOnlyList<string> arguments, string directory)
+    {
+        foreach (var request in OpenRequestedEventArgs.From(arguments, directory))
+        {
+            try
+            {
+                OpenRequested?.Invoke(this, request);
+            }
+            catch (Exception e)
+            {
+                ReportError(e);
+            }
+        }
+    }
+
+    private int RunLoop(Action ready)
+    {
         if (RunsOnCallingThread)
         {
-            _platform.Run(() => ready?.Invoke());
+            _platform.Run(ready);
             return 0;
         }
 
@@ -254,7 +316,7 @@ public sealed class OrielApp : ICoalescingSink
         {
             try
             {
-                _platform.Run(() => ready?.Invoke());
+                _platform.Run(ready);
             }
             catch (Exception e)
             {

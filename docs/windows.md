@@ -53,6 +53,43 @@ are where the window goes back to.
 `Focus` cannot always take the keyboard from another app: Windows then
 flashes the window in the taskbar instead.
 
+## One instance, links and files
+
+With `AppOptions.SingleInstance`, the app runs once per user. Launched
+again, as when a link of its scheme or one of its files is opened, the new
+process sends its command line to the one that runs and exits: its `Run`
+returns 0 at once.
+
+```csharp
+var app = new OrielApp(new AppOptions { Name = "Notes", SingleInstance = true });
+OrielWindow? window = null;
+app.SecondInstanceStarted += (_, _) => window?.Show(); // in front, and shown if hidden
+app.OpenRequested += (_, e) =>
+{
+    if (e.Url is { } link)
+        OpenLink(link);       // notes://open?id=4
+    else
+        OpenFile(e.Path!);    // C:\Users\ada\Documents\todo.note
+};
+app.Run(() => window = app.OpenWindow());
+```
+
+- `SecondInstanceStarted` gets the arguments of each later launch, and
+  the folder it started in.
+- `OpenRequested` is raised for each argument that is a link (an absolute
+  URL of a scheme other than `file`) or a file that exists: those of the
+  app's own launch, once the `ready` of `Run` ran, then those of later
+  launches. It is raised without `SingleInstance` too, for the first launch.
+- Both are raised on the UI thread.
+- Instances are told apart by user: another user's instance is another app.
+  The first instance takes the others' arguments on a named pipe that only
+  its user can open.
+
+The installer registers the schemes and file types of the app, which the
+`OrielUrlSchemes` and `OrielFileTypes` properties name (see
+[build.md](build.md#installers)): the system then starts the app with the
+link or the file's path as its argument.
+
 ## Tray icons
 
 `OrielApp.AddTrayIcon` shows an icon of the app in the notification area

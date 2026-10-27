@@ -471,3 +471,14 @@ Oriel.NotificationClickedEventArgs.Notification.get -> Oriel.Notification!
 Oriel.NotificationClickedEventArgs.NotificationClickedEventArgs(Oriel.Notification! notification, Oriel.NotificationAction? action) -> void
 Oriel.OrielApp.NotificationClicked -> System.EventHandler<Oriel.NotificationClickedEventArgs!>?
 Oriel.OrielApp.ShowNotification(Oriel.Notification! notification) -> void
+Oriel.AppOptions.SingleInstance.get -> bool
+Oriel.AppOptions.SingleInstance.init -> void
+Oriel.OrielApp.OpenRequested -> System.EventHandler<Oriel.OpenRequestedEventArgs!>?
+Oriel.OrielApp.SecondInstanceStarted -> System.EventHandler<Oriel.SecondInstanceEventArgs!>?
+Oriel.OpenRequestedEventArgs
+Oriel.OpenRequestedEventArgs.Path.get -> string?
+Oriel.OpenRequestedEventArgs.Url.get -> System.Uri?
+Oriel.SecondInstanceEventArgs
+Oriel.SecondInstanceEventArgs.Arguments.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Oriel.SecondInstanceEventArgs.SecondInstanceEventArgs(System.Collections.Generic.IReadOnlyList<string!>! arguments, string! workingDirectory) -> void
+Oriel.SecondInstanceEventArgs.WorkingDirectory.get -> string!

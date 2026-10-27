@@ -13,6 +13,8 @@ namespace Oriel.Build;
 /// <param name="OutputDirectory">Where the installer is written.</param>
 /// <param name="Icon">The icon of the installer, or null for Inno Setup's.</param>
 /// <param name="Languages">The languages of the wizard, by the names of Inno Setup's message files: <c>english</c>, <c>french</c>…</param>
+/// <param name="UrlSchemes">The schemes of links the app opens, such as <c>myapp</c> for <c>myapp://…</c>.</param>
+/// <param name="FileTypes">The extensions of the files the app opens, such as <c>.note</c>.</param>
 internal sealed record InstallerSettings(
     string AppName,
     string AppVersion,
@@ -22,7 +24,9 @@ internal sealed record InstallerSettings(
     string PublishDirectory,
     string OutputDirectory,
     string? Icon,
-    IReadOnlyList<string> Languages);
+    IReadOnlyList<string> Languages,
+    IReadOnlyList<string>? UrlSchemes = null,
+    IReadOnlyList<string>? FileTypes = null);
 
 /// <summary>
 /// Writes the Inno Setup script of an Oriel app's installer: a per-user
@@ -69,6 +73,8 @@ internal static class InnoSetupScript
         Line(sb, "MinVersion", "10.0.17763");
         Line(sb, "OutputDir", s.OutputDirectory);
         Line(sb, "OutputBaseFilename", FileName(s.AppName) + "-Setup-" + s.AppVersion);
+        if (s.FileTypes is { Count: > 0 })
+            Line(sb, "ChangesAssociations", "yes");
 
         sb.Append("\n[Languages]\n");
         foreach (var language in s.Languages)
@@ -90,6 +96,8 @@ internal static class InnoSetupScript
         sb.Append("\n[Run]\n");
         sb.Append($"Filename: {Quote("{app}\\" + Constant(s.Executable))}; Description: {Quote("{cm:LaunchProgram," + Constant(s.AppName).Replace("&", "&&").Replace(",", "%2c") + "}")}; Flags: nowait postinstall skipifsilent\n");
 
+        Registry(sb, s);
+
         sb.Append("\n[UninstallDelete]\n");
         sb.Append("; The webview's data; the app's own data, in %APPDATA%, is the user's and stays.\n");
         sb.Append($"Type: filesandordirs; Name: {Quote("{localappdata}\\" + Constant(s.AppName) + "\\WebView")}\n");
@@ -98,6 +106,53 @@ internal static class InnoSetupScript
         sb.Append(WebView2Check);
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The keys that make links of the app's schemes, and its files, open
+    /// with it: under HKA, the user's classes for a per-user install, and
+    /// removed with the app. Files are offered in Open with (OpenWithProgids):
+    /// Windows asks the person before making the app their default.
+    /// </summary>
+    private static void Registry(StringBuilder sb, InstallerSettings s)
+    {
+        var schemes = s.UrlSchemes ?? [];
+        var types = s.FileTypes ?? [];
+        if (schemes.Count == 0 && types.Count == 0)
+            return;
+        var exe = "{app}\\" + Constant(s.Executable);
+        var open = "\"\"" + exe + "\"\" \"\"%1\"\"";
+        sb.Append("\n[Registry]\n");
+        foreach (var scheme in schemes)
+        {
+            var key = "Software\\Classes\\" + scheme;
+            sb.Append($"Root: HKA; Subkey: {Quote(key)}; ValueType: string; ValueName: \"\"; ValueData: {Quote("URL:" + Constant(s.AppName))}; Flags: uninsdeletekey\n");
+            sb.Append($"Root: HKA; Subkey: {Quote(key)}; ValueType: string; ValueName: \"URL Protocol\"; ValueData: \"\"\n");
+            sb.Append($"Root: HKA; Subkey: {Quote(key + "\\DefaultIcon")}; ValueType: string; ValueName: \"\"; ValueData: {Quote(exe + ",0")}\n");
+            sb.Append($"Root: HKA; Subkey: {Quote(key + "\\shell\\open\\command")}; ValueType: string; ValueName: \"\"; ValueData: \"{open}\"\n");
+        }
+        foreach (var type in types)
+        {
+            var progId = FileName(s.AppName) + type;
+            var key = "Software\\Classes\\" + progId;
+            sb.Append($"Root: HKA; Subkey: {Quote("Software\\Classes\\" + type + "\\OpenWithProgids")}; ValueType: string; ValueName: {Quote(progId)}; ValueData: \"\"; Flags: uninsdeletevalue\n");
+            sb.Append($"Root: HKA; Subkey: {Quote(key)}; ValueType: string; ValueName: \"\"; ValueData: {Quote(Constant(s.AppName))}; Flags: uninsdeletekey\n");
+            sb.Append($"Root: HKA; Subkey: {Quote(key + "\\DefaultIcon")}; ValueType: string; ValueName: \"\"; ValueData: {Quote(exe + ",0")}\n");
+            sb.Append($"Root: HKA; Subkey: {Quote(key + "\\shell\\open\\command")}; ValueType: string; ValueName: \"\"; ValueData: \"{open}\"\n");
+        }
+    }
+
+    /// <summary>Whether <paramref name="scheme"/> may be a link's scheme the app takes: letters first, then letters, digits, <c>+</c>, <c>-</c> and <c>.</c>.</summary>
+    public static bool IsScheme(string scheme) =>
+        scheme.Length > 1 && IsLetter(scheme[0]) && scheme.All(c => IsLetterOrDigit(c) || c is '+' or '-' or '.')
+        && !new[] { "http", "https", "file", "mailto", "ftp", "javascript", "data", "about", "ms-settings" }.Contains(scheme.ToLowerInvariant());
+
+    private static bool IsLetter(char c) => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z';
+
+    private static bool IsLetterOrDigit(char c) => IsLetter(c) || c is >= '0' and <= '9';
+
+    /// <summary>Whether <paramref name="type"/> is an extension, as <c>.note</c>.</summary>
+    public static bool IsFileType(string type) =>
+        type.Length > 1 && type[0] == '.' && type.Skip(1).All(c => IsLetterOrDigit(c) || c is '-' or '_');
 
     /// <summary>
     /// An AppId of <paramref name="appName"/>, the same on every build: a

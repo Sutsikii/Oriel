@@ -12,6 +12,8 @@ self-contained piece of work.
   high-frequency updates, once per frame at most.
 - The clipboard: text, HTML, images and files (Windows).
 - Notifications with buttons (Windows).
+- One instance per user, with the arguments of later launches; links of
+  the app's schemes and its files, registered by the installer.
 - Tray icons with a menu (Windows); windows that hide, and ask before
   the person closes them.
 - Binary results: `ReadOnlyMemory<T>` as typed arrays, through buffers
@@ -51,7 +53,6 @@ self-contained piece of work.
 
 ### Windows and desktop
 
-- **Single instance, deep links.**
 - **Embedded files**: the frontend inside the executable, served through
   `WebResourceRequested`, for a single-file app.
 

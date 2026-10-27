@@ -54,9 +54,18 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
     /// <summary>The wizard's languages, separated by semicolons.</summary>
     public string Languages { get; set; } = "english";
 
+    /// <summary>The schemes of links the app opens, separated by semicolons: <c>myapp</c>.</summary>
+    public string? UrlSchemes { get; set; }
+
+    /// <summary>The extensions of files the app opens, separated by semicolons: <c>.note;.notes</c>.</summary>
+    public string? FileTypes { get; set; }
+
     /// <summary>Where the script is written.</summary>
     [Required]
     public string ScriptPath { get; set; } = "";
+
+    private static IEnumerable<string> List(string? items) =>
+        (items ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(i => i.Trim()).Where(i => i.Length > 0);
 
     /// <inheritdoc />
     public override bool Execute()
@@ -85,6 +94,18 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
             .Select(l => l.Trim().ToLowerInvariant())
             .Where(l => l.Length > 0)
             .ToList();
+        var schemes = List(UrlSchemes).Select(l => l.ToLowerInvariant()).ToList();
+        var types = List(FileTypes).Select(t => (t.StartsWith(".", StringComparison.Ordinal) ? t : "." + t).ToLowerInvariant()).ToList();
+        foreach (var scheme in schemes.Where(x => !InnoSetupScript.IsScheme(x)))
+        {
+            Log.LogError($"Oriel: OrielUrlSchemes '{scheme}' is not a scheme an app can take: letters first, then letters, digits, '+', '-' or '.', and not http, file or another the system has.");
+            return false;
+        }
+        foreach (var type in types.Where(x => !InnoSetupScript.IsFileType(x)))
+        {
+            Log.LogError($"Oriel: OrielFileTypes '{type}' is not an extension, such as .note.");
+            return false;
+        }
         var settings = new InstallerSettings(
             AppName,
             AppVersion,
@@ -94,7 +115,9 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
             publish,
             Path.GetFullPath(OutputDirectory),
             string.IsNullOrEmpty(Icon) ? null : Path.GetFullPath(Icon),
-            languages.Count == 0 ? new[] { "english" } : languages);
+            languages.Count == 0 ? new[] { "english" } : languages,
+            schemes,
+            types);
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(ScriptPath))!);
         File.WriteAllText(ScriptPath, InnoSetupScript.Create(settings));

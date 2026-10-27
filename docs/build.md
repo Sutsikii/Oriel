@@ -156,6 +156,8 @@ publishing it warns, and gives a new GUID to use instead.
 | `OrielAppId` | derived from the name | Identifies the app across versions. |
 | `OrielInstallerIcon` | `$(ApplicationIcon)` | The icon of the installer. |
 | `OrielInstallerLanguages` | `english` | The wizard's languages, by Inno Setup's message files: `english;french;german`… The wizard picks the user's. |
+| `OrielUrlSchemes` | none | Schemes of links the app opens, separated by `;`: `myapp` makes `myapp://…` links start it (see [windows.md](windows.md#links-and-files)). |
+| `OrielFileTypes` | none | Extensions of files the app opens, separated by `;`: `.note;.notes`. The app is offered in Open with; Windows asks the person before making it their default. |
 | `OrielInstallerOutput` | `bin/installer` | Where the installer is written. |
 | `OrielInnoSetupCompiler` | found | The path of `ISCC.exe`, when Inno Setup is not installed where it usually is. |
 
