@@ -456,7 +456,10 @@ test("starts in a WebKit page: posts through the oriel handler, receives through
 test("sends files only where the webview can", () => {
   assert.equal(typeof findTransport(webView2Page().page).postFiles, "function");
   assert.equal(findTransport(webView2Page({ withFiles: false }).page).postFiles, null);
-  assert.equal(findTransport(webKitPage().page).postFiles, null);
+  // WebKit: the message alone, the backend has the drag's paths.
+  const { page, posted } = webKitPage();
+  findTransport(page).postFiles('{"t":"drop","k":"x","x":1,"y":2}', ["ignored"]);
+  assert.deepEqual(posted, [{ t: "drop", k: "x", x: 1, y: 2 }]);
 });
 
 test("does nothing outside an Oriel window, in frames, or twice", () => {

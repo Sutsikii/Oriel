@@ -370,7 +370,8 @@
     if (handler && typeof handler.postMessage === "function") {
       return {
         post: (message) => handler.postMessage(message),
-        postFiles: null, // the backend reads dropped files' paths itself
+        // A drop's message goes alone: the backend has the paths of the drag.
+        postFiles: (message) => handler.postMessage(message),
         listen: (receive) => Object.defineProperty(root, "__orielReceive", { value: receive }),
       };
     }

@@ -5,6 +5,23 @@ namespace Oriel.Tests;
 
 public sealed class MenuTests : IDisposable
 {
+    [Theory]
+    [InlineData("&File", "_File")]
+    [InlineData("Save &As…", "Save _As…")]
+    [InlineData("Fish && Chips", "Fish & Chips")]
+    [InlineData("snake_case", "snake__case")]
+    public void WritesMnemonicsAsGtkDoes(string text, string label) =>
+        Assert.Equal(label, Oriel.Platform.Linux.GtkLabels.Label(text));
+
+    [Theory]
+    [InlineData(0x53, 0x73u)] // S: s
+    [InlineData(0x35, 0x35u)] // 5
+    [InlineData(0x74, 0xFFC2u)] // F5
+    [InlineData(0x2E, 0xFFFFu)] // Delete
+    [InlineData(0xBA, null)] // ; is not shown
+    public void NamesKeysAsGdkDoes(int key, uint? keyval) =>
+        Assert.Equal(keyval, Oriel.Platform.Linux.GtkLabels.Keyval(key));
+
     private readonly FakePlatform _platform = new();
     private readonly OrielApp _app;
     private readonly Task<int> _run;
