@@ -43,6 +43,9 @@ public sealed class SharedStream : IDisposable
 
     internal Func<Stream> Open { get; }
 
+    /// <summary>Whether it is served once only, then removed.</summary>
+    internal bool Once { get; init; }
+
     /// <summary>Stops serving it: pages that load it later get a 404. Loads under way finish.</summary>
     public void Dispose() => _server.Remove(Id);
 }
@@ -89,6 +92,21 @@ internal sealed class StreamServer
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
         var shared = new SharedStream(this, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16)), open, contentType);
         _streams[shared.Id] = shared;
+        return shared;
+    }
+
+    /// <summary>
+    /// Shares <paramref name="data"/> for one request, such as the bytes of
+    /// a binary result; a minute at most, should the page never ask.
+    /// </summary>
+    public SharedStream ShareOnce(byte[] data)
+    {
+        var shared = new SharedStream(this, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16)), () => new MemoryStream(data, writable: false), "application/octet-stream")
+        {
+            Once = true,
+        };
+        _streams[shared.Id] = shared;
+        _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(_ => Remove(shared.Id), TaskScheduler.Default);
         return shared;
     }
 
@@ -139,6 +157,8 @@ internal sealed class StreamServer
     {
         if (!_streams.TryGetValue(id, out var shared))
             return Text(404, "Not Found");
+        if (shared.Once)
+            Remove(id);
         Stream stream;
         try
         {

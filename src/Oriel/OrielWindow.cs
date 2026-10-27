@@ -39,7 +39,8 @@ public sealed class OrielWindow : IPlatformWindowEvents
         _bounds = new WindowBounds(options.X ?? 0, options.Y ?? 0, Math.Max(1, options.Width), Math.Max(1, options.Height));
         _state = options.State;
         _alwaysOnTop = options.AlwaysOnTop;
-        Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch, showExceptionMessages: app.IsDev);
+        Connection = new PageConnection(app.Services, message => app.Dispatch(() => _native?.PostMessage(message)), this, PageLimits.From(app.Options), app.Dispatch,
+            showExceptionMessages: app.IsDev, postBinary: (id, token, data) => app.Dispatch(() => PostBinary(id, token, data)));
         Connection.CallFailed += (method, error) => app.ReportCallFailure(method, error);
         Connection.KeyPressed += chord => app.Dispatch(() => PressKey(chord));
         Connection.FilesDropped += drop => app.Dispatch(() => DropFiles(drop));
@@ -151,6 +152,31 @@ public sealed class OrielWindow : IPlatformWindowEvents
 
     /// <summary>Closes the window.</summary>
     public void Close() => _app.Dispatch(() => _native?.Close());
+
+    /// <summary>
+    /// Sends the binary result of call <paramref name="id"/>: in a buffer
+    /// shared with the page (WebView2), else at a URL the page fetches once.
+    /// </summary>
+    private void PostBinary(long id, string token, BinaryData data)
+    {
+        if (_native is null)
+            return;
+        var bytes = data.Bytes();
+        var message = Protocol.BinaryResultMessage(id, token, data.TypedArray, bytes.Length);
+        if (bytes.Length == 0)
+        {
+            _native.PostMessage(message); // nothing to send apart
+        }
+        else if (_native.PostBuffer(message, bytes))
+        {
+            Tracing.Write($"window {Id} shared a buffer of {bytes.Length} bytes");
+        }
+        else
+        {
+            Tracing.Write($"window {Id} sends {bytes.Length} bytes at a URL");
+            _native.PostMessage(Protocol.BinaryResultMessage(id, token, data.TypedArray, bytes.Length, _app.Streams.ShareOnce(bytes.ToArray()).Url));
+        }
+    }
 
     /// <summary>
     /// Where the window is, frame included, in device-independent pixels, as

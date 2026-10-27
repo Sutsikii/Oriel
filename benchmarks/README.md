@@ -11,6 +11,7 @@ than guessed. Baseline numbers are in
 | `ProtocolAdd`, `ProtocolDeck` | `PageConnection.ReceiveAsync`: a page's message parsed, run on the thread pool, the reply encoded |
 | `EncodeEvent` | an event's message, as `Event<T>.Emit` encodes it once for every page |
 | `RoundTrip` | a page in a real window: the latency of calls one after another (p50, p99), then calls a second with 10 000 in flight |
+| `binary` | a page in a real window: 1, 10 and 100 MB as binary data (`ReadOnlyMemory<byte>`) and as JSON (`byte[]`, base64), until the page holds a `Uint8Array`. Run by hand: `dotnet run --project benchmarks/Oriel.Benchmarks -c Release -- binary` |
 
 ## Run them
 

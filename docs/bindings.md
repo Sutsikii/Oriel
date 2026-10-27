@@ -139,6 +139,7 @@ JSON has no `undefined`: an argument left out between others is sent as
 | `Guid` | `string` | `"6f9619ff-..."` |
 | `DateTime`, `DateTimeOffset` | `string` | ISO 8601: `new Date(value)` reads it |
 | `byte[]` | `string` | base64 |
+| `ReadOnlyMemory<T>`, `Memory<T>` of `byte` … `ulong`, `float`, `double`, as a result | `Uint8Array` … `BigUint64Array`, `Float32Array`, `Float64Array` | none: bytes (see [Binary data](#binary-data)) |
 | `JsonElement` | `unknown` | any JSON, as is |
 | `T?` (value or reference) | `T \| null` | `null` or the value |
 | `T[]`, `List<T>`, `IList<T>`, `IReadOnlyList<T>`, `IEnumerable<T>`… | `T[]` | array |
@@ -159,6 +160,42 @@ honored:
 - `[JsonIgnore]` leaves one out;
 - `[JsonStringEnumMemberName("lo")]` renames an enum member;
 - `[JsonConstructor]` picks the constructor objects are read with.
+
+### Binary data
+
+A method returning `ReadOnlyMemory<T>` or `Memory<T>` of numbers (also in a
+`Task`) sends their bytes as they are, rather than as JSON: the page gets a
+typed array. Meshes, point clouds, images, audio and samples go this way:
+
+```csharp
+[Service]
+public sealed class Scan
+{
+    /// <summary>The points of the scan, x, y and z after each other.</summary>
+    public ReadOnlyMemory<float> Points() => _points;
+}
+```
+
+```ts
+const points: Float32Array = await Scan.points();
+geometry.setAttribute("position", new BufferAttribute(points, 3));
+```
+
+On Windows the bytes go in a buffer WebView2 shares with the page: one
+copy, and no encoding. Measured on a developer machine, from the call
+until the page holds the array (`dotnet run --project
+benchmarks/Oriel.Benchmarks -c Release -- binary`):
+
+| Size | Binary data | `byte[]` as JSON (base64, decoded) |
+|---|---|---|
+| 1 MB | 0.9 ms | 22 ms |
+| 10 MB | 4.5 ms | 214 ms |
+| 100 MB | 37 ms | 2.1 s |
+
+On Linux and macOS, which have no such buffers, the page fetches the
+bytes once from a URL of the app: still no encoding. The array is the
+page's to change. Only results are binary: arguments stay JSON, and `byte[]`
+stays base64 everywhere, as before.
 
 ### Objects
 

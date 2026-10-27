@@ -496,6 +496,41 @@ public class PageConnectionTests
         page.Dispose();
     }
 
+    private sealed class Samples : ServiceDispatcher
+    {
+        public Samples()
+            : base("Samples")
+        {
+        }
+
+        public override ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context) =>
+            new(context.Return<float>(new float[] { 1, 2 }, "Float32Array"));
+    }
+
+    [Fact]
+    public async Task SendsBinaryResultsApart()
+    {
+        var services = new ServiceTable();
+        services.Add(new Samples());
+        var sent = new List<(long, string, string, byte[])>();
+        var page = new PageConnection(services, _posted.Enqueue, postBinary: (id, token, data) => sent.Add((id, token, data.TypedArray, data.Bytes().ToArray())));
+        await page.ReceiveAsync(Call(4, "Samples.Levels", "[]"));
+        Assert.Empty(_posted);
+        var (id, token, type, bytes) = Assert.Single(sent);
+        Assert.Equal((4L, "page1", "Float32Array"), (id, token, type));
+        Assert.Equal(new byte[] { 0, 0, 0x80, 0x3f, 0, 0, 0, 0x40 }, bytes);
+    }
+
+    [Fact]
+    public async Task FailsBinaryResultsWithoutAWindow()
+    {
+        var services = new ServiceTable();
+        services.Add(new Samples());
+        var page = new PageConnection(services, _posted.Enqueue);
+        await page.ReceiveAsync(Call(1, "Samples.Levels", "[]"));
+        Assert.Equal("""{"t":"error","id":1,"k":"page1","e":"Samples.Levels returns binary data, which only pages of a window get"}""", Single());
+    }
+
     private sealed class Slow : ServiceDispatcher
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

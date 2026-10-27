@@ -89,6 +89,23 @@ internal static class Protocol
             }
         });
 
+    /// <summary>
+    /// The reply to a call returning binary data: the result is the bytes
+    /// sent with it, of length <c>n</c>, as the typed array <c>b</c>; at the
+    /// URL <paramref name="url"/>, when there is one, rather than in a buffer.
+    /// </summary>
+    public static string BinaryResultMessage(long id, string token, string typedArray, int length, string? url = null) =>
+        Write(w =>
+        {
+            w.WriteString("t", Result);
+            w.WriteNumber("id", id);
+            w.WriteString("k", token);
+            w.WriteString("b", typedArray);
+            w.WriteNumber("n", length);
+            if (url is not null)
+                w.WriteString("u", url);
+        });
+
     public static string ItemMessage(long id, string token, ValueWriter value) =>
         Write(w =>
         {

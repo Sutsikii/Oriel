@@ -45,6 +45,20 @@ internal sealed class TypeMapper
         return mapped;
     }
 
+    /// <summary>
+    /// Maps the result of a method: as <see cref="Map"/>, and binary data
+    /// (<c>ReadOnlyMemory&lt;T&gt;</c>), which only results can be.
+    /// </summary>
+    public TypeRef? MapResult(ITypeSymbol type, ISymbol at, string what)
+    {
+        if (Binary(type, out var problem) is { } binary)
+            return binary;
+        if (problem is null)
+            return Map(type, at, what);
+        _diagnostics.Add(DiagnosticInfo.Create(Diagnostics.UnsupportedType, at, what, problem));
+        return null;
+    }
+
     public static string CSharpName(ITypeSymbol type) =>
         type.WithNullableAnnotation(NullableAnnotation.NotAnnotated).ToDisplayString(s_csharp);
 
@@ -171,13 +185,48 @@ internal sealed class TypeMapper
                 return true;
             }
         }
-        if (definition.StartsWith("System.Collections.Generic.IAsyncEnumerable<", StringComparison.Ordinal))
+        if (definition is "System.ReadOnlyMemory<T>" or "System.Memory<T>")
+            reason = "binary data (ReadOnlyMemory<T>) can only be the result of a method";
+        else if (definition.StartsWith("System.Collections.Generic.IAsyncEnumerable<", StringComparison.Ordinal))
             reason = "streams (IAsyncEnumerable) can only be returned, not nested";
         else if (definition.StartsWith("System.Tuple<", StringComparison.Ordinal))
             reason = "tuples have no property names; use a record";
         else if (definition.StartsWith("System.Threading.Tasks.", StringComparison.Ordinal))
             reason = "tasks can only be returned, not nested";
         return reason.Length > 0;
+    }
+
+    /// <summary>
+    /// The typed array of <c>ReadOnlyMemory&lt;T&gt;</c> or <c>Memory&lt;T&gt;</c>,
+    /// for a method's result, or null when <paramref name="type"/> is neither.
+    /// </summary>
+    public static TypeRef? Binary(ITypeSymbol type, out string? problem)
+    {
+        problem = null;
+        if (type is not INamedTypeSymbol { IsGenericType: true } named
+            || named.OriginalDefinition.ToDisplayString() is not ("System.ReadOnlyMemory<T>" or "System.Memory<T>"))
+            return null;
+        var element = named.TypeArguments[0];
+        var array = element.SpecialType switch
+        {
+            SpecialType.System_Byte => "Uint8Array",
+            SpecialType.System_SByte => "Int8Array",
+            SpecialType.System_Int16 => "Int16Array",
+            SpecialType.System_UInt16 => "Uint16Array",
+            SpecialType.System_Int32 => "Int32Array",
+            SpecialType.System_UInt32 => "Uint32Array",
+            SpecialType.System_Int64 => "BigInt64Array",
+            SpecialType.System_UInt64 => "BigUint64Array",
+            SpecialType.System_Single => "Float32Array",
+            SpecialType.System_Double => "Float64Array",
+            _ => null,
+        };
+        if (array is null)
+        {
+            problem = $"binary data holds numbers that have a typed array in JavaScript, not {element.ToDisplayString()}";
+            return null;
+        }
+        return new TypeRef(TypeKind.Binary, CSharpName(element), array, array, null);
     }
 
     private TypeRef? MapEnum(INamedTypeSymbol type, ref string reason)

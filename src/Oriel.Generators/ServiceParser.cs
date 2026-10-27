@@ -178,7 +178,9 @@ internal static class ServiceParser
             type = ((INamedTypeSymbol)type).TypeArguments[0];
             returns = Returns.TaskOfValue;
         }
-        var mapped = mapper.Map(type, method, returns == Returns.Stream ? $"the items of {name}" : $"the result of {name}");
+        var mapped = returns == Returns.Stream
+            ? mapper.Map(type, method, $"the items of {name}")
+            : mapper.MapResult(type, method, $"the result of {name}");
         if (mapped is null)
             ok = false;
         return (returns, mapped);

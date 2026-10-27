@@ -63,6 +63,11 @@ public class TypeScriptTests
 
             public System.Text.Json.JsonElement Raw(System.Text.Json.JsonElement value) => value;
 
+            /// <summary>The thumbnail's pixels, as RGBA bytes.</summary>
+            public Task<ReadOnlyMemory<byte>> Pixels(string path) => Task.FromResult(ReadOnlyMemory<byte>.Empty);
+
+            public Memory<float> Levels() => default;
+
             /// <summary>The slides of the deck at <paramref name="path"/>, as they are read.</summary>
             public IAsyncEnumerable<Slide> Slides(string path, CancellationToken cancellation = default) => null!;
 

@@ -26,6 +26,24 @@ public sealed class CallContext
     /// <summary>The window of the page that made the call.</summary>
     public OrielWindow? Window { get; }
 
+    /// <summary>The binary data the method returned, which the call sends as bytes.</summary>
+    internal BinaryData? Binary { get; private set; }
+
+    /// <summary>
+    /// Makes <paramref name="data"/> the result of the call: bytes the page
+    /// gets as a typed array, <paramref name="typedArray"/>, rather than JSON.
+    /// Generated code calls it for methods returning <see cref="ReadOnlyMemory{T}"/>.
+    /// </summary>
+    /// <param name="data">The numbers, which must stay as they are until the page has them.</param>
+    /// <param name="typedArray">The page's type: <c>Float32Array</c> for <see cref="float"/>.</param>
+    /// <returns>Nothing to write: the bytes go apart.</returns>
+    public ValueWriter? Return<T>(ReadOnlyMemory<T> data, string typedArray) where T : unmanaged
+    {
+        ArgumentNullException.ThrowIfNull(typedArray);
+        Binary = new BinaryData(typedArray, () => System.Runtime.InteropServices.MemoryMarshal.AsBytes(data.Span));
+        return null;
+    }
+
     /// <summary>The stream the method returned, which the call sends once it returns.</summary>
     internal StreamPump? Stream { get; private set; }
 

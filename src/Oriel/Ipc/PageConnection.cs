@@ -22,6 +22,7 @@ internal sealed class PageConnection : IDisposable
     private readonly PageLimits _limits;
     private readonly Action<Action>? _dispatch;
     private readonly bool _showExceptionMessages;
+    private readonly Action<long, string, BinaryData>? _postBinary;
     private readonly Lock _lock = new();
     private string? _token;
     private CancellationTokenSource _page = new();
@@ -52,9 +53,14 @@ internal sealed class PageConnection : IDisposable
     /// Whether pages get the messages of unexpected exceptions, which may tell
     /// about the app's internals. Only in development.
     /// </param>
+    /// <param name="postBinary">
+    /// Delivers the binary result of call <c>id</c> of the page of a token.
+    /// Without it, methods returning binary data fail.
+    /// </param>
     public PageConnection(ServiceTable services, Action<string> post, OrielWindow? window = null, PageLimits? limits = null,
-        Action<Action>? dispatch = null, bool showExceptionMessages = true)
+        Action<Action>? dispatch = null, bool showExceptionMessages = true, Action<long, string, BinaryData>? postBinary = null)
     {
+        _postBinary = postBinary;
         _services = services;
         _post = post;
         _window = window;
@@ -354,6 +360,7 @@ internal sealed class PageConnection : IDisposable
         Task<IDisposable>? turn, JsonElement args, CancellationToken cancellation, CallStream? stream)
     {
         string reply;
+        BinaryData? binary = null;
         using (doc)
         using (turn is null ? null : await turn.ConfigureAwait(false))
         {
@@ -378,7 +385,17 @@ internal sealed class PageConnection : IDisposable
                     else
                         await pump(stream.WaitAsync, Send, stream.Cancellation).ConfigureAwait(false);
                 }
-                reply = Protocol.ResultMessage(id, token, result); // for a stream, its end
+                if (context.Binary is { } data)
+                {
+                    binary = _postBinary is null
+                        ? throw new NotSupportedException($"{method} returns binary data, which only pages of a window get")
+                        : data;
+                    reply = "";
+                }
+                else
+                {
+                    reply = Protocol.ResultMessage(id, token, result); // for a stream, its end
+                }
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested || stream?.Cancellation.IsCancellationRequested == true)
             {
@@ -396,7 +413,10 @@ internal sealed class PageConnection : IDisposable
             if (_disposed || _token != token)
                 return; // the reply belongs to a page that went away
         }
-        _post(reply);
+        if (binary is not null)
+            _postBinary!(id, token, binary);
+        else
+            _post(reply);
     }
 
     /// <summary>Sends an item of the stream of call <paramref name="id"/>, if its page is still there.</summary>
