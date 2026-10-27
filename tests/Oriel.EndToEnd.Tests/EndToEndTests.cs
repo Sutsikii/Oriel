@@ -378,6 +378,67 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(404, root.GetProperty("gone").GetInt32());
     }
 
+    [EndToEndFact] // tray icons are in the Windows backend only
+    [System.Runtime.Versioning.SupportedOSPlatform("windows10.0.17763")]
+    public async Task HidesToATrayIconAndComesBack()
+    {
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        File.WriteAllText(Path.Combine(_assets, "index.html"), "<!doctype html><title>Tray</title>");
+        OrielWindow? window = null;
+        var run = Task.Run(() => app.Run(() => window = app.OpenWindow(new WindowOptions { Width = 300, Height = 200 })));
+        try
+        {
+            await WaitFor(() => window?.NativeWindow is not null);
+            var hwnd = ((Oriel.Platform.Windows.WindowsWebWindow)window!.NativeWindow!).Hwnd;
+            var tray = app.AddTrayIcon(new TrayIconOptions { Tooltip = "Oriel E2E" });
+            var asked = 0;
+            window.Closing += (_, e) =>
+            {
+                asked++;
+                e.Cancel = true;
+                window.Hide();
+            };
+            tray.Clicked += (_, _) => window.Show();
+            var platform = (Oriel.Platform.Windows.WindowsPlatform)app.Platform;
+            await WaitFor(() => platform.TrayWindow != 0);
+
+            // The close button: the window hides, and stays open.
+            PostMessageW(hwnd, 0x0010, 0, 0); // WM_CLOSE
+            await WaitFor(() => !IsWindowVisible(hwnd));
+            Assert.Equal(1, asked);
+            Assert.False(window.IsClosed);
+
+            // A click on the icon: the window shows again.
+            PostMessageW(platform.TrayWindow, Oriel.Platform.Windows.WinTrayIcon.WM_APP_TRAY, 0, (1 << 16) | 0x400); // NIN_SELECT of icon 1
+            await WaitFor(() => IsWindowVisible(hwnd));
+            Assert.True(window.IsVisible);
+
+            // Closed by the app, it closes without asking.
+            window.Close();
+            await WaitFor(() => window.IsClosed);
+            Assert.Equal(1, asked);
+            tray.Dispose();
+        }
+        finally
+        {
+            app.Quit();
+            await run.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        static async Task WaitFor(Func<bool> condition)
+        {
+            for (var i = 0; i < 500 && !condition(); i++)
+                await Task.Delay(10);
+            Assert.True(condition());
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PostMessageW(nint hwnd, uint msg, nuint wParam, nint lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(nint hwnd);
+
     [EndToEndFact] // the clipboard is in the Windows backend only
     public async Task CopiesAndPastesThroughTheClipboard()
     {

@@ -113,8 +113,18 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
 
     public void Close()
     {
+        if (_destroyed)
+            return;
+        _closing = true; // the app's choice: the person is not asked
+        Win32.PostMessageW(Hwnd, Win32.WM_CLOSE, 0, 0);
+    }
+
+    private bool _closing;
+
+    public void SetVisible(bool visible)
+    {
         if (!_destroyed)
-            Win32.PostMessageW(Hwnd, Win32.WM_CLOSE, 0, 0);
+            Win32.ShowWindow(Hwnd, !visible ? Win32.SW_HIDE : Win32.IsIconic(Hwnd) ? Win32.SW_RESTORE : Win32.SW_SHOW);
     }
 
     public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => ShellDialogs.Show(Hwnd, request);
@@ -543,7 +553,9 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
                 return true;
 
             case Win32.WM_CLOSE:
-                Win32.DestroyWindow(Hwnd);
+                if (_closing || _events.CloseRequested())
+                    Win32.DestroyWindow(Hwnd);
+                result = 0;
                 return true;
 
             case Win32.WM_DESTROY:

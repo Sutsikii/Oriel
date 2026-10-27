@@ -105,6 +105,20 @@ public sealed class OrielApp : ICoalescingSink
 
     internal IPlatform Platform => _platform;
 
+    /// <summary>
+    /// Shows an icon of the app in the notification area of the taskbar.
+    /// Any thread may call it. With windows hidden to the icon, set
+    /// <see cref="AppOptions.QuitWhenLastWindowCloses"/> as fits: hidden
+    /// windows are still open.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The backend has no tray icons yet: Linux and macOS.</exception>
+    public TrayIcon AddTrayIcon(TrayIconOptions? options = null)
+    {
+        if (!_platform.SupportsTrayIcons)
+            throw new NotSupportedException("Tray icons are in the Windows backend only, for now.");
+        return new TrayIcon(this, options ?? new TrayIconOptions());
+    }
+
     /// <summary>The system's clipboard: text, HTML, images and files.</summary>
     public Clipboard Clipboard => _clipboard ??= new Clipboard(this);
 

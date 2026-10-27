@@ -24,6 +24,13 @@ internal sealed unsafe class WindowsPlatform : IPlatform
     private readonly ConcurrentQueue<Action> _queue = new();
     private readonly List<Action<nint>> _waitingForEnvironment = [];
     private nint _dispatchWindow;
+    private nint _trayWindow;
+    private readonly Dictionary<uint, WinTrayIcon> _trayIcons = [];
+    private uint _lastTrayId;
+    private uint _taskbarCreated;
+
+    /// <summary>The window tray icons send their messages to, once there is one: for tests.</summary>
+    internal nint TrayWindow => _trayWindow;
     private nint _environment;
     private Exception? _environmentError;
     private bool _creatingEnvironment;
@@ -65,6 +72,12 @@ internal sealed unsafe class WindowsPlatform : IPlatform
         {
             foreach (var window in s_windows.Values.ToList())
                 window.Destroy();
+            // Left there, an icon stays until the pointer passes over it.
+            foreach (var icon in _trayIcons.Values.ToList())
+                icon.Remove();
+            if (_trayWindow != 0)
+                Win32.DestroyWindow(_trayWindow);
+            _trayWindow = 0;
             if (_dispatchWindow != 0)
                 Win32.DestroyWindow(_dispatchWindow);
             Com.Release(_environment);
@@ -86,6 +99,45 @@ internal sealed unsafe class WindowsPlatform : IPlatform
     }
 
     public void Quit() => Win32.PostQuitMessage(0);
+
+    public bool SupportsTrayIcons => true;
+
+    public IPlatformTrayIcon AddTrayIcon(TrayIconSpec spec, IPlatformTrayIconEvents events)
+    {
+        if (_trayWindow == 0)
+        {
+            // Top-level and never shown: a message-only window cannot come
+            // to the foreground, which the icon's menu needs.
+            fixed (char* cls = WindowClass)
+                _trayWindow = Win32.CreateWindowExW(0, cls, null, Win32.WS_POPUP, 0, 0, 0, 0, 0, 0, Instance, 0);
+            if (_trayWindow == 0)
+                throw new COMException("Creating the window of tray icons failed", Marshal.GetHRForLastWin32Error());
+            fixed (char* name = "TaskbarCreated")
+                _taskbarCreated = Win32.RegisterWindowMessageW(name);
+        }
+        var id = ++_lastTrayId;
+        var icon = new WinTrayIcon(_trayWindow, Instance, id, spec, events, removed => _trayIcons.Remove(removed));
+        _trayIcons[id] = icon;
+        return icon;
+    }
+
+    /// <summary>A message of the window of tray icons: from an icon, or Explorer restarting, which forgot them.</summary>
+    private bool HandleTrayMessage(uint msg, nint lParam)
+    {
+        if (msg == WinTrayIcon.WM_APP_TRAY)
+        {
+            if (_trayIcons.TryGetValue((uint)((lParam >> 16) & 0xFFFF), out var icon))
+                icon.Handle((uint)(lParam & 0xFFFF));
+            return true;
+        }
+        if (msg == _taskbarCreated && _taskbarCreated != 0)
+        {
+            foreach (var each in _trayIcons.Values)
+                each.Add();
+            return true;
+        }
+        return false;
+    }
 
     public string? GetClipboardText() => WinClipboard.GetText(_dispatchWindow);
 
@@ -242,6 +294,8 @@ internal sealed unsafe class WindowsPlatform : IPlatform
                 platform.Drain();
                 return 0;
             }
+            if (platform is not null && hwnd == platform._trayWindow && hwnd != 0 && platform.HandleTrayMessage(msg, lParam))
+                return 0;
             if (s_windows.TryGetValue(hwnd, out var window) && window.HandleMessage(msg, wParam, lParam, out var result))
                 return result;
         }

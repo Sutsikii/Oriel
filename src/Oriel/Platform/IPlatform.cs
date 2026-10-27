@@ -49,6 +49,15 @@ internal interface IPlatform
     /// <summary>Empties the clipboard, then puts each format of <paramref name="content"/> there.</summary>
     void SetClipboard(ClipboardContent content) => throw ClipboardNotYet();
 
+    // ---- Tray icons, UI thread only (see TrayIcon) ----
+
+    /// <summary>Whether <see cref="AddTrayIcon"/> works. Any thread.</summary>
+    bool SupportsTrayIcons => false;
+
+    /// <summary>Shows an icon in the notification area.</summary>
+    IPlatformTrayIcon AddTrayIcon(TrayIconSpec spec, IPlatformTrayIconEvents events) =>
+        throw new NotSupportedException("Tray icons are in the Windows backend only, for now.");
+
     private static NotSupportedException ClipboardNotYet() =>
         new("The clipboard is in the Windows backend only, for now.");
 }
@@ -58,6 +67,9 @@ internal interface IPlatformWindow
 {
     /// <summary>Delivers a message to the page; dropped when there is no page yet.</summary>
     void PostMessage(string message);
+
+    /// <summary>Shows the window, or hides it, from the screen and the taskbar; hidden, it stays open.</summary>
+    void SetVisible(bool visible);
 
     /// <summary>
     /// Delivers a message to the page with <paramref name="bytes"/>, in a
@@ -199,6 +211,12 @@ internal interface IPlatformWindowEvents
     /// <summary>The window is gone.</summary>
     void Closed();
 
+    /// <summary>
+    /// The person asked to close the window, with its close button or
+    /// Alt+F4: returns whether it closes. Not asked for <see cref="IPlatformWindow.Close"/>.
+    /// </summary>
+    bool CloseRequested() => true;
+
     /// <summary>Something failed after the window opened, such as creating its webview.</summary>
     void Failed(Exception error);
 
@@ -281,4 +299,28 @@ internal sealed record PlatformWindowOptions(
 
     /// <summary>The app's shared streams, which the window serves (see <see cref="StreamServer.TryGetId"/>).</summary>
     public StreamServer? Streams { get; init; }
+}
+
+/// <summary>What a tray icon shows: <see cref="TrayIconOptions"/>, but the menu, which Oriel keeps.</summary>
+internal sealed record TrayIconSpec(string? Tooltip, string? IconPath);
+
+/// <summary>A tray icon of a backend. Every member is called on the UI thread.</summary>
+internal interface IPlatformTrayIcon
+{
+    void SetTooltip(string? tooltip);
+
+    /// <summary>Shows <paramref name="menu"/> at the pointer, until the person picks an item or none.</summary>
+    MenuItem? ShowMenu(Menu menu);
+
+    void Remove();
+}
+
+/// <summary>What a tray icon tells Oriel, on the UI thread.</summary>
+internal interface IPlatformTrayIconEvents
+{
+    /// <summary>A click, or the keyboard's choice, of the icon.</summary>
+    void Clicked();
+
+    /// <summary>A right click, or the menu key: the time to show the menu.</summary>
+    void MenuRequested();
 }

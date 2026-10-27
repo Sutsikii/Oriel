@@ -100,6 +100,12 @@ internal static unsafe partial class Gtk
     public static partial void gtk_widget_show_all(nint widget);
 
     [LibraryImport(Gtk3)]
+    public static partial void gtk_widget_show(nint widget);
+
+    [LibraryImport(Gtk3)]
+    public static partial void gtk_widget_hide(nint widget);
+
+    [LibraryImport(Gtk3)]
     public static partial void gtk_widget_destroy(nint widget);
 
     [LibraryImport(Gtk3)]

@@ -13,6 +13,9 @@ public sealed class OrielWindow : IPlatformWindowEvents
     private readonly OrielApp _app;
     private readonly bool _titleFollowsPage;
     private IPlatformWindow? _native;
+
+    /// <summary>The backend's window, once open and until closed: for tests. UI thread.</summary>
+    internal IPlatformWindow? NativeWindow => _native;
     private volatile string _title;
     private volatile bool _closed;
     private volatile Menu? _menu;
@@ -79,6 +82,40 @@ public sealed class OrielWindow : IPlatformWindowEvents
 
     /// <summary>Raised on the UI thread once the window is closed.</summary>
     public event EventHandler? Closed;
+
+    /// <summary>
+    /// Raised on the UI thread when the person asks to close the window,
+    /// with its close button or Alt+F4. Set <see cref="WindowClosingEventArgs.Cancel"/>
+    /// to keep it open, such as to hide it to a tray icon instead. Not
+    /// raised for <see cref="Close"/>, which always closes.
+    /// </summary>
+    public event EventHandler<WindowClosingEventArgs>? Closing;
+
+    /// <summary>Whether the window is shown, rather than hidden by <see cref="Hide"/>.</summary>
+    public bool IsVisible => Volatile.Read(ref _visible);
+
+    private bool _visible = true;
+
+    /// <summary>
+    /// Hides the window from the screen and the taskbar. It stays open, its
+    /// page with it, until <see cref="Show"/>. Any thread may call it.
+    /// </summary>
+    public void Hide()
+    {
+        Volatile.Write(ref _visible, false);
+        Native(native => native.SetVisible(false));
+    }
+
+    /// <summary>Shows the window again, in front, with the focus. Any thread may call it.</summary>
+    public void Show()
+    {
+        Volatile.Write(ref _visible, true);
+        Native(native =>
+        {
+            native.SetVisible(true);
+            native.Focus();
+        });
+    }
 
     /// <summary>
     /// Raised on the UI thread when a process of the webview fails. Oriel
@@ -417,6 +454,21 @@ public sealed class OrielWindow : IPlatformWindowEvents
             pdf.TrySetResult(false);
         _app.WindowClosed(this);
         Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    bool IPlatformWindowEvents.CloseRequested()
+    {
+        var args = new WindowClosingEventArgs();
+        try
+        {
+            Closing?.Invoke(this, args);
+        }
+        catch (Exception e)
+        {
+            _app.ReportError(e); // and the window closes, as asked
+            return true;
+        }
+        return !args.Cancel;
     }
 
     void IPlatformWindowEvents.Failed(Exception error) => _app.ReportError(error);

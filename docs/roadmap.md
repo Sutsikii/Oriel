@@ -11,6 +11,8 @@ self-contained piece of work.
   ids, and names to find them by. Coalesced events for
   high-frequency updates, once per frame at most.
 - The clipboard: text, HTML, images and files (Windows).
+- Tray icons with a menu (Windows); windows that hide, and ask before
+  the person closes them.
 - Binary results: `ReadOnlyMemory<T>` as typed arrays, through buffers
   shared with the page on Windows.
 - Files and large data by URL (`OrielApp.Share`), read as pages take

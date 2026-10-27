@@ -52,6 +52,7 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
     private static nint HandlerClass() => s_class != 0 ? s_class : s_class = DefineClass("OrielWebWindow",
         ["NSWindowDelegate", "WKNavigationDelegate", "WKUIDelegate", "WKScriptMessageHandler", "WKURLSchemeHandler"],
         ("windowWillClose:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnWillClose, "v@:@"),
+        ("windowShouldClose:", (nint)(delegate* unmanaged<nint, nint, nint, byte>)&OnShouldClose, "c@:@"),
         ("windowDidMove:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMoved, "v@:@"),
         ("windowDidResize:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnMoved, "v@:@"),
         ("windowDidMiniaturize:", (nint)(delegate* unmanaged<nint, nint, nint, void>)&OnStateChanged, "v@:@"),
@@ -456,7 +457,22 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
     public void Close()
     {
         if (!_destroyed)
-            Send(_window, Sel("close"));
+            Send(_window, Sel("close")); // asks no windowShouldClose:, as the app chose
+    }
+
+    public void SetVisible(bool visible)
+    {
+        if (!_destroyed)
+            Send(_window, Sel(visible ? "makeKeyAndOrderFront:" : "orderOut:"), (nint)0);
+    }
+
+    /// <summary>The close button: whether the window closes.</summary>
+    [UnmanagedCallersOnly]
+    private static byte OnShouldClose(nint self, nint sel, nint window)
+    {
+        var close = true;
+        Guard(self, w => close = w._events.CloseRequested());
+        return close ? (byte)1 : (byte)0;
     }
 
     public void Reload()
