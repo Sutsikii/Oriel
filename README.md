@@ -105,8 +105,8 @@ The Linux and macOS backends have the core, and not yet dialogs, menus or
 printing. The macOS one is tested in CI only, since the maintainers have no
 Mac yet: if you have one, your help is welcome. The calls, events, generator, Windows
 backend, window control, dialogs, menus, installers, tray icons,
-notifications, single instance and the `oriel` command are done and tested;
-signing and updates are next. See the [roadmap](docs/roadmap.md).
+notifications, single instance, signing and the `oriel` command are done
+and tested; updates are next. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 

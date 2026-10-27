@@ -60,6 +60,13 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
     /// <summary>The extensions of files the app opens, separated by semicolons: <c>.note;.notes</c>.</summary>
     public string? FileTypes { get; set; }
 
+    /// <summary>The command that signs a file, its <c>{file}</c> the file: OrielSignCommand. Empty for none.</summary>
+    public string? SignCommand { get; set; }
+
+    /// <summary>The compiler's argument that defines the sign tool of <see cref="SignCommand"/>, or empty.</summary>
+    [Output]
+    public string SignToolArgument { get; private set; } = "";
+
     /// <summary>Where the script is written.</summary>
     [Required]
     public string ScriptPath { get; set; } = "";
@@ -106,6 +113,13 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
             Log.LogError($"Oriel: OrielFileTypes '{type}' is not an extension, such as .note.");
             return false;
         }
+        var signed = !string.IsNullOrWhiteSpace(SignCommand);
+        if (signed && !SignCommand!.Contains("{file}"))
+        {
+            Log.LogError("Oriel: OrielSignCommand has no {file}, where the file to sign goes, such as: signtool sign /fd SHA256 /f cert.pfx {file}.");
+            return false;
+        }
+        SignToolArgument = signed ? InnoSetupScript.SignToolArgument(SignCommand!) : "";
         var settings = new InstallerSettings(
             AppName,
             AppVersion,
@@ -117,7 +131,8 @@ public sealed class WriteInnoSetupScript : Microsoft.Build.Utilities.Task
             string.IsNullOrEmpty(Icon) ? null : Path.GetFullPath(Icon),
             languages.Count == 0 ? new[] { "english" } : languages,
             schemes,
-            types);
+            types,
+            signed);
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(ScriptPath))!);
         File.WriteAllText(ScriptPath, InnoSetupScript.Create(settings));

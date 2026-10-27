@@ -27,6 +27,23 @@ public class InnoSetupScriptTests
     }
 
     [Fact]
+    public void SignsTheInstallerAndUninstallerWhenSigned()
+    {
+        var script = InnoSetupScript.Create(Settings() with { Signed = true });
+        Assert.Contains("SignTool=oriel\n", script);
+        Assert.Contains("SignedUninstaller=yes\n", script);
+        Assert.DoesNotContain("SignTool", InnoSetupScript.Create(Settings()));
+    }
+
+    [Fact]
+    public void GivesTheSignCommandToInnoSetupInItsTerms()
+    {
+        Assert.Equal(
+            "/Soriel=$qC:\\Kits\\signtool.exe$q sign /fd SHA256 /f $qC:\\my $$ cert.pfx$q $f",
+            InnoSetupScript.SignToolArgument("\"C:\\Kits\\signtool.exe\" sign /fd SHA256 /f \"C:\\my $ cert.pfx\" {file}"));
+    }
+
+    [Fact]
     public void RegistersNothingWithoutSchemesOrFileTypes()
     {
         var script = InnoSetupScript.Create(Settings());

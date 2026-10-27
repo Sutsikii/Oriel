@@ -29,10 +29,20 @@
     runs in a process of its own, so that rebuilding it is never blocked by
     a build that loaded it.
   -->
+  <!--
+    When the app is published. With NativeAOT, CopyNativeBinary copies the
+    executable to the publish folder after Publish: signing it, or packing
+    it into the installer, before that would take the file it replaces.
+  -->
+  <PropertyGroup>
+    <_OrielPublished Condition="'$(PublishAot)' == 'true'">CopyNativeBinary</_OrielPublished>
+    <_OrielPublished Condition="'$(_OrielPublished)' == ''">Publish</_OrielPublished>
+  </PropertyGroup>
+
   <UsingTask TaskName="Oriel.Build.WriteInnoSetupScript" AssemblyFile="$(OrielBuildTasksAssembly)" TaskFactory="TaskHostFactory" />
 
   <Target Name="OrielBuildInstaller"
-          AfterTargets="Publish"
+          AfterTargets="$(_OrielPublished)"
           Condition="'$(OrielInstaller)' == 'true'">
     <PropertyGroup>
       <_OrielAppName>$(OrielAppName)</_OrielAppName>
@@ -69,9 +79,32 @@
                           Languages="$(OrielInstallerLanguages)"
                           UrlSchemes="$(OrielUrlSchemes)"
                           FileTypes="$(OrielFileTypes)"
-                          ScriptPath="$(_OrielInstallerScript)" />
-    <Exec Command="&quot;$(_OrielIscc)&quot; /Q &quot;$(_OrielInstallerScript)&quot;" />
+                          SignCommand="$(OrielSignCommand)"
+                          ScriptPath="$(_OrielInstallerScript)">
+      <Output TaskParameter="SignToolArgument" PropertyName="_OrielSignTool" />
+    </WriteInnoSetupScript>
+    <Exec Command="&quot;$(_OrielIscc)&quot; /Q &quot;$(_OrielSignTool)&quot; &quot;$(_OrielInstallerScript)&quot;" Condition="'$(_OrielSignTool)' != ''" />
+    <Exec Command="&quot;$(_OrielIscc)&quot; /Q &quot;$(_OrielInstallerScript)&quot;" Condition="'$(_OrielSignTool)' == ''" />
     <Message Importance="high" Text="Oriel: installer of $(_OrielAppName) $(_OrielAppVersion) in $(_OrielInstallerOutput)" />
+  </Target>
+
+  <!--
+    Signs the published executable with OrielSignCommand, before the
+    installer takes it: signtool, Azure Trusted Signing, or any command,
+    its {file} replaced by the executable's quoted path.
+  -->
+  <Target Name="OrielSignExecutable"
+          AfterTargets="$(_OrielPublished)"
+          BeforeTargets="OrielBuildInstaller"
+          Condition="'$(OrielSignCommand)' != ''">
+    <PropertyGroup>
+      <_OrielSignedFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/$(PublishDir)$(AssemblyName).exe'))</_OrielSignedFile>
+      <_OrielSignedFile Condition="!Exists('$(_OrielSignedFile)')">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/$(PublishDir)$(AssemblyName)'))</_OrielSignedFile>
+    </PropertyGroup>
+    <Error Condition="!$(OrielSignCommand.Contains('{file}'))"
+           Text="Oriel: OrielSignCommand has no {file}, where the file to sign goes, such as: signtool sign /fd SHA256 /f cert.pfx {file}." />
+    <Exec Command="$(OrielSignCommand.Replace('{file}', '&quot;$(_OrielSignedFile)&quot;'))" />
+    <Message Importance="high" Text="Oriel: signed $(_OrielSignedFile)" />
   </Target>
 
   <!-- Builds the frontend in Release builds, when a command is set. -->
