@@ -26,6 +26,16 @@ public sealed class Event<T>
     private volatile Binding? _binding;
 
     /// <summary>
+    /// Whether pages get only the latest payload. An event emitted faster
+    /// than a page takes it, such as a position at 60 to 120 Hz, would
+    /// otherwise queue messages behind a busy or hidden page. Coalesced, each
+    /// page has at most one payload of the event on its way and one waiting,
+    /// which the next emit replaces; the page takes them once per frame at
+    /// most. Leave it off for events where every payload counts.
+    /// </summary>
+    public bool Coalesce { get; init; }
+
+    /// <summary>
     /// Sends <paramref name="payload"/> to every page of the app. Any thread may
     /// call it; before the service is bound, it does nothing.
     /// </summary>
@@ -34,7 +44,10 @@ public sealed class Event<T>
         var binding = _binding;
         if (binding is null)
             return;
-        binding.Sink.Broadcast(Protocol.EventMessage(binding.Name, w => binding.Write(w, payload)));
+        if (Coalesce && binding.Sink is ICoalescingSink coalescing)
+            coalescing.BroadcastLatest(binding.Name, Message(binding, payload));
+        else
+            binding.Sink.Broadcast(Message(binding, payload));
     }
 
     /// <summary>
@@ -51,7 +64,10 @@ public sealed class Event<T>
             return;
         if (!ReferenceEquals(window.App, binding.Sink))
             throw new ArgumentException($"The window is of another app than the one {binding.Name} is bound to.", nameof(window));
-        window.Connection.Send(Protocol.EventMessage(binding.Name, w => binding.Write(w, payload)));
+        if (Coalesce)
+            window.Connection.SendLatest(binding.Name, Message(binding, payload));
+        else
+            window.Connection.Send(Message(binding, payload));
     }
 
     /// <summary>Connects the event to the app that bound its service. Generated code calls it.</summary>
@@ -67,6 +83,9 @@ public sealed class Event<T>
         if (Interlocked.CompareExchange(ref _binding, new Binding(name, write, sink), null) is not null)
             throw new InvalidOperationException($"The event {name} is already bound; a service instance can be bound once.");
     }
+
+    private string Message(Binding binding, T payload) =>
+        Protocol.EventMessage(binding.Name, w => binding.Write(w, payload), Coalesce);
 
     private sealed record Binding(string Name, Action<Utf8JsonWriter, T> Write, IEventSink Sink);
 }

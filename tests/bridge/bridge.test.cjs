@@ -139,6 +139,34 @@ test("a throwing listener does not keep the others from an event", () => {
   assert.throws(rethrow, /listener bug/);
 });
 
+test("acknowledges coalesced events once per frame, all at once", () => {
+  const sent = [];
+  const frames = [];
+  const { runtime, receive, token } = createRuntime((m) => sent.push(JSON.parse(m)), null, (f) => frames.push(f));
+  const got = [];
+  runtime.on("Pointer.Moved", (v) => got.push(v));
+  receive({ t: "event", n: "Pointer.Moved", v: 1, c: 1 });
+  receive({ t: "event", n: "Clock.Tick", v: 2 }); // not coalesced: no acknowledgement
+  receive({ t: "event", n: "Pointer.Moved", v: 3, c: 1 });
+  receive({ t: "event", n: "Zoom.Changed", v: 4, c: 1 }); // acknowledged though no one listens
+  assert.deepEqual(got, [1, 3]);
+  assert.equal(frames.length, 1);
+  assert.equal(sent.length, 1); // the hello
+
+  frames.shift()();
+  assert.deepEqual(sent.slice(1), [{ t: "ack", k: token, n: ["Pointer.Moved", "Zoom.Changed"] }]);
+
+  receive({ t: "event", n: "Pointer.Moved", v: 5, c: 1 });
+  assert.equal(frames.length, 1); // the next frame's
+});
+
+test("ignores coalesced events without a name", () => {
+  const frames = [];
+  const { receive } = createRuntime(() => {}, null, (f) => frames.push(f));
+  receive({ t: "event", n: 7, v: 1, c: 1 });
+  assert.equal(frames.length, 0);
+});
+
 test("the runtime cannot be changed by pages", () => {
   const { runtime } = setup();
   assert.ok(Object.isFrozen(runtime));

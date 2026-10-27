@@ -28,6 +28,12 @@ internal sealed class PageConnection : IDisposable
     private bool _disposed;
     private int _callsInFlight;
 
+    /// <summary>
+    /// The coalesced events of the current page, by name: whether a payload
+    /// is on its way, not acknowledged yet, and the one waiting behind it.
+    /// </summary>
+    private readonly Dictionary<string, Coalesced> _coalesced = new(StringComparer.Ordinal);
+
     /// <param name="services">The services pages may call.</param>
     /// <param name="post">
     /// Delivers a message to the page. It is called from any thread, and must
@@ -163,6 +169,17 @@ internal sealed class PageConnection : IDisposable
             FilesDropped?.Invoke(new FilesDroppedEventArgs(files, x.GetDouble(), y.GetDouble()));
         }
 
+        if (type == Protocol.Ack
+            && root.TryGetProperty("n", out var names) && names.ValueKind == JsonValueKind.Array
+            && !cancellation.IsCancellationRequested)
+        {
+            foreach (var name in names.EnumerateArray())
+            {
+                if (TryGetString(name, out var acked))
+                    Acknowledge(token, acked);
+            }
+        }
+
         doc.Dispose(); // a hello, or a message of a later protocol
         return Task.CompletedTask;
     }
@@ -176,6 +193,30 @@ internal sealed class PageConnection : IDisposable
                 return;
         }
         _post(message);
+    }
+
+    /// <summary>
+    /// Sends <paramref name="message"/>, of the coalesced event
+    /// <paramref name="name"/>, to the current page: now if the page took
+    /// the event's previous payload, else once it does, in place of any
+    /// message of the event still waiting.
+    /// </summary>
+    public void SendLatest(string name, string message)
+    {
+        lock (_lock)
+        {
+            if (_disposed || _token is null)
+                return;
+            if (_coalesced.TryGetValue(name, out var slot))
+            {
+                slot.Waiting = message;
+                return;
+            }
+            _coalesced.Add(name, new Coalesced());
+            // Posted under the lock, so that an acknowledgement on another
+            // thread cannot send a later payload before this one.
+            _post(message);
+        }
     }
 
     /// <summary>The page is gone for good: its window closed.</summary>
@@ -210,6 +251,7 @@ internal sealed class PageConnection : IDisposable
                     _page = new CancellationTokenSource();
                 }
                 _token = token;
+                _coalesced.Clear(); // what waited was for the page before
             }
             current = _page.Token;
         }
@@ -219,6 +261,26 @@ internal sealed class PageConnection : IDisposable
             previous.Dispose();
         }
         return current;
+    }
+
+    /// <summary>
+    /// The page of <paramref name="token"/> took the coalesced event
+    /// <paramref name="name"/>: sends the payload waiting, if any.
+    /// </summary>
+    private void Acknowledge(string token, string name)
+    {
+        lock (_lock)
+        {
+            if (_disposed || _token != token || !_coalesced.TryGetValue(name, out var slot))
+                return;
+            if (slot.Waiting is not { } waiting)
+            {
+                _coalesced.Remove(name);
+                return;
+            }
+            slot.Waiting = null;
+            _post(waiting);
+        }
     }
 
     /// <summary>The service <paramref name="method"/> belongs to, or null and why.</summary>
@@ -368,8 +430,21 @@ internal sealed class PageConnection : IDisposable
         value = "";
         try
         {
-            if (!obj.TryGetProperty(name, out var e) || e.ValueKind != JsonValueKind.String)
-                return false;
+            return obj.TryGetProperty(name, out var e) && TryGetString(e, out value);
+        }
+        catch (InvalidOperationException)
+        {
+            return false; // an escaped lone surrogate
+        }
+    }
+
+    private static bool TryGetString(JsonElement e, out string value)
+    {
+        value = "";
+        if (e.ValueKind != JsonValueKind.String)
+            return false;
+        try
+        {
             value = e.GetString()!;
             return true;
         }
@@ -377,5 +452,12 @@ internal sealed class PageConnection : IDisposable
         {
             return false; // an escaped lone surrogate
         }
+    }
+
+    /// <summary>A coalesced event with a payload on its way to the page.</summary>
+    private sealed class Coalesced
+    {
+        /// <summary>The message to send once the page takes the one on its way.</summary>
+        public string? Waiting { get; set; }
     }
 }
