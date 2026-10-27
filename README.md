@@ -111,6 +111,8 @@ tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/
   the page gets first.
 - [Printing](docs/printing.md): print dialogs, and pages to PDF files.
 - [The clipboard](docs/clipboard.md): text, HTML, images and files.
+- [Plugins](docs/plugins.md): SQLite and secure storage, and writing a
+  plugin of your own.
 - [Notifications](docs/notifications.md): toasts with buttons; tray icons
   are in [Windows](docs/windows.md#tray-icons).
 - [Building and shipping](docs/build.md): build properties, development

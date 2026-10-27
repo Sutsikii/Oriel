@@ -6,6 +6,10 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Plugins.** `Oriel.Sqlite` (a SQLite database pages query) and
+  `Oriel.SecureStorage` (secrets encrypted with DPAPI, Windows), with their
+  TypeScript clients; docs/plugins.md says how to write one.
+
 - **Templates and the `oriel` command.** `dotnet new oriel --framework
   react` (or `vue`, `svelte`, `vanilla`). The new `Oriel.Cli` tool gives
   `oriel doctor`, which checks what building and shipping apps needs, and

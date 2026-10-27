@@ -9,11 +9,16 @@
     <Project Path="src/Oriel.Hosting/Oriel.Hosting.csproj" />
     <Project Path="src/Oriel/Oriel.csproj" />
   </Folder>
+  <Folder Name="/src/plugins/">
+    <Project Path="src/plugins/Oriel.SecureStorage/Oriel.SecureStorage.csproj" />
+    <Project Path="src/plugins/Oriel.Sqlite/Oriel.Sqlite.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Oriel.Build.Tests/Oriel.Build.Tests.csproj" />
     <Project Path="tests/Oriel.Cli.Tests/Oriel.Cli.Tests.csproj" />
     <Project Path="tests/Oriel.EndToEnd.Tests/Oriel.EndToEnd.Tests.csproj" />
     <Project Path="tests/Oriel.Generators.Tests/Oriel.Generators.Tests.csproj" />
+    <Project Path="tests/Oriel.Plugins.Tests/Oriel.Plugins.Tests.csproj" />
     <Project Path="tests/Oriel.Stress.Tests/Oriel.Stress.Tests.csproj" />
     <Project Path="tests/Oriel.Tests/Oriel.Tests.csproj" />
   </Folder>

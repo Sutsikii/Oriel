@@ -14,6 +14,8 @@ self-contained piece of work.
 - Templates for vanilla TypeScript, React, Vue and Svelte frontends
   (`dotnet new oriel --framework`), and the `oriel` command: `oriel doctor`
   and `oriel dev`.
+- Plugins: `Oriel.Sqlite` and `Oriel.SecureStorage` (Windows), and how to
+  write one.
 - Notifications with buttons (Windows).
 - One instance per user, with the arguments of later launches; links of
   the app's schemes and its files, registered by the installer.
