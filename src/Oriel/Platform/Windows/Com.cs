@@ -75,7 +75,10 @@ internal static unsafe class ComCallback
         public int References;
         public Guid Iid;
         public nint Handle;
+        public int Agile;
     }
+
+    private static readonly Guid IID_IAgileObject = new("94EA2B94-E9CC-49E0-C0FF-EE64CA8F5B90");
 
     // One vtable per signature of Invoke, shared by every object of it.
     private static readonly void** s_resultVtable = CreateVtable(
@@ -104,6 +107,18 @@ internal static unsafe class ComCallback
     /// <summary>An event handler, <c>Invoke(sender, args)</c>, both borrowed for the call only.</summary>
     public static nint ForEvent(in Guid iid, Action<nint, nint> invoke) => Create(s_eventVtable, iid, invoke);
 
+    /// <summary>
+    /// An event handler that says it is agile (IAgileObject): WinRT then
+    /// calls it on any thread, rather than marshal it, which a handler made
+    /// here cannot be. <paramref name="invoke"/> must be safe on any thread.
+    /// </summary>
+    public static nint ForAgileEvent(in Guid iid, Action<nint, nint> invoke)
+    {
+        var obj = (Object*)Create(s_eventVtable, iid, invoke);
+        obj->Agile = 1;
+        return (nint)obj;
+    }
+
     private static nint Create(void** vtable, in Guid iid, Delegate invoke)
     {
         var obj = (Object*)NativeMemory.Alloc((nuint)sizeof(Object));
@@ -111,6 +126,7 @@ internal static unsafe class ComCallback
         obj->References = 1;
         obj->Iid = iid;
         obj->Handle = GCHandle.ToIntPtr(GCHandle.Alloc(invoke));
+        obj->Agile = 0;
         Interlocked.Increment(ref s_live);
         return (nint)obj;
     }
@@ -130,7 +146,7 @@ internal static unsafe class ComCallback
     {
         if (result is null)
             return Com.E_POINTER;
-        if (*iid == Com.IID_IUnknown || *iid == self->Iid)
+        if (*iid == Com.IID_IUnknown || *iid == self->Iid || (self->Agile != 0 && *iid == IID_IAgileObject))
         {
             Interlocked.Increment(ref self->References);
             *result = self;

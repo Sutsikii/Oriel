@@ -378,6 +378,39 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(404, root.GetProperty("gone").GetInt32());
     }
 
+    [EndToEndFact] // notifications are in the Windows backend only
+    [System.Runtime.Versioning.SupportedOSPlatform("windows10.0.17763")]
+    public async Task ShowsNotifications()
+    {
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = Task.Run(() => app.Run(started.SetResult));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var shown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            app.ShowNotification(new Notification
+            {
+                Title = "Oriel E2E <test> & co",
+                Body = "A notification of the end-to-end tests.",
+                Actions = [new NotificationAction("ok", "OK")],
+            });
+            app.Dispatch(shown.SetResult); // after the notification, on the UI thread
+            await shown.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Empty(errors);
+            // In the notification center, unless notifications are off (some CI machines).
+            Console.WriteLine($"toasts in history: {Oriel.Platform.Windows.WinToast.HistoryCount(app.NotificationId)}");
+        }
+        finally
+        {
+            app.Quit();
+            await run.WaitAsync(TimeSpan.FromSeconds(10));
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\AppUserModelId\" + app.NotificationId, throwOnMissingSubKey: false);
+        }
+    }
+
     [EndToEndFact] // tray icons are in the Windows backend only
     [System.Runtime.Versioning.SupportedOSPlatform("windows10.0.17763")]
     public async Task HidesToATrayIconAndComesBack()
