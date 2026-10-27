@@ -123,7 +123,7 @@ internal sealed unsafe class LinuxPlatform : IPlatform
     /// <summary>The windows that are open, which report what fails outside any of them.</summary>
     internal static readonly List<LinuxWebWindow> Windows = [];
 
-    private static void Report(Exception e)
+    internal static void Report(Exception e)
     {
         Tracing.Write($"a posted action failed: {e}");
         if (Windows.Count > 0)
