@@ -62,7 +62,14 @@ internal static class MacDialogs
         var paths = new List<string>();
         if (save)
         {
-            if (Text(Send(Send(panel, Sel("URL")), Sel("path"))) is { } path)
+            var url = Send(panel, Sel("URL"));
+            // Without a URL, as when the session ends from code: the folder shown and the name typed.
+            var path = url != 0
+                ? Text(Send(url, Sel("path")))
+                : Text(Send(Send(panel, Sel("directoryURL")), Sel("path"))) is { } folder && Text(Send(panel, Sel("nameFieldStringValue"))) is { Length: > 0 } typed
+                    ? Path.Combine(folder, typed)
+                    : null;
+            if (path is not null)
                 paths.Add(path);
         }
         else
@@ -121,12 +128,16 @@ internal static class MacDialogs
         }
     }
 
-    /// <summary>Answers the panel running with OK, or Cancel, as a person would: for tests. Main thread.</summary>
+    /// <summary>
+    /// Ends the panel running with OK, or Cancel: for tests. Main thread.
+    /// Panels of recent macOS run in another process, which takes no
+    /// clicks of this one: the modal session ends as AppKit ends it.
+    /// </summary>
     internal static bool AnswerPanel(bool ok)
     {
         if (s_panel == 0)
             return false;
-        Send(s_panel, Sel(ok ? "ok:" : "cancel:"), (nint)0);
+        Send(Send(Class("NSApplication"), Sel("sharedApplication")), Sel("stopModalWithCode:"), ok ? NSModalResponseOK : 0);
         return true;
     }
 
