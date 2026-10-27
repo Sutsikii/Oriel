@@ -1,0 +1,88 @@
+:root {
+  font-family: system-ui, "Segoe UI", sans-serif;
+  color-scheme: light dark;
+  --line: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+#rate {
+  opacity: 0.7;
+}
+
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+h2 {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 span {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+ol {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 0.8rem ui-monospace, "Cascadia Mono", monospace;
+}
+
+li.warning {
+  color: #d97706;
+}
+
+li.error {
+  color: #dc2626;
+}
+
+button {
+  font: inherit;
+  font-size: 0.85rem;
+}

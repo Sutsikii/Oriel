@@ -14,6 +14,8 @@ self-contained piece of work.
 - Templates for vanilla TypeScript, React, Vue and Svelte frontends
   (`dotnet new oriel --framework`), and the `oriel` command: `oriel doctor`
   and `oriel dev`.
+- Examples of what Oriel is for: a back office, a 3D viewer and a
+  real-time dashboard, published in CI.
 - Plugins: `Oriel.Sqlite` and `Oriel.SecureStorage` (Windows), and how to
   write one.
 - Notifications with buttons (Windows).

@@ -1,0 +1,14 @@
+{
+  "name": "oriel-back-office-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.mjs",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "~7.3.7"
+  }
+}

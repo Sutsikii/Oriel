@@ -136,6 +136,41 @@ jobs:
           name: hello-installer
           path: examples/hello/bin/installer
 
+  examples:
+    name: Publish the ${{ matrix.example }} example
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [back-office, viewer-3d, dashboard]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the frontend's packages
+        working-directory: examples/${{ matrix.example }}/frontend
+        run: npm ci
+
+      # The build type-checks the page against the client it writes, and
+      # bundles it beside a native executable.
+      - name: Publish with NativeAOT
+        run: dotnet publish examples/${{ matrix.example }} -c Release -r win-x64 -o artifacts/${{ matrix.example }}
+
+      - name: Check the client in the repository is up to date
+        run: git diff --exit-code examples/${{ matrix.example }}/frontend/src
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: example-${{ matrix.example }}
+          path: artifacts/${{ matrix.example }}
+
   template:
     name: Create an app with dotnet new (${{ matrix.framework }})
     runs-on: windows-latest

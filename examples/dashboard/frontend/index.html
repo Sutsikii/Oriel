@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Dashboard</title>
+  </head>
+  <body>
+    <header>
+      <h1>Live</h1>
+      <span id="rate" role="status"></span>
+    </header>
+    <main>
+      <section class="tile"><h2>Signal <span id="signal-value"></span></h2><canvas id="signal"></canvas></section>
+      <section class="tile"><h2>CPU <span id="cpu-value"></span></h2><canvas id="cpu"></canvas></section>
+      <section class="tile"><h2>Memory <span id="memory-value"></span></h2><canvas id="memory"></canvas></section>
+      <section class="tile log">
+        <h2>Log <button id="pause" type="button">Pause</button></h2>
+        <ol id="log"></ol>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

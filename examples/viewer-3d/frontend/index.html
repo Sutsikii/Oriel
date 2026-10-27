@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>3D viewer</title>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <aside>
+      <label>Detail <input id="detail" type="range" min="64" max="4096" step="64" value="512" /></label>
+      <button id="open" type="button">Open a .glb…</button>
+      <output id="stats" role="status"></output>
+    </aside>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

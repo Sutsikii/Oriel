@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Back office</title>
+  </head>
+  <body>
+    <header>
+      <h1>Customers</h1>
+      <input id="search" type="search" placeholder="Search names and emails" autocomplete="off" />
+      <span id="count" role="status"></span>
+      <button id="add" type="button">New customer</button>
+    </header>
+    <div id="grid" role="grid" aria-label="Customers">
+      <div class="row head" role="row">
+        <button data-sort="id">#</button>
+        <button data-sort="name">Name</button>
+        <button data-sort="email">Email</button>
+        <button data-sort="tier">Tier</button>
+        <button data-sort="balance" class="number">Balance</button>
+        <button data-sort="joined">Joined</button>
+      </div>
+      <div id="viewport"><div id="rows"></div></div>
+    </div>
+    <dialog id="editor">
+      <form method="dialog" id="form" novalidate>
+        <h2 id="editor-title">Customer</h2>
+        <label>Name <input name="name" /><small data-error="name"></small></label>
+        <label>Email <input name="email" type="email" /><small data-error="email"></small></label>
+        <label>Tier
+          <select name="tier">
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </label>
+        <label>Balance <input name="balance" type="number" step="0.01" /><small data-error="balance"></small></label>
+        <p class="error" id="form-error"></p>
+        <menu>
+          <button type="button" id="delete" class="danger">Delete</button>
+          <button type="button" id="cancel">Cancel</button>
+          <button type="submit" id="save">Save</button>
+        </menu>
+      </form>
+    </dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
