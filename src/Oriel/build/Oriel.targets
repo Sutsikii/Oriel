@@ -67,6 +67,8 @@
                           OutputDirectory="$(_OrielInstallerOutput)"
                           Icon="$(_OrielInstallerIcon)"
                           Languages="$(OrielInstallerLanguages)"
+                          UrlSchemes="$(OrielUrlSchemes)"
+                          FileTypes="$(OrielFileTypes)"
                           ScriptPath="$(_OrielInstallerScript)" />
     <Exec Command="&quot;$(_OrielIscc)&quot; /Q &quot;$(_OrielInstallerScript)&quot;" />
     <Message Importance="high" Text="Oriel: installer of $(_OrielAppName) $(_OrielAppVersion) in $(_OrielInstallerOutput)" />

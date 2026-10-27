@@ -26,6 +26,15 @@ public sealed class AppOptions
     public bool QuitWhenLastWindowCloses { get; init; } = true;
 
     /// <summary>
+    /// Whether the app runs once per user: launched again, as when a link of
+    /// its scheme or one of its files is opened, it sends its arguments to
+    /// the instance that runs, which raises <see cref="OrielApp.SecondInstanceStarted"/>
+    /// and <see cref="OrielApp.OpenRequested"/>, and <see cref="OrielApp.Run"/>
+    /// returns 0 at once. Defaults to false.
+    /// </summary>
+    public bool SingleInstance { get; init; }
+
+    /// <summary>
     /// The longest message a page may send, in characters. Longer ones are
     /// refused before they are parsed. Defaults to 16 Mi characters.
     /// </summary>

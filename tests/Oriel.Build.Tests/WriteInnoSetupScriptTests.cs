@@ -84,6 +84,31 @@ public sealed class WriteInnoSetupScriptTests : IDisposable
     }
 
     [Fact]
+    public void RegistersTheSchemesAndFileTypesOfTheProject()
+    {
+        var task = Task();
+        task.UrlSchemes = " MyApp ; ";
+        task.FileTypes = "note;.Notes";
+        Assert.True(task.Execute(), string.Join("\n", _engine.Errors));
+        var script = File.ReadAllText(task.ScriptPath);
+        Assert.Contains("Software\\Classes\\myapp\"", script);
+        Assert.Contains("Software\\Classes\\.note\\OpenWithProgids", script);
+        Assert.Contains("Software\\Classes\\.notes\\OpenWithProgids", script);
+    }
+
+    [Theory]
+    [InlineData("https", null, "OrielUrlSchemes 'https' is not a scheme")]
+    [InlineData(null, ".no te", "OrielFileTypes '.no te' is not an extension")]
+    public void RefusesSchemesAndFileTypesThatAreNot(string? schemes, string? types, string error)
+    {
+        var task = Task();
+        task.UrlSchemes = schemes;
+        task.FileTypes = types;
+        Assert.False(task.Execute());
+        Assert.Contains(error, Assert.Single(_engine.Errors));
+    }
+
+    [Fact]
     public void FailsWithoutThePublishedExecutable()
     {
         File.Delete(Path.Combine(_dir, "publish", "Demo.exe"));
@@ -101,7 +126,10 @@ public sealed class WriteInnoSetupScriptTests : IDisposable
     [InnoSetupFact]
     public void ItsScriptCompilesWithInnoSetup()
     {
-        Assert.True(Task().Execute());
+        var task = Task();
+        task.UrlSchemes = "oriel-demo";
+        task.FileTypes = ".orieldemo";
+        Assert.True(task.Execute());
         using var iscc = Process.Start(new ProcessStartInfo(Compiler()!, $"/Q \"{Path.Combine(_dir, "obj", "installer.iss")}\"")
         {
             RedirectStandardError = true,

@@ -14,6 +14,46 @@ public class InnoSetupScriptTests
         languages.Length == 0 ? ["english"] : languages);
 
     [Fact]
+    public void RegistersTheSchemesAndFileTypesItIsGiven()
+    {
+        var script = InnoSetupScript.Create(Settings() with { UrlSchemes = ["myapp"], FileTypes = [".note"] });
+        Assert.Contains("ChangesAssociations=yes\n", script);
+        Assert.Contains("\n[Registry]\n", script);
+        Assert.Contains("Root: HKA; Subkey: \"Software\\Classes\\myapp\"; ValueType: string; ValueName: \"\"; ValueData: \"URL:My App\"; Flags: uninsdeletekey\n", script);
+        Assert.Contains("Root: HKA; Subkey: \"Software\\Classes\\myapp\"; ValueType: string; ValueName: \"URL Protocol\"; ValueData: \"\"\n", script);
+        Assert.Contains("Root: HKA; Subkey: \"Software\\Classes\\myapp\\shell\\open\\command\"; ValueType: string; ValueName: \"\"; ValueData: \"\"\"{app}\\MyApp.exe\"\" \"\"%1\"\"\"\n", script);
+        Assert.Contains("Root: HKA; Subkey: \"Software\\Classes\\.note\\OpenWithProgids\"; ValueType: string; ValueName: \"My-App.note\"; ValueData: \"\"; Flags: uninsdeletevalue\n", script);
+        Assert.Contains("Root: HKA; Subkey: \"Software\\Classes\\My-App.note\\shell\\open\\command\"; ValueType: string; ValueName: \"\"; ValueData: \"\"\"{app}\\MyApp.exe\"\" \"\"%1\"\"\"\n", script);
+    }
+
+    [Fact]
+    public void RegistersNothingWithoutSchemesOrFileTypes()
+    {
+        var script = InnoSetupScript.Create(Settings());
+        Assert.DoesNotContain("[Registry]", script);
+        Assert.DoesNotContain("ChangesAssociations", script);
+    }
+
+    [Theory]
+    [InlineData("myapp", true)]
+    [InlineData("my-app+x.y", true)]
+    [InlineData("1app", false)]
+    [InlineData("my app", false)]
+    [InlineData("m", false)]
+    [InlineData("https", false)]
+    [InlineData("File", false)]
+    public void TakesSchemesAppsMayHave(string scheme, bool ok) => Assert.Equal(ok, InnoSetupScript.IsScheme(scheme));
+
+    [Theory]
+    [InlineData(".note", true)]
+    [InlineData(".my-notes_2", true)]
+    [InlineData("note", false)]
+    [InlineData(".", false)]
+    [InlineData(".no te", false)]
+    [InlineData(".a;b", false)]
+    public void TakesExtensions(string type, bool ok) => Assert.Equal(ok, InnoSetupScript.IsFileType(type));
+
+    [Fact]
     public void InstallsForTheUserWithoutAdministratorRights()
     {
         var script = InnoSetupScript.Create(Settings());

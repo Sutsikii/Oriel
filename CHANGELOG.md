@@ -6,6 +6,12 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **One instance, links and files.** `AppOptions.SingleInstance` keeps one
+  instance per user: later launches send it their arguments
+  (`SecondInstanceStarted`). `OpenRequested` tells the links and files a
+  launch asks to open, and the installer registers the app's schemes and
+  file types (`OrielUrlSchemes`, `OrielFileTypes`).
+
 - **Notifications.** `OrielApp.ShowNotification` shows a toast with up to
   five buttons, and `NotificationClicked` tells which was clicked (Windows).
 
