@@ -105,6 +105,55 @@ public sealed class OrielApp : ICoalescingSink
 
     internal IPlatform Platform => _platform;
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, Notification> _notifications = new();
+    private long _lastNotification;
+
+    /// <summary>
+    /// Raised on the UI thread when the person clicks a notification of the
+    /// app, or one of its buttons, while the app runs: often, to show its
+    /// window.
+    /// </summary>
+    public event EventHandler<NotificationClickedEventArgs>? NotificationClicked;
+
+    /// <summary>
+    /// The id the system knows the app by for notifications (an
+    /// AppUserModelID): <c>Oriel.</c> and the letters and digits of
+    /// <see cref="AppOptions.Name"/>.
+    /// </summary>
+    internal string NotificationId => "Oriel." + new string([.. Options.Name.Where(char.IsAsciiLetterOrDigit)]);
+
+    /// <summary>
+    /// Shows a notification outside the app's windows, in the system's
+    /// notification center: a message that came, a task done. Any thread
+    /// may call it; failures go to <see cref="Error"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException">It has more than five actions, or two of the same id.</exception>
+    /// <exception cref="NotSupportedException">The backend has no notifications yet: Linux and macOS.</exception>
+    public void ShowNotification(Notification notification)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        ArgumentException.ThrowIfNullOrWhiteSpace(notification.Title, nameof(notification));
+        if (notification.Actions.Count > 5)
+            throw new ArgumentException("A notification has five actions at most.", nameof(notification));
+        if (notification.Actions.Select(a => a.Id).Distinct().Count() != notification.Actions.Count)
+            throw new ArgumentException("The actions of a notification have ids of their own.", nameof(notification));
+        if (!_platform.SupportsNotifications)
+            throw new NotSupportedException("Notifications are in the Windows backend only, for now.");
+        var id = Interlocked.Increment(ref _lastNotification);
+        _notifications[id] = notification;
+        _notifications.TryRemove(id - 64, out _); // the latest ones only can still be clicked
+        var xml = ToastXml.Of(id, notification);
+        Dispatch(() => _platform.ShowNotification(NotificationId, Options.Name, xml, arguments => Dispatch(() => NotificationActivated(arguments))));
+    }
+
+    private void NotificationActivated(string arguments)
+    {
+        if (!ToastXml.TryParse(arguments, out var id, out var index) || !_notifications.TryGetValue(id, out var notification))
+            return;
+        var action = index is { } i && i < notification.Actions.Count ? notification.Actions[i] : null;
+        NotificationClicked?.Invoke(this, new NotificationClickedEventArgs(notification, action));
+    }
+
     /// <summary>
     /// Shows an icon of the app in the notification area of the taskbar.
     /// Any thread may call it. With windows hidden to the icon, set

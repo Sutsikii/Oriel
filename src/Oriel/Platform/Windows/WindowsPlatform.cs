@@ -100,6 +100,11 @@ internal sealed unsafe class WindowsPlatform : IPlatform
 
     public void Quit() => Win32.PostQuitMessage(0);
 
+    public bool SupportsNotifications => true;
+
+    public void ShowNotification(string appId, string appName, string xml, Action<string> activated) =>
+        WinToast.Show(appId, appName, xml, activated);
+
     public bool SupportsTrayIcons => true;
 
     public IPlatformTrayIcon AddTrayIcon(TrayIconSpec spec, IPlatformTrayIconEvents events)

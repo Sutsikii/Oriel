@@ -49,6 +49,19 @@ internal interface IPlatform
     /// <summary>Empties the clipboard, then puts each format of <paramref name="content"/> there.</summary>
     void SetClipboard(ClipboardContent content) => throw ClipboardNotYet();
 
+    // ---- Notifications, UI thread only ----
+
+    /// <summary>Whether <see cref="ShowNotification"/> works. Any thread.</summary>
+    bool SupportsNotifications => false;
+
+    /// <summary>
+    /// Shows the toast <paramref name="xml"/> (see <see cref="ToastXml"/>)
+    /// under <paramref name="appId"/>; <paramref name="activated"/> gets the
+    /// arguments of each click on it, on any thread.
+    /// </summary>
+    void ShowNotification(string appId, string appName, string xml, Action<string> activated) =>
+        throw new NotSupportedException("Notifications are in the Windows backend only, for now.");
+
     // ---- Tray icons, UI thread only (see TrayIcon) ----
 
     /// <summary>Whether <see cref="AddTrayIcon"/> works. Any thread.</summary>

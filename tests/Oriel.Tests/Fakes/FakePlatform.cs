@@ -45,6 +45,13 @@ internal sealed class FakePlatform : IPlatform
         return window;
     }
 
+    public bool SupportsNotifications { get; set; } = true;
+
+    public ConcurrentQueue<(string AppId, string AppName, string Xml, Action<string> Activated)> Notifications { get; } = new();
+
+    public void ShowNotification(string appId, string appName, string xml, Action<string> activated) =>
+        Notifications.Enqueue((appId, appName, xml, activated));
+
     public bool SupportsTrayIcons { get; set; } = true;
 
     public ConcurrentQueue<FakeTrayIcon> TrayIcons { get; } = new();

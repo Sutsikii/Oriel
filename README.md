@@ -111,6 +111,8 @@ tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/
   the page gets first.
 - [Printing](docs/printing.md): print dialogs, and pages to PDF files.
 - [The clipboard](docs/clipboard.md): text, HTML, images and files.
+- [Notifications](docs/notifications.md): toasts with buttons; tray icons
+  are in [Windows](docs/windows.md#tray-icons).
 - [Building and shipping](docs/build.md): build properties, development
   loop, publishing.
 - [WebView2](docs/webview2.md): the runtime apps need, its updates, and

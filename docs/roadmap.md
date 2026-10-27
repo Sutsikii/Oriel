@@ -11,6 +11,7 @@ self-contained piece of work.
   ids, and names to find them by. Coalesced events for
   high-frequency updates, once per frame at most.
 - The clipboard: text, HTML, images and files (Windows).
+- Notifications with buttons (Windows).
 - Tray icons with a menu (Windows); windows that hide, and ask before
   the person closes them.
 - Binary results: `ReadOnlyMemory<T>` as typed arrays, through buffers
@@ -50,7 +51,7 @@ self-contained piece of work.
 
 ### Windows and desktop
 
-- **Tray icon, notifications, single instance, deep links.**
+- **Single instance, deep links.**
 - **Embedded files**: the frontend inside the executable, served through
   `WebResourceRequested`, for a single-file app.
 

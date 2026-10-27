@@ -6,6 +6,9 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Notifications.** `OrielApp.ShowNotification` shows a toast with up to
+  five buttons, and `NotificationClicked` tells which was clicked (Windows).
+
 - **Tray icons.** `OrielApp.AddTrayIcon` shows an icon in the notification
   area, with a tooltip and a menu (Windows). Windows gain `Hide`, `Show`,
   `IsVisible`, and `Closing`, raised when the person closes one, which

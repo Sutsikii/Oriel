@@ -453,3 +453,21 @@ Oriel.TrayIconOptions.TrayIconOptions() -> void
 Oriel.TrayMenuItemClickedEventArgs
 Oriel.TrayMenuItemClickedEventArgs.Item.get -> Oriel.MenuItem!
 Oriel.TrayMenuItemClickedEventArgs.TrayMenuItemClickedEventArgs(Oriel.MenuItem! item) -> void
+Oriel.Notification
+Oriel.Notification.Actions.get -> System.Collections.Generic.IReadOnlyList<Oriel.NotificationAction!>!
+Oriel.Notification.Actions.init -> void
+Oriel.Notification.Body.get -> string?
+Oriel.Notification.Body.init -> void
+Oriel.Notification.Notification() -> void
+Oriel.Notification.Title.get -> string!
+Oriel.Notification.Title.init -> void
+Oriel.NotificationAction
+Oriel.NotificationAction.Id.get -> string!
+Oriel.NotificationAction.Label.get -> string!
+Oriel.NotificationAction.NotificationAction(string! id, string! label) -> void
+Oriel.NotificationClickedEventArgs
+Oriel.NotificationClickedEventArgs.Action.get -> Oriel.NotificationAction?
+Oriel.NotificationClickedEventArgs.Notification.get -> Oriel.Notification!
+Oriel.NotificationClickedEventArgs.NotificationClickedEventArgs(Oriel.Notification! notification, Oriel.NotificationAction? action) -> void
+Oriel.OrielApp.NotificationClicked -> System.EventHandler<Oriel.NotificationClickedEventArgs!>?
+Oriel.OrielApp.ShowNotification(Oriel.Notification! notification) -> void
