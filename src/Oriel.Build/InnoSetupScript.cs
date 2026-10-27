@@ -15,6 +15,10 @@ namespace Oriel.Build;
 /// <param name="Languages">The languages of the wizard, by the names of Inno Setup's message files: <c>english</c>, <c>french</c>…</param>
 /// <param name="UrlSchemes">The schemes of links the app opens, such as <c>myapp</c> for <c>myapp://…</c>.</param>
 /// <param name="FileTypes">The extensions of the files the app opens, such as <c>.note</c>.</param>
+/// <param name="Signed">
+/// Whether Inno Setup signs the installer and the uninstaller, with the
+/// sign tool <c>oriel</c> the compiler is given (<see cref="InnoSetupScript.SignToolArgument"/>).
+/// </param>
 internal sealed record InstallerSettings(
     string AppName,
     string AppVersion,
@@ -26,7 +30,8 @@ internal sealed record InstallerSettings(
     string? Icon,
     IReadOnlyList<string> Languages,
     IReadOnlyList<string>? UrlSchemes = null,
-    IReadOnlyList<string>? FileTypes = null);
+    IReadOnlyList<string>? FileTypes = null,
+    bool Signed = false);
 
 /// <summary>
 /// Writes the Inno Setup script of an Oriel app's installer: a per-user
@@ -71,6 +76,11 @@ internal static class InnoSetupScript
         Line(sb, "ArchitecturesAllowed", "x64compatible");
         Line(sb, "ArchitecturesInstallIn64BitMode", "x64compatible");
         Line(sb, "MinVersion", "10.0.17763");
+        if (s.Signed)
+        {
+            Line(sb, "SignTool", "oriel");
+            Line(sb, "SignedUninstaller", "yes");
+        }
         Line(sb, "OutputDir", s.OutputDirectory);
         Line(sb, "OutputBaseFilename", FileName(s.AppName) + "-Setup-" + s.AppVersion);
         if (s.FileTypes is { Count: > 0 })
@@ -140,6 +150,15 @@ internal static class InnoSetupScript
             sb.Append($"Root: HKA; Subkey: {Quote(key + "\\shell\\open\\command")}; ValueType: string; ValueName: \"\"; ValueData: \"{open}\"\n");
         }
     }
+
+    /// <summary>
+    /// The compiler's argument that defines the sign tool <c>oriel</c> of
+    /// <paramref name="command"/>, whose <c>{file}</c> is the file to sign,
+    /// in Inno Setup's terms: <c>$f</c> the file (quoted by Inno Setup),
+    /// <c>$q</c> a quote, <c>$$</c> a dollar.
+    /// </summary>
+    public static string SignToolArgument(string command) =>
+        "/Soriel=" + command.Replace("$", "$$").Replace("\"", "$q").Replace("{file}", "$f");
 
     /// <summary>Whether <paramref name="scheme"/> may be a link's scheme the app takes: letters first, then letters, digits, <c>+</c>, <c>-</c> and <c>.</c>.</summary>
     public static bool IsScheme(string scheme) =>

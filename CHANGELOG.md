@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Signing.** `OrielSignCommand` signs the published executable, the
+  installer and its uninstaller: signtool, Azure Trusted Signing, or any
+  command. Installers of NativeAOT apps now take the executable after it is
+  copied to the publish folder, which they could miss before.
+
 - **Examples.** A back office (SQLite, 100 000 rows, validated forms), a 3D
   viewer (glTF through the binary channel, three.js) and a dashboard
   (coalesced events at 120 Hz, a log as a stream), published in CI.

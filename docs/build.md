@@ -158,15 +158,59 @@ publishing it warns, and gives a new GUID to use instead.
 | `OrielInstallerLanguages` | `english` | The wizard's languages, by Inno Setup's message files: `english;french;german`… The wizard picks the user's. |
 | `OrielUrlSchemes` | none | Schemes of links the app opens, separated by `;`: `myapp` makes `myapp://…` links start it (see [windows.md](windows.md#links-and-files)). |
 | `OrielFileTypes` | none | Extensions of files the app opens, separated by `;`: `.note;.notes`. The app is offered in Open with; Windows asks the person before making it their default. |
+| `OrielSignCommand` | none | Signs the executable, the installer and its uninstaller: a command whose `{file}` is the file to sign (see [Signing](#signing)). |
 | `OrielInstallerOutput` | `bin/installer` | Where the installer is written. |
 | `OrielInnoSetupCompiler` | found | The path of `ISCC.exe`, when Inno Setup is not installed where it usually is. |
 
 The script Oriel generates is in `obj/` (`oriel-installer.iss`), for a look
 at what the installer does.
 
-Installers that are not signed make Windows SmartScreen warn the people who
-download them. Signing needs a code signing certificate; Oriel does not sign
-yet (see the [roadmap](roadmap.md)).
+## Signing
+
+Executables and installers that are not signed make Windows SmartScreen
+warn the people who download them, and some companies' machines refuse
+them. With `OrielSignCommand` set, `dotnet publish` signs the app's
+executable, then Inno Setup signs the installer and its uninstaller, with
+the same command. `{file}` is the file to sign, quoted by Oriel: write it
+without quotes.
+
+With a certificate file, through the Windows SDK's `signtool`:
+
+```xml
+<OrielSignCommand>signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f "$(MSBuildProjectDirectory)\cert.pfx" /p $(SIGNING_PASSWORD) {file}</OrielSignCommand>
+```
+
+`signtool` comes with the Windows SDK (Visual Studio installs it); give its
+full path, such as `C:\Program Files (x86)\Windows Kitsin.0.26100.0d\signtool.exe`
+in quotes, when it is not on the `PATH`. `$(SIGNING_PASSWORD)` is read from
+the environment variable of that name,
+so the password stays out of the project. Keep the certificate out of the
+repository too.
+
+With [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/),
+which keeps the key in Azure: install its client tools
+(`winget install -e --id Microsoft.Azure.TrustedSigningClientTools`), then
+describe the account in a `metadata.json` beside the project:
+
+```json
+{
+  "Endpoint": "https://eus.codesigning.azure.net",
+  "CodeSigningAccountName": "contoso",
+  "CertificateProfileName": "contoso-apps"
+}
+```
+
+```xml
+<OrielSignCommand>signtool sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "$(LOCALAPPDATA)\Microsoft\MicrosoftTrustedSigningClientTools\Azure.CodeSigning.Dlib.dll" /dmdf "$(MSBuildProjectDirectory)\metadata.json" {file}</OrielSignCommand>
+```
+
+The signing service authenticates as Azure tools do: `az login` on a
+developer's machine, or the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
+`AZURE_CLIENT_SECRET` variables in CI.
+
+Any other command works as well, such as a signing service's own tool, as
+long as it signs the file it is given and exits with 0. Inno Setup checks
+that the installer is signed after the command.
 
 ## Environment variables
 

@@ -14,6 +14,8 @@ self-contained piece of work.
 - Templates for vanilla TypeScript, React, Vue and Svelte frontends
   (`dotnet new oriel --framework`), and the `oriel` command: `oriel doctor`
   and `oriel dev`.
+- Signing of the executable, the installer and the uninstaller with any
+  command: signtool and a certificate, or Azure Trusted Signing.
 - Examples of what Oriel is for: a back office, a 3D viewer and a
   real-time dashboard, published in CI.
 - Plugins: `Oriel.Sqlite` and `Oriel.SecureStorage` (Windows), and how to
@@ -65,8 +67,6 @@ self-contained piece of work.
 
 ### Tooling
 
-- **Signing** of the app and its installer, from a certificate or a
-  signing service.
 - **MSIX** packages, for the Microsoft Store.
 - **Auto-updates**, signed.
 
