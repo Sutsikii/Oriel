@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DefaultItemExcludes>$(DefaultItemExcludes);frontend/**</DefaultItemExcludes>
+
+    <OrielTypeScriptOutput>frontend/src/oriel.ts</OrielTypeScriptOutput>
+    <OrielFrontendDist>frontend/dist</OrielFrontendDist>
+    <OrielFrontendBuildCommand>npm run build</OrielFrontendBuildCommand>
+    <PublishAot>true</PublishAot>
+    <Product>Oriel Back Office</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/plugins/Oriel.Sqlite/Oriel.Sqlite.csproj" />
+  </ItemGroup>
+
+</Project>

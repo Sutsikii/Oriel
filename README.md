@@ -84,6 +84,18 @@ The [hello example](examples/hello), published with NativeAOT, on Windows 11:
 The second memory line is the one to compare: the webview's processes are
 most of an app's footprint, as in every webview-based framework.
 
+## Examples
+
+| Example | What it shows |
+|---|---|
+| [hello](examples/hello) | Calls, events, a window: the mechanics |
+| [back-office](examples/back-office) | SQLite, a grid of 100 000 rows, validated forms with typed errors |
+| [viewer-3d](examples/viewer-3d) | glTF models brought as bytes by the binary channel, rendered with three.js |
+| [dashboard](examples/dashboard) | Metrics at 120 Hz as a coalesced event, a log as a stream |
+| [chess-next-move](examples/chess-next-move) | A finished app: an engine, a board, an installer |
+
+CI publishes each with NativeAOT, so they double as tests.
+
 ## Status
 
 Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
@@ -92,8 +104,9 @@ and on **macOS** with AppKit and WKWebView ([macos.md](docs/macos.md)).
 The Linux and macOS backends have the core, and not yet dialogs, menus or
 printing. The macOS one is tested in CI only, since the maintainers have no
 Mac yet: if you have one, your help is welcome. The calls, events, generator, Windows
-backend, window control, dialogs, menus and installers are done and tested;
-tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/roadmap.md).
+backend, window control, dialogs, menus, installers, tray icons,
+notifications, single instance and the `oriel` command are done and tested;
+signing and updates are next. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 

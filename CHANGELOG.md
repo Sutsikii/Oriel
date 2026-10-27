@@ -6,6 +6,10 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Examples.** A back office (SQLite, 100 000 rows, validated forms), a 3D
+  viewer (glTF through the binary channel, three.js) and a dashboard
+  (coalesced events at 120 Hz, a log as a stream), published in CI.
+
 - **Plugins.** `Oriel.Sqlite` (a SQLite database pages query) and
   `Oriel.SecureStorage` (secrets encrypted with DPAPI, Windows), with their
   TypeScript clients; docs/plugins.md says how to write one.
