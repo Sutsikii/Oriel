@@ -6,6 +6,9 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **The clipboard.** `OrielApp.Clipboard` gets and sets text, HTML,
+  images (PNG, screenshots included) and files, on Windows.
+
 - **Binary results.** Methods returning `ReadOnlyMemory<T>` or `Memory<T>`
   of numbers give pages typed arrays (`Float32Array`, `Uint8Array`…),
   sent as bytes: through a buffer shared with the page on Windows, 25 to

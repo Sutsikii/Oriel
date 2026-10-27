@@ -103,6 +103,13 @@ public sealed class OrielApp : ICoalescingSink
 
     internal Frontend Frontend { get; }
 
+    internal IPlatform Platform => _platform;
+
+    /// <summary>The system's clipboard: text, HTML, images and files.</summary>
+    public Clipboard Clipboard => _clipboard ??= new Clipboard(this);
+
+    private Clipboard? _clipboard;
+
     internal ServiceTable Services { get; } = new();
 
     /// <summary>The clock windows count failures with; tests give their own.</summary>

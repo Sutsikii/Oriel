@@ -110,6 +110,7 @@ tray icons, single instance, signing and a CLI are next. See the [roadmap](docs/
 - [Menus](docs/menus.md): the menu bar, context menus, and accelerators
   the page gets first.
 - [Printing](docs/printing.md): print dialogs, and pages to PDF files.
+- [The clipboard](docs/clipboard.md): text, HTML, images and files.
 - [Building and shipping](docs/build.md): build properties, development
   loop, publishing.
 - [WebView2](docs/webview2.md): the runtime apps need, its updates, and
