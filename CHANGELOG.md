@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Streams.** Methods returning `IAsyncEnumerable<T>` become
+  `AsyncIterable<T>` in the TypeScript client, for `for await`. The page
+  pulls items as it takes them, so a slow page slows the producer, and
+  stopping the loop cancels the stream.
+
 - **Coalesced events.** `new Event<T> { Coalesce = true }` sends pages only
   the latest payload of an event emitted faster than they take it, once
   per frame at most, so that a busy or hidden page does not fall behind.

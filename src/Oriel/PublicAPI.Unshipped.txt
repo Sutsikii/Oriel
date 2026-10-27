@@ -44,6 +44,7 @@ Oriel.FolderOptions.Title.get -> string?
 Oriel.FolderOptions.Title.init -> void
 Oriel.Generated.Arguments
 Oriel.Generated.CallContext
+Oriel.Generated.CallContext.Return<T>(System.Collections.Generic.IAsyncEnumerable<T>! items, System.Action<System.Text.Json.Utf8JsonWriter!, T>! write) -> Oriel.Generated.ValueWriter?
 Oriel.Generated.CallContext.Cancellation.get -> System.Threading.CancellationToken
 Oriel.Generated.CallContext.Window.get -> Oriel.OrielWindow?
 Oriel.Generated.CodecException

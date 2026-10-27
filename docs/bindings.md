@@ -50,6 +50,7 @@ What pages see:
 | A public instance method `Open` | `Decks.open(...)`, returning a `Promise` |
 | `void`, `Task`, `ValueTask` | `Promise<void>` |
 | `T`, `Task<T>`, `ValueTask<T>` | `Promise<T>` |
+| `IAsyncEnumerable<T>` | `AsyncIterable<T>`, for `for await` (see [Streams](#streams)) |
 | A thrown exception | A rejected promise with a `CallError` (`err.message`, `err.method`) |
 | An `Event<T>` property `Changed` | `Decks.onChanged(listener)`, returning a function that stops listening |
 | `[Service(Name = "Files")]` | The service is called `Files` in pages |
@@ -184,7 +185,52 @@ The generator reports these as errors, where they are used (see
 - `[Flags]` enums;
 - dictionaries with keys that are not strings;
 - multidimensional arrays;
-- streams (`IAsyncEnumerable<T>`): planned.
+- streams (`IAsyncEnumerable<T>`) anywhere but as the result of a method,
+  such as in a `Task` or a property.
+
+## Streams
+
+A method returning `IAsyncEnumerable<T>` sends its items as they come:
+progress, the lines of a log, results found one by one. Pages iterate them
+with `for await`:
+
+```csharp
+[Service]
+public sealed class Search
+{
+    /// <summary>The files under <paramref name="folder"/> whose name has <paramref name="text"/>.</summary>
+    public async IAsyncEnumerable<string> Find(string folder, string text,
+        [EnumeratorCancellation] CancellationToken cancellation = default)
+    {
+        foreach (var path in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (Path.GetFileName(path).Contains(text, StringComparison.OrdinalIgnoreCase))
+                yield return path;
+        }
+    }
+}
+```
+
+```ts
+for await (const path of Search.find("C:\\Users\\ada\\Documents", "invoice")) {
+  list.append(path);
+  if (list.childElementCount === 100) break; // stops the search in C#
+}
+```
+
+- **Back-pressure.** The stream runs no further ahead of the page than 16
+  items: the page asks for more as it takes them. A page that draws each
+  item slowly slows the producer, rather than piling items up in memory.
+- **Cancellation.** When the page stops iterating (`break`, `return`, an
+  exception in the loop) or goes away, the stream's `CancellationToken` is
+  canceled. Ask for it with `[EnumeratorCancellation]`, as above, or as a
+  plain `CancellationToken` parameter of the method: both get it.
+- **Errors.** An exception in the stream rejects the page's next
+  `next()`, after the items sent before, with a `CallError` as for calls.
+- The call starts when iteration does, not when the method is called in
+  the page. A stream of a `Serial` service holds its turn until it ends;
+  one of a `UiThread` service runs on the UI thread between its items.
 
 ## Events
 

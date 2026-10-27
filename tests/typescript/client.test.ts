@@ -87,6 +87,40 @@ test("listens to an event until told to stop", () => {
   assert.deepEqual(titles, ["A"]);
 });
 
+test("iterates a stream, pulling items as it takes them", async () => {
+  const titles: string[] = [];
+  const done = (async () => {
+    for await (const slide of Decks.slides("/d.json")) titles.push(slide.title);
+  })();
+  await Promise.resolve();
+  const call = sent.at(-1)!;
+  assert.deepEqual(call, { t: "call", id: call.id, k: page.token, m: "Decks.Slides", a: ["/d.json"], w: 16 });
+  for (let i = 0; i < 10; i++) page.receive({ t: "item", id: call.id, k: page.token, v: { title: `S${i}` } });
+  await new Promise((resolve) => setImmediate(resolve)); // the loop takes them
+  assert.equal(titles.length, 10);
+  assert.deepEqual(sent.slice(-1), [{ t: "pull", id: call.id, k: page.token, n: 8 }]);
+  page.receive({ t: "result", id: call.id, k: page.token });
+  await done;
+});
+
+test("cancels a stream the page stops iterating, and fails one that fails", async () => {
+  const first = (async () => {
+    for await (const slide of Decks.slides("/a.json")) return slide.title;
+  })();
+  await Promise.resolve();
+  const call = sent.at(-1)!;
+  page.receive({ t: "item", id: call.id, k: page.token, v: { title: "A" } });
+  assert.equal(await first, "A");
+  assert.deepEqual(sent.at(-1), { t: "cancel", id: call.id, k: page.token });
+
+  const failed = (async () => {
+    for await (const _ of Decks.slides("/b.json"));
+  })();
+  await Promise.resolve();
+  page.receive({ t: "error", id: sent.at(-1)!.id, k: page.token, e: "gone", c: "conflict", d: { path: "/b.json", version: 1 } });
+  await assert.rejects(failed, (err: unknown) => err instanceof CallError && err.method === "Decks.Slides" && err.code === "conflict");
+});
+
 test("says when the page is not in an Oriel window", async () => {
   delete (globalThis as { oriel?: unknown }).oriel;
   await assert.rejects(Greeter.greet("Ada"), /window\.oriel is missing/);

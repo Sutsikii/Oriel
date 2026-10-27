@@ -1,3 +1,8 @@
+using System.Buffers;
+using System.Text;
+using System.Text.Json;
+using Oriel.Generated;
+
 namespace Oriel.Generators.Tests;
 
 /// <summary>How generated dispatchers call service methods.</summary>
@@ -70,6 +75,38 @@ public class DispatcherTests
 
         Assert.Equal("\"done\"", await service.Call("Text"));
         Assert.Equal("7", await service.Call("Number"));
+    }
+
+    [Fact]
+    public async Task ReturnsStreamsThroughTheContext()
+    {
+        var service = Harness.Compile("""
+            [Service]
+            public class Counter
+            {
+                public async IAsyncEnumerable<string> Count(int to, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellation = default)
+                {
+                    for (var i = 1; i <= to; i++)
+                    {
+                        await Task.Yield();
+                        yield return "#" + i;
+                    }
+                }
+            }
+            """).Bind("Counter");
+
+        using var args = JsonDocument.Parse("[3]");
+        var context = new CallContext(CancellationToken.None);
+        Assert.Null(await service.Dispatcher.InvokeAsync("Count", args.RootElement, context));
+        var items = new List<string>();
+        await context.Stream!.Invoke(() => Task.CompletedTask, item =>
+        {
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var w = new Utf8JsonWriter(buffer))
+                item(w);
+            items.Add(Encoding.UTF8.GetString(buffer.WrittenSpan));
+        }, CancellationToken.None);
+        Assert.Equal(["\"#1\"", "\"#2\"", "\"#3\""], items);
     }
 
     [Fact]

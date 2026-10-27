@@ -63,6 +63,9 @@ public class TypeScriptTests
 
             public System.Text.Json.JsonElement Raw(System.Text.Json.JsonElement value) => value;
 
+            /// <summary>The slides of the deck at <paramref name="path"/>, as they are read.</summary>
+            public IAsyncEnumerable<Slide> Slides(string path, CancellationToken cancellation = default) => null!;
+
             /// <summary>Fires when a deck changed on disk.</summary>
             public Event<Deck> Changed { get; } = new();
         }

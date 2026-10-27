@@ -34,6 +34,9 @@ internal sealed class PageConnection : IDisposable
     /// </summary>
     private readonly Dictionary<string, Coalesced> _coalesced = new(StringComparer.Ordinal);
 
+    /// <summary>The calls iterating a stream, by the page's token and the call's id.</summary>
+    private readonly Dictionary<(string Token, long Id), CallStream> _streams = new();
+
     /// <param name="services">The services pages may call.</param>
     /// <param name="post">
     /// Delivers a message to the page. It is called from any thread, and must
@@ -136,6 +139,10 @@ internal sealed class PageConnection : IDisposable
                 _post(Protocol.ErrorMessage(id, token, $"Too many calls at once: {_limits.MaxCallsInFlight} are running"));
                 return Task.CompletedTask;
             }
+            // A call iterating a stream says how many items the page is ready for.
+            var stream = root.TryGetProperty("w", out var w) && w.ValueKind == JsonValueKind.Number && w.TryGetInt32(out var window) && window > 0
+                ? OpenStream(token, id, window, cancellation)
+                : null;
             // A serial service's turn is taken now, so calls run in the order they arrived.
             var service = Resolve(method, out var problem);
             var turn = service?.Concurrency == ServiceConcurrency.Serial ? service.Queue.Enter() : null;
@@ -143,10 +150,12 @@ internal sealed class PageConnection : IDisposable
             {
                 try
                 {
-                    await CallAsync(doc, id, token, method, service, problem, turn, args, cancellation).ConfigureAwait(false);
+                    await CallAsync(doc, id, token, method, service, problem, turn, args, cancellation, stream).ConfigureAwait(false);
                 }
                 finally
                 {
+                    if (stream is not null)
+                        CloseStream(token, id, stream);
                     Interlocked.Decrement(ref _callsInFlight);
                 }
             });
@@ -167,6 +176,27 @@ internal sealed class PageConnection : IDisposable
             && !cancellation.IsCancellationRequested)
         {
             FilesDropped?.Invoke(new FilesDroppedEventArgs(files, x.GetDouble(), y.GetDouble()));
+        }
+
+        if ((type == Protocol.Pull || type == Protocol.Cancel)
+            && root.TryGetProperty("id", out var streamId) && streamId.ValueKind == JsonValueKind.Number && streamId.TryGetInt64(out var call)
+            && !cancellation.IsCancellationRequested)
+        {
+            CallStream? stream;
+            lock (_lock)
+                _streams.TryGetValue((token, call), out stream);
+            if (stream is null)
+            {
+                // A call that ended, or never was.
+            }
+            else if (type == Protocol.Cancel)
+            {
+                stream.Cancel();
+            }
+            else if (root.TryGetProperty("n", out var n) && n.ValueKind == JsonValueKind.Number && n.TryGetInt32(out var items) && items > 0)
+            {
+                stream.Grant(items);
+            }
         }
 
         if (type == Protocol.Ack
@@ -283,6 +313,29 @@ internal sealed class PageConnection : IDisposable
         }
     }
 
+    /// <summary>
+    /// Opens the stream of call <paramref name="id"/>, or returns null when
+    /// the page has a call of that id running already.
+    /// </summary>
+    private CallStream? OpenStream(string token, long id, int window, CancellationToken page)
+    {
+        lock (_lock)
+        {
+            if (_disposed || _streams.ContainsKey((token, id)))
+                return null;
+            var stream = new CallStream(window, page);
+            _streams.Add((token, id), stream);
+            return stream;
+        }
+    }
+
+    private void CloseStream(string token, long id, CallStream stream)
+    {
+        lock (_lock)
+            _streams.Remove((token, id));
+        stream.Dispose();
+    }
+
     /// <summary>The service <paramref name="method"/> belongs to, or null and why.</summary>
     private ServiceDispatcher? Resolve(string method, out Exception? problem)
     {
@@ -298,7 +351,7 @@ internal sealed class PageConnection : IDisposable
     }
 
     private async Task CallAsync(JsonDocument doc, long id, string token, string method, ServiceDispatcher? service, Exception? problem,
-        Task<IDisposable>? turn, JsonElement args, CancellationToken cancellation)
+        Task<IDisposable>? turn, JsonElement args, CancellationToken cancellation, CallStream? stream)
     {
         string reply;
         using (doc)
@@ -309,16 +362,27 @@ internal sealed class PageConnection : IDisposable
                 if (service is null)
                     throw problem!;
                 cancellation.ThrowIfCancellationRequested(); // the page went away while the call waited its turn
-                var context = new CallContext(cancellation, _window);
+                var context = new CallContext(stream?.Cancellation ?? cancellation, _window);
                 var name = method[(service.Name.Length + 1)..];
-                var result = service.Concurrency == ServiceConcurrency.UiThread && _dispatch is not null
+                var onUiThread = service.Concurrency == ServiceConcurrency.UiThread && _dispatch is not null;
+                var result = onUiThread
                     ? await OnUiThread(() => service.InvokeAsync(name, args, context)).ConfigureAwait(false)
                     : await service.InvokeAsync(name, args, context).ConfigureAwait(false);
-                reply = Protocol.ResultMessage(id, token, result);
+                if (context.Stream is { } pump)
+                {
+                    if (stream is null)
+                        throw new CodecException($"{method} returns a stream: iterate it with oriel.stream");
+                    void Send(ValueWriter item) => SendItem(id, token, item);
+                    if (onUiThread)
+                        await OnUiThread(async () => { await pump(stream.WaitAsync, Send, stream.Cancellation); return null; }).ConfigureAwait(false);
+                    else
+                        await pump(stream.WaitAsync, Send, stream.Cancellation).ConfigureAwait(false);
+                }
+                reply = Protocol.ResultMessage(id, token, result); // for a stream, its end
             }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested || stream?.Cancellation.IsCancellationRequested == true)
             {
-                return; // the page went away
+                return; // the page went away, or stopped iterating
             }
             catch (Exception e)
             {
@@ -333,6 +397,18 @@ internal sealed class PageConnection : IDisposable
                 return; // the reply belongs to a page that went away
         }
         _post(reply);
+    }
+
+    /// <summary>Sends an item of the stream of call <paramref name="id"/>, if its page is still there.</summary>
+    private void SendItem(long id, string token, ValueWriter item)
+    {
+        var message = Protocol.ItemMessage(id, token, item);
+        lock (_lock)
+        {
+            if (_disposed || _token != token)
+                return;
+        }
+        _post(message);
     }
 
     private void Refuse(string reason)

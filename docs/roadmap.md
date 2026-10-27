@@ -10,6 +10,8 @@ self-contained piece of work.
 - Events from services to pages, to every window or to one; windows have
   ids, and names to find them by. Coalesced events for
   high-frequency updates, once per frame at most.
+- Streams: `IAsyncEnumerable<T>` results as async iterables in pages, with
+  back-pressure and cancellation when the page stops iterating.
 - The source generator: dispatchers, JSON codecs and the TypeScript client,
   without reflection; diagnostics for what it cannot generate.
 - Windows backend: Win32 windows with WebView2 through COM, no loader DLL;
@@ -36,8 +38,6 @@ self-contained piece of work.
 
 ### Calls and types
 
-- **Streams**: `IAsyncEnumerable<T>` results as async iterables in pages, with
-  back-pressure.
 - **Polymorphism**: `[JsonDerivedType]` hierarchies as TypeScript unions.
 - **Generic records** of the app's own.
 

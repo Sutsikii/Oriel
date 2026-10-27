@@ -135,6 +135,9 @@ internal static class CSharpEmitter
                 w.Line($"var result = await {call}.ConfigureAwait(false);");
                 w.Line($"return writer => {{ {WriteStatement(method.Result!, "writer", "result", 0)} }};");
                 break;
+            case Returns.Stream:
+                w.Line($"return context.Return({call}, static (writer, item) => {{ {WriteStatement(method.Result!, "writer", "item", 0)} }});");
+                break;
         }
     }
 

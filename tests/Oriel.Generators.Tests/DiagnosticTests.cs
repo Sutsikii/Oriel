@@ -17,7 +17,8 @@ public class DiagnosticTests
     [InlineData("public void Set(int[,] grid) { }", "parameter 'grid' of S.Set cannot be sent between C# and pages: multidimensional arrays are not supported; use an array of arrays")]
     [InlineData("public void Set(Dictionary<int, string> d) { }", "parameter 'd' of S.Set cannot be sent between C# and pages: dictionaries need string keys, as JSON objects have")]
     [InlineData("public (int, int) Get() => default;", "the result of S.Get cannot be sent between C# and pages: tuples have no property names; use a record")]
-    [InlineData("public IAsyncEnumerable<int> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: streams (IAsyncEnumerable) are not supported yet")]
+    [InlineData("public Task<IAsyncEnumerable<int>> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: streams (IAsyncEnumerable) can only be returned, not nested")]
+    [InlineData("public IAsyncEnumerable<Uri> Get() => null!;", "the items of S.Get cannot be sent between C# and pages: System.Uri is not a type Oriel maps")]
     [InlineData("public Task<Task<int>> Get() => null!;", "the result of S.Get cannot be sent between C# and pages: tasks can only be returned, not nested")]
     [InlineData("public void Set(Action a) { }", "parameter 'a' of S.Set cannot be sent between C# and pages: delegates cannot be sent")]
     public void ReportsUnsupportedTypes(string member, string message)

@@ -369,6 +369,133 @@ public class PageConnectionTests
         Assert.Empty(_posted);
     }
 
+    /// <summary>A service with streams, as the generator would write it.</summary>
+    private sealed class Feed : ServiceDispatcher
+    {
+        public int Produced;
+
+        public TaskCompletionSource Stopped { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Feed()
+            : base("Feed")
+        {
+        }
+
+        public override ValueTask<ValueWriter?> InvokeAsync(string method, JsonElement args, CallContext context) => method switch
+        {
+            "Count" => new(context.Return(Count(context.Cancellation), Json.Write)),
+            "Fail" => new(context.Return(Fail(), Json.Write)),
+            _ => throw new MethodNotFoundException(Name, method),
+        };
+
+        private async IAsyncEnumerable<int> Count([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellation = default)
+        {
+            try
+            {
+                for (var i = 1; ; i++)
+                {
+                    await Task.Yield();
+                    cancellation.ThrowIfCancellationRequested();
+                    Interlocked.Increment(ref Produced);
+                    yield return i;
+                }
+            }
+            finally
+            {
+                Stopped.TrySetResult();
+            }
+        }
+
+        private static async IAsyncEnumerable<int> Fail()
+        {
+            yield return 1;
+            await Task.Yield();
+            throw new InvalidOperationException("feed broke");
+        }
+    }
+
+    private (PageConnection Page, Feed Feed) FeedPage()
+    {
+        var services = new ServiceTable();
+        var feed = new Feed();
+        services.Add(feed);
+        return (new PageConnection(services, _posted.Enqueue), feed);
+    }
+
+    private static string Stream(long id, string method, int window, string token = "page1") =>
+        $$"""{"t":"call","id":{{id}},"k":"{{token}}","m":"{{method}}","a":[],"w":{{window}}}""";
+
+    [Fact]
+    public async Task StreamsNoFurtherAheadThanThePageLets()
+    {
+        var (page, feed) = FeedPage();
+        var call = page.ReceiveAsync(Stream(1, "Feed.Count", 3));
+        await WaitUntil(() => _posted.Count == 3);
+        await Task.Delay(50);
+        Assert.Equal(["""{"t":"item","id":1,"k":"page1","v":1}""", """{"t":"item","id":1,"k":"page1","v":2}""", """{"t":"item","id":1,"k":"page1","v":3}"""], _posted);
+        Assert.InRange(feed.Produced, 3, 4); // the producer waits for the page
+
+        await page.ReceiveAsync("""{"t":"pull","id":1,"k":"page1","n":2}""");
+        await WaitUntil(() => _posted.Count == 5);
+        await Task.Delay(50);
+        Assert.Equal(5, _posted.Count);
+
+        // The page stops iterating: the stream ends, with no reply.
+        await page.ReceiveAsync("""{"t":"cancel","id":1,"k":"page1"}""");
+        await feed.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await call.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(5, _posted.Count);
+    }
+
+    [Fact]
+    public async Task EndsAStreamWithAResultAndFailsItWithAnError()
+    {
+        var (page, _) = FeedPage();
+        await page.ReceiveAsync(Stream(1, "Feed.Fail", 16));
+        Assert.Equal(["""{"t":"item","id":1,"k":"page1","v":1}""", """{"t":"error","id":1,"k":"page1","e":"feed broke"}"""], _posted);
+    }
+
+    [Fact]
+    public async Task StopsTheStreamsOfAPageThatWentAway()
+    {
+        var (page, feed) = FeedPage();
+        var call = page.ReceiveAsync(Stream(1, "Feed.Count", 1));
+        await WaitUntil(() => _posted.Count == 1);
+        await page.ReceiveAsync("""{"t":"hello","k":"page2"}""");
+        await feed.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await call.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Pulls of the page before reach nothing.
+        await page.ReceiveAsync("""{"t":"pull","id":1,"k":"page1","n":5}""");
+        Assert.Single(_posted);
+    }
+
+    [Fact]
+    public async Task RefusesAStreamCalledAsAPlainCall()
+    {
+        var (page, feed) = FeedPage();
+        await page.ReceiveAsync(Call(1, "Feed.Count", "[]"));
+        Assert.Equal("""{"t":"error","id":1,"k":"page1","e":"Feed.Count returns a stream: iterate it with oriel.stream"}""", Single());
+        Assert.Equal(0, feed.Produced);
+    }
+
+    [Theory]
+    [InlineData("""{"t":"pull","id":9,"k":"page1","n":5}""")]
+    [InlineData("""{"t":"pull","id":1,"k":"page1","n":-5}""")]
+    [InlineData("""{"t":"pull","id":1,"k":"page1","n":"5"}""")]
+    [InlineData("""{"t":"pull","id":1,"k":"page1"}""")]
+    [InlineData("""{"t":"cancel","id":"1","k":"page1"}""")]
+    public async Task IgnoresPullsAndCancelsThatDoNotFit(string message)
+    {
+        var (page, _) = FeedPage();
+        _ = page.ReceiveAsync(Stream(1, "Feed.Count", 1));
+        await WaitUntil(() => _posted.Count == 1);
+        await page.ReceiveAsync(message);
+        await Task.Delay(50);
+        Assert.Single(_posted);
+        page.Dispose();
+    }
+
     private sealed class Slow : ServiceDispatcher
     {
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

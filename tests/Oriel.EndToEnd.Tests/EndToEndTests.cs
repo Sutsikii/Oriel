@@ -87,6 +87,36 @@ public sealed class Probe
 
     public Event<int> Moved { get; } = new() { Coalesce = true };
 
+    public TaskCompletionSource<int> Endless { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>1 to <paramref name="to"/>.</summary>
+    public async IAsyncEnumerable<int> Count(int to)
+    {
+        for (var i = 1; i <= to; i++)
+        {
+            await Task.Yield();
+            yield return i;
+        }
+    }
+
+    /// <summary>1, 2, 3… until the page stops; <see cref="Endless"/> gets how many it made.</summary>
+    public async IAsyncEnumerable<int> Forever([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellation = default)
+    {
+        var made = 0;
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(1, cancellation);
+                yield return ++made;
+            }
+        }
+        finally
+        {
+            Endless.TrySetResult(made);
+        }
+    }
+
     /// <summary>Emits <see cref="Moved"/> 1 to <paramref name="count"/>, faster than any page takes them.</summary>
     public void Burst(int count)
     {
@@ -248,6 +278,27 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(Pages.Origin, root.GetProperty("origin").GetString());
         Assert.Equal("Done", window.Title);
         Assert.True(window.IsClosed);
+    }
+
+    [EndToEndFact(Linux = true, MacOS = true)]
+    public async Task PagesIterateStreamsAndStopThem()
+    {
+        var (report, _, _, probe) = await RunPage("""
+            let sum = 0;
+            for await (const n of oriel.stream("E2E.Count", [1000])) sum += n;
+            let last = 0;
+            for await (const n of oriel.stream("E2E.Forever", [])) {
+              last = n;
+              if (n === 50) break;
+            }
+            await oriel.call("E2E.Report", [JSON.stringify({ sum, last })]);
+            """);
+
+        using var results = JsonDocument.Parse(report);
+        Assert.Equal(500500, results.RootElement.GetProperty("sum").GetInt32());
+        Assert.Equal(50, results.RootElement.GetProperty("last").GetInt32());
+        // The producer stopped, no further ahead than the page's window.
+        Assert.InRange(await probe.Endless.Task.WaitAsync(TimeSpan.FromSeconds(10)), 50, 50 + 16);
     }
 
     [EndToEndFact(Linux = true, MacOS = true)]

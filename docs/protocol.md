@@ -42,6 +42,34 @@ method's parameters, without the ones Oriel passes itself (see
 
 `id` numbers the calls of a page, from 1.
 
+A call of a method returning a stream has `w`, the number of items the
+page is ready for (16). The app replies with up to that many
+[`item`](#item) messages, then sends more as the page grants them with
+`pull`, and ends the stream with a `result`, or an `error`. Called without
+`w`, such a method fails.
+
+```json
+{ "t": "call", "id": 2, "k": "3f9a…", "m": "Search.Find", "a": ["C:\\docs", "invoice"], "w": 16 }
+```
+
+### `pull`
+
+The page took items of the stream of call `id`, and is ready for `n` more.
+The runtime sends one each time it took half the window.
+
+```json
+{ "t": "pull", "id": 2, "k": "3f9a…", "n": 8 }
+```
+
+### `cancel`
+
+The page stopped iterating the stream of call `id`. The stream's
+`CancellationToken` is canceled, and no reply is sent.
+
+```json
+{ "t": "cancel", "id": 2, "k": "3f9a…" }
+```
+
 ### `key`
 
 The page let a key with Ctrl or Alt, or a function key, go by: no listener
@@ -92,6 +120,15 @@ nothing.
 
 ```json
 { "t": "result", "id": 1, "k": "3f9a…", "v": "Hello, Ada" }
+```
+
+### `item`
+
+An item `v` of the stream of call `id`. Items come in order, and no more
+than the page granted.
+
+```json
+{ "t": "item", "id": 2, "k": "3f9a…", "v": "C:\\docs\\invoice-04.pdf" }
 ```
 
 ### `error`
