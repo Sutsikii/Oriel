@@ -181,6 +181,9 @@ internal sealed unsafe class MacPlatform : IPlatform
         }
     }
 
+    /// <summary>Runs <paramref name="action"/> on the main thread, unless the app quit.</summary>
+    internal static void PostToRunning(Action action) => s_running?.Post(action);
+
     internal static void Report(Exception e)
     {
         Tracing.Write($"a posted action failed: {e}");

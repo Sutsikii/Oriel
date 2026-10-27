@@ -6,6 +6,10 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Files and large data by URL.** `OrielApp.Share` and `ShareFile` give
+  a URL pages load a `Stream` from, in `<video>`, `<img>` or `fetch`,
+  read as the page takes it, with range requests: videos seek.
+
 - **Streams.** Methods returning `IAsyncEnumerable<T>` become
   `AsyncIterable<T>` in the TypeScript client, for `for await`. The page
   pulls items as it takes them, so a slow page slows the producer, and

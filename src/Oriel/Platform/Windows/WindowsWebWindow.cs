@@ -631,10 +631,9 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
             Com.Release(settings);
         }
 
-        if (_options.EmbeddedAssets is { } embedded)
-            ServeEmbedded(embedded);
-        else if (_options.AssetsFolder is not null)
+        if (_options.EmbeddedAssets is null && _options.AssetsFolder is not null)
             WebView2.WebView.SetVirtualHostNameToFolderMapping(_webview, Frontend.AppHost, Path.GetFullPath(_options.AssetsFolder));
+        Serve(_options.EmbeddedAssets, _options.Streams);
 
         Subscribe(WebView2.IID_WebMessageReceivedEventHandler, WebView2.WebView.AddWebMessageReceived, (_, args) =>
         {
@@ -734,16 +733,29 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
     }
 
     /// <summary>
-    /// Answers the requests for the app's files with the frontend embedded in
-    /// it: the webview asks before going to the network, which has no
-    /// app.oriel anyway.
+    /// Answers the requests for the app's shared streams, at streams.oriel,
+    /// and for its files when the frontend is embedded in it: the webview
+    /// asks before going to the network, which has neither host anyway.
+    /// Requests for a folder's files never come: its mapping serves them.
     /// </summary>
-    private void ServeEmbedded(EmbeddedFrontend embedded)
+    private void Serve(EmbeddedFrontend? embedded, StreamServer? streams)
     {
-        WebView2.WebView.AddWebResourceRequestedFilter(_webview, Frontend.AppOrigin + "/*", WebView2.WebResourceContextAll);
+        if (embedded is null && streams is null)
+            return;
+        if (embedded is not null)
+            WebView2.WebView.AddWebResourceRequestedFilter(_webview, Frontend.AppOrigin + "/*", WebView2.WebResourceContextAll);
+        if (streams is not null)
+            WebView2.WebView.AddWebResourceRequestedFilter(_webview, "https://" + StreamServer.Host + "/*", WebView2.WebResourceContextAll);
         Subscribe(WebView2.IID_WebResourceRequestedEventHandler, WebView2.WebView.AddWebResourceRequested, (_, args) =>
         {
             var uri = new Uri(WebView2.WebResourceRequestedEventArgs.GetUri(args));
+            if (streams is not null && StreamServer.TryGetId(uri, out var id))
+            {
+                ServeStream(args, streams.Serve(id, WebView2.WebResourceRequestedEventArgs.GetHeader(args, "Range"), WebView2.WebResourceRequestedEventArgs.GetMethod(args)));
+                return;
+            }
+            if (embedded is null)
+                return;
             var file = embedded.Read(uri.AbsolutePath);
             Tracing.Write($"window {Hwnd:X} serves {uri.AbsolutePath} from the executable{(file is null ? ": not found" : "")}");
 
@@ -777,6 +789,29 @@ internal sealed unsafe class WindowsWebWindow : IPlatformWindow
                 Com.Release(stream);
             }
         });
+    }
+
+    /// <summary>Answers with a shared stream, which WebView2 reads as the page takes it.</summary>
+    private void ServeStream(nint args, StreamResponse answer)
+    {
+        Tracing.Write($"window {Hwnd:X} serves a shared stream: {answer.Status}");
+        var stream = answer.Body is null ? 0 : ComStream.Create(answer.Body, answer.Length);
+        try
+        {
+            var response = WebView2.Environment.CreateWebResourceResponse(_environment, stream, answer.Status, answer.Reason, answer.HeaderLines);
+            try
+            {
+                WebView2.WebResourceRequestedEventArgs.SetResponse(args, response);
+            }
+            finally
+            {
+                Com.Release(response);
+            }
+        }
+        finally
+        {
+            Com.Release(stream);
+        }
     }
 
     private void Subscribe(in Guid iid, Action<nint, nint> add, Action<nint, nint> handle)

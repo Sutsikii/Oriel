@@ -28,6 +28,9 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
     private const nint Titled = 1, Closable = 2, Miniaturizable = 4, Resizable = 8, FullSizeContentView = 1 << 15;
 
     private static readonly Dictionary<nint, MacWebWindow> s_windows = [];
+
+    // The scheme tasks sending a shared stream, which WebKit may stop. Main thread only.
+    private static readonly HashSet<nint> s_streaming = [];
     private static nint s_class;
 
     private readonly PlatformWindowOptions _options;
@@ -319,12 +322,21 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
     [UnmanagedCallersOnly]
     private static void OnStopTask(nint self, nint sel, nint webview, nint task)
     {
-        // Tasks are answered at once: none is left to stop.
+        // Files are answered at once; shared streams stop sending.
+        s_streaming.Remove(task);
     }
 
     private static void Serve(nint task, PlatformWindowOptions? options)
     {
-        var url = Send(Send(task, Sel("request")), Sel("URL"));
+        var request = Send(task, Sel("request"));
+        var url = Send(request, Sel("URL"));
+        if (options?.Streams is { } streams && Uri.TryCreate(UrlText(url), UriKind.Absolute, out var asked) && StreamServer.TryGetId(asked, out var id))
+        {
+            var range = Send(request, Sel("valueForHTTPHeaderField:"), Str("Range"));
+            var method = Send(request, Sel("HTTPMethod"));
+            ServeStream(task, url, streams.Serve(id, range == 0 ? null : Text(range), method == 0 ? "GET" : Text(method) ?? "GET"));
+            return;
+        }
         var path = AppScheme.FilePath(Uri.TryCreate(UrlText(url), UriKind.Absolute, out var uri) ? uri.AbsolutePath : "/");
         var file = options is null ? null : AppScheme.Read(path, options.AssetsFolder, options.EmbeddedAssets);
         Tracing.Write($"serves {path}{(file is null ? ": not found" : "")}");
@@ -344,6 +356,78 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
             data = Send(Class("NSData"), Sel("dataWithBytes:length:"), (nint)p, body.Length); // copies
         Send(task, Sel("didReceiveData:"), data);
         Send(task, Sel("didFinish"));
+    }
+
+    /// <summary>
+    /// Answers with a shared stream: a task reads it, and sends it in chunks
+    /// from the main thread, a few at a time, until WebKit stops the task.
+    /// </summary>
+    private static void ServeStream(nint task, nint url, StreamResponse answer)
+    {
+        Tracing.Write($"serves a shared stream: {answer.Status}");
+        var count = answer.Headers.Count;
+        var keys = stackalloc nint[count];
+        var values = stackalloc nint[count];
+        for (var i = 0; i < count; i++)
+        {
+            keys[i] = Str(answer.Headers[i].Key);
+            values[i] = Str(answer.Headers[i].Value);
+        }
+        var headers = Send(Class("NSDictionary"), Sel("dictionaryWithObjects:forKeys:count:"), (nint)values, (nint)keys, (nint)count);
+        var response = Send(Send(Class("NSHTTPURLResponse"), Sel("alloc")), Sel("initWithURL:statusCode:HTTPVersion:headerFields:"),
+            url, answer.Status, Str("HTTP/1.1"), headers);
+        Send(task, Sel("didReceiveResponse:"), response);
+        Release(response);
+        if (answer.Body is not { } body)
+        {
+            Send(task, Sel("didFinish"));
+            return;
+        }
+
+        Send(task, Sel("retain"));
+        s_streaming.Add(task);
+        var sending = new SemaphoreSlim(4); // chunks on their way to the main thread
+        var stopped = false;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                using (body)
+                {
+                    while (!Volatile.Read(ref stopped))
+                    {
+                        var chunk = new byte[256 * 1024];
+                        var read = body.Read(chunk);
+                        if (read == 0)
+                            break;
+                        sending.Wait();
+                        MacPlatform.PostToRunning(() =>
+                        {
+                            sending.Release();
+                            if (!s_streaming.Contains(task))
+                            {
+                                Volatile.Write(ref stopped, true);
+                                return;
+                            }
+                            nint data;
+                            fixed (byte* p = chunk)
+                                data = Send(Class("NSData"), Sel("dataWithBytes:length:"), (nint)p, read); // copies
+                            Send(task, Sel("didReceiveData:"), data);
+                        });
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Tracing.Write($"a shared stream failed to read: {e.Message}");
+            }
+            MacPlatform.PostToRunning(() =>
+            {
+                if (s_streaming.Remove(task))
+                    Send(task, Sel("didFinish"));
+                Release(task);
+            });
+        });
     }
 
     public void Fail(Exception error) => _events.Failed(error);

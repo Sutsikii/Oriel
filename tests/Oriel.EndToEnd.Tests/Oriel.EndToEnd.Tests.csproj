@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <!-- A frontend embedded as OrielEmbedFrontend embeds one, for the test of embedded pages. -->
+    <None Include="Media/**" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="Embedded/**" LogicalName="oriel-frontend/%(RecursiveDir)%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
 

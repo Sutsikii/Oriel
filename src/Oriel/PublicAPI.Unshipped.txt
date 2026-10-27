@@ -153,6 +153,8 @@ Oriel.OrielApp.OpenWindow(Oriel.WindowOptions? options = null) -> Oriel.OrielWin
 Oriel.OrielApp.Options.get -> Oriel.AppOptions!
 Oriel.OrielApp.OrielApp(Oriel.AppOptions! options) -> void
 Oriel.OrielApp.Quit() -> void
+Oriel.OrielApp.Share(System.Func<System.IO.Stream!>! open, string! contentType) -> Oriel.SharedStream!
+Oriel.OrielApp.ShareFile(string! path, string? contentType = null) -> Oriel.SharedStream!
 Oriel.OrielApp.Run(System.Action? ready = null) -> int
 Oriel.OrielApp.Windows.get -> System.Collections.Generic.IReadOnlyList<Oriel.OrielWindow!>!
 Oriel.OrielWindow
@@ -407,3 +409,7 @@ static Oriel.Generated.ServiceRegistry.RegisterError<T>(string! code, System.Act
 static Oriel.TypeScriptClient.Register(System.Reflection.Assembly! assembly, string! source) -> void
 virtual Oriel.Generated.ServiceDispatcher.Attach(Oriel.Generated.IEventSink! sink) -> void
 virtual Oriel.Generated.ValueWriter.Invoke(System.Text.Json.Utf8JsonWriter! writer) -> void
+Oriel.SharedStream
+Oriel.SharedStream.ContentType.get -> string!
+Oriel.SharedStream.Dispose() -> void
+Oriel.SharedStream.Url.get -> string!

@@ -27,6 +27,7 @@ internal sealed unsafe class LinuxPlatform : IPlatform
     private volatile bool _looping;
     private string? _assetsFolder;
     private EmbeddedFrontend? _embedded;
+    private StreamServer? _streams;
 
     // WebKit takes the first thread that uses it for its main thread, for
     // the life of the process, and aborts when another one does later. So
@@ -165,6 +166,7 @@ internal sealed unsafe class LinuxPlatform : IPlatform
     {
         _assetsFolder = options.AssetsFolder;
         _embedded = options.EmbeddedAssets;
+        _streams = options.Streams;
         if (s_schemeRegistered)
             return;
         s_schemeRegistered = true;
@@ -191,6 +193,15 @@ internal sealed unsafe class LinuxPlatform : IPlatform
 
     private void Serve(nint request)
     {
+        if (_streams is not null
+            && Uri.TryCreate(Gtk.Text(Gtk.webkit_uri_scheme_request_get_uri(request)), UriKind.Absolute, out var uri)
+            && StreamServer.TryGetId(uri, out var id))
+        {
+            var asked = Gtk.webkit_uri_scheme_request_get_http_headers(request);
+            var range = asked == 0 ? null : Gtk.Text(Gtk.soup_message_headers_get_one(asked, "Range"));
+            ServeStream(request, _streams.Serve(id, range, Gtk.Text(Gtk.webkit_uri_scheme_request_get_http_method(request)) ?? "GET"));
+            return;
+        }
         var path = AppScheme.FilePath(Gtk.Text(Gtk.webkit_uri_scheme_request_get_path(request)) ?? "/");
         var file = AppScheme.Read(path, _assetsFolder, _embedded);
         Tracing.Write($"serves {path}{(file is null ? ": not found" : "")}");
@@ -214,5 +225,63 @@ internal sealed unsafe class LinuxPlatform : IPlatform
         Gtk.g_object_unref(response);
         Gtk.g_object_unref(stream);
         Gtk.g_bytes_unref(bytes);
+    }
+
+    /// <summary>
+    /// Answers with a shared stream, through a pipe: a task writes the data
+    /// in as WebKit reads it out, so it is never all in memory. When the
+    /// page stops reading, WebKit closes its end, and the write fails.
+    /// </summary>
+    private static void ServeStream(nint request, StreamResponse answer)
+    {
+        Tracing.Write($"serves a shared stream: {answer.Status}");
+        nint input;
+        if (answer.Body is { } body)
+        {
+            var fds = stackalloc int[2];
+            if (Gtk.pipe(fds) != 0)
+            {
+                body.Dispose();
+                throw new IOException($"pipe failed: errno {Marshal.GetLastPInvokeError()}");
+            }
+            input = Gtk.g_unix_input_stream_new(fds[0], 1);
+            var output = new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(fds[1], ownsHandle: true), FileAccess.Write, 1);
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    using (body)
+                    using (output)
+                        body.CopyTo(output, 64 * 1024);
+                }
+                catch (IOException e)
+                {
+                    Tracing.Write($"a shared stream stopped: {e.Message}"); // the page stopped reading
+                }
+                catch (Exception e)
+                {
+                    Report(e);
+                }
+            });
+        }
+        else
+        {
+            var empty = Gtk.g_bytes_new(null, 0);
+            input = Gtk.g_memory_input_stream_new_from_bytes(empty);
+            Gtk.g_bytes_unref(empty);
+        }
+        var response = Gtk.webkit_uri_scheme_response_new(input, answer.Body is null ? 0 : answer.Length);
+        Gtk.webkit_uri_scheme_response_set_status(response, (uint)answer.Status, answer.Reason);
+        var headers = Gtk.soup_message_headers_new(Gtk.SOUP_MESSAGE_HEADERS_RESPONSE);
+        foreach (var (name, value) in answer.Headers)
+        {
+            if (name == "Content-Type")
+                Gtk.webkit_uri_scheme_response_set_content_type(response, value);
+            Gtk.soup_message_headers_append(headers, name, value);
+        }
+        Gtk.webkit_uri_scheme_response_set_http_headers(response, headers);
+        Gtk.webkit_uri_scheme_request_finish_with_response(request, response);
+        Gtk.g_object_unref(response);
+        Gtk.g_object_unref(input);
     }
 }
