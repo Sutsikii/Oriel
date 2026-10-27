@@ -136,6 +136,22 @@ jobs:
           name: hello-installer
           path: examples/hello/bin/installer
 
+  updates:
+    name: Update an installed app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Publishes 1.0.0 and 2.0.0, packs them with vpk, installs 1.0.0 and
+      # checks it updates itself to 2.0.0 (docs/updates.md).
+      - name: Install, then update from 1.0.0 to 2.0.0
+        shell: pwsh
+        run: ./tests/updates/run.ps1
+
   examples:
     name: Publish the ${{ matrix.example }} example
     runs-on: windows-latest
@@ -251,6 +267,7 @@ jobs:
           dotnet pack src/Oriel.Cli -c Release -o artifacts/packages
           dotnet pack src/plugins/Oriel.Sqlite -c Release -o artifacts/packages
           dotnet pack src/plugins/Oriel.SecureStorage -c Release -o artifacts/packages
+          dotnet pack src/plugins/Oriel.Updates -c Release -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:

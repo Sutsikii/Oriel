@@ -83,6 +83,7 @@ jobs:
           dotnet pack src/Oriel.Cli -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
           dotnet pack src/plugins/Oriel.Sqlite -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
           dotnet pack src/plugins/Oriel.SecureStorage -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
+          dotnet pack src/plugins/Oriel.Updates -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:

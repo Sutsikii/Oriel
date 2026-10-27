@@ -105,8 +105,8 @@ The Linux and macOS backends have the core, and not yet dialogs, menus or
 printing. The macOS one is tested in CI only, since the maintainers have no
 Mac yet: if you have one, your help is welcome. The calls, events, generator, Windows
 backend, window control, dialogs, menus, installers, tray icons,
-notifications, single instance, signing and the `oriel` command are done
-and tested; updates are next. See the [roadmap](docs/roadmap.md).
+notifications, single instance, signing, updates and the `oriel` command
+are done and tested. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 
@@ -126,6 +126,7 @@ and tested; updates are next. See the [roadmap](docs/roadmap.md).
 - [The clipboard](docs/clipboard.md): text, HTML, images and files.
 - [Plugins](docs/plugins.md): SQLite and secure storage, and writing a
   plugin of your own.
+- [Updates](docs/updates.md): apps that update themselves, with Velopack.
 - [Notifications](docs/notifications.md): toasts with buttons; tray icons
   are in [Windows](docs/windows.md#tray-icons).
 - [Building and shipping](docs/build.md): build properties, development

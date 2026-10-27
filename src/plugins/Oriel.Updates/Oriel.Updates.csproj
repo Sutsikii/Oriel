@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Oriel.Updates</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Updates for Oriel apps with Velopack: check, download with progress, and restart into the new version, from C# and from pages through a generated TypeScript client.</Description>
+    <PackageTags>desktop;webview;oriel-plugin;updates;velopack;auto-update</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- As a plugin's package references Oriel's, all of whose assets flow to apps: the generator writes the services' dispatcher and client. -->
+    <ProjectReference Include="../../Oriel/Oriel.csproj" PrivateAssets="none" />
+    <ProjectReference Include="../../Oriel.Generators/Oriel.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <InternalsVisibleTo Include="Oriel.Plugins.Tests" />
+  </ItemGroup>
+
+</Project>
