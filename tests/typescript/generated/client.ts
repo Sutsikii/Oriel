@@ -23,7 +23,10 @@ class CallErrorBase extends Error {
  * Errors of [ServiceError] exceptions have their code, which tells their data's type.
  */
 export type CallError = CallErrorBase & ({ readonly code: "conflict"; readonly data: ConflictException } | { readonly code: null; readonly data: null });
-export const CallError = CallErrorBase as unknown as {
+// One class for the clients of every assembly, so that instanceof CallError holds whichever threw.
+const callErrors = globalThis as { [key: symbol]: unknown };
+const SharedCallError = (callErrors[Symbol.for("oriel.CallError")] ??= CallErrorBase) as typeof CallErrorBase;
+export const CallError = SharedCallError as unknown as {
   new (method: string, message: string, code?: string | null, data?: unknown): CallError;
   readonly prototype: CallError;
 };

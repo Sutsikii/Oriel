@@ -542,7 +542,7 @@ public sealed class OrielApp : ICoalescingSink
     {
         var assembly = Assembly.GetEntryAssembly()
             ?? throw new InvalidOperationException("No entry assembly to write the TypeScript client of.");
-        TypeScriptClient.Write(assembly, path);
+        TypeScriptClient.WriteAll(assembly, path);
         return 0;
     }
 }
