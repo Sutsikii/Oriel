@@ -1,24 +1,132 @@
 {
   "$schema": "http://json.schemastore.org/template",
   "author": "Oriel contributors",
-  "classifications": ["Desktop", "Windows", "Web", "TypeScript"],
+  "classifications": [
+    "Desktop",
+    "Windows",
+    "Web",
+    "TypeScript",
+    "React",
+    "Vue",
+    "Svelte"
+  ],
   "identity": "Oriel.App.CSharp",
   "groupIdentity": "Oriel.App",
   "name": "Oriel app",
-  "description": "A desktop app in C#, with a Vite and TypeScript frontend calling C# through a generated client.",
+  "description": "A desktop app in C#, with a Vite and TypeScript frontend calling C# through a generated client: vanilla, React, Vue or Svelte.",
   "shortName": "oriel",
-  "tags": { "language": "C#", "type": "project" },
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
   "sourceName": "OrielTemplate",
   "preferNameDirectory": true,
-  "guids": ["7F3C2A51-0B6E-4D8A-9C1F-5E2B8A4D6C90"],
-  "sources": [{ "modifiers": [{ "exclude": ["frontend/node_modules/**", "frontend/dist/**", "bin/**", "obj/**"] }] }],
-  "primaryOutputs": [{ "path": "OrielTemplate.csproj" }],
+  "guids": [
+    "7F3C2A51-0B6E-4D8A-9C1F-5E2B8A4D6C90"
+  ],
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "frontend/node_modules/**",
+            "frontend/dist/**",
+            "frontends/*/node_modules/**",
+            "frontends/*/dist/**",
+            "bin/**",
+            "obj/**"
+          ]
+        },
+        {
+          "condition": "(framework != \"vanilla\")",
+          "exclude": [
+            "frontend/index.html",
+            "frontend/package.json",
+            "frontend/tsconfig.json",
+            "frontend/vite.config.ts",
+            "frontend/src/main.ts"
+          ]
+        },
+        {
+          "condition": "(framework != \"react\")",
+          "exclude": [
+            "frontends/react/**"
+          ]
+        },
+        {
+          "condition": "(framework == \"react\")",
+          "rename": {
+            "frontends/react/": "frontend/"
+          }
+        },
+        {
+          "condition": "(framework != \"vue\")",
+          "exclude": [
+            "frontends/vue/**"
+          ]
+        },
+        {
+          "condition": "(framework == \"vue\")",
+          "rename": {
+            "frontends/vue/": "frontend/"
+          }
+        },
+        {
+          "condition": "(framework != \"svelte\")",
+          "exclude": [
+            "frontends/svelte/**"
+          ]
+        },
+        {
+          "condition": "(framework == \"svelte\")",
+          "rename": {
+            "frontends/svelte/": "frontend/"
+          }
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    {
+      "path": "OrielTemplate.csproj"
+    }
+  ],
   "postActions": [
     {
       "description": "Next steps.",
-      "manualInstructions": [{ "text": "cd frontend, then: npm install, and npm run dev" }],
+      "manualInstructions": [
+        {
+          "text": "cd frontend, then: npm install, and npm run dev"
+        }
+      ],
       "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
       "continueOnError": true
     }
-  ]
+  ],
+  "symbols": {
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "vanilla",
+      "description": "The frontend's framework.",
+      "choices": [
+        {
+          "choice": "vanilla",
+          "description": "TypeScript and the DOM, no framework"
+        },
+        {
+          "choice": "react",
+          "description": "React"
+        },
+        {
+          "choice": "vue",
+          "description": "Vue"
+        },
+        {
+          "choice": "svelte",
+          "description": "Svelte"
+        }
+      ]
+    }
+  }
 }

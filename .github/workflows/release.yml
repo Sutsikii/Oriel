@@ -80,6 +80,7 @@ jobs:
           dotnet pack src/Oriel -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
           dotnet pack src/Oriel.Hosting -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
           dotnet pack templates/Oriel.Templates -c Release -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
+          dotnet pack src/Oriel.Cli -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:

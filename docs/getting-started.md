@@ -15,21 +15,32 @@ and a native executable at the end.
 Later, for a native executable (NativeAOT) only: Visual Studio or its Build
 Tools, with the "Desktop development with C++" workload.
 
+The `oriel` command checks all of this, and says how to get what is
+missing:
+
+```sh
+dotnet tool install -g Oriel.Cli --prerelease
+oriel doctor
+```
+
 ## 1. The project
 
-Install the templates once, then create the app:
+Install the templates once, then create the app, with the frontend's
+framework of your choice: `vanilla` (TypeScript and the DOM, the default),
+`react`, `vue` or `svelte`:
 
 ```sh
 dotnet new install Oriel.Templates
-dotnet new oriel -o MyApp
-cd MyApp/frontend
-npm install
-npm run dev
+dotnet new oriel -o MyApp --framework react
+cd MyApp
+oriel dev
 ```
 
-A window opens with a page that calls C#. `npm run dev` starts Vite and
-`dotnet watch` together: editing the page reloads it; editing C# rebuilds
-the app, restarts it and rewrites the TypeScript client.
+`oriel dev` installs the frontend's packages the first time, starts Vite,
+then the app with `dotnet watch`, pointed at Vite. A window opens with a page
+that calls C#: editing the page reloads it; editing C# rebuilds the app,
+restarts it and rewrites the TypeScript client. Without the `oriel`
+command, `npm install` then `npm run dev` in `frontend/` do the same.
 
 The app has:
 
@@ -38,7 +49,7 @@ The app has:
 | `MyApp.csproj` | The project, with the `Oriel` package and its build properties ([build.md](build.md)), and an `OrielAppId` of its own |
 | `Program.cs` | Binds the services and opens the window |
 | `Services.cs` | A `[Service]` class, which the page calls |
-| `frontend/` | A Vite and TypeScript frontend; `src/oriel.ts` is the generated client |
+| `frontend/` | A Vite and TypeScript frontend, with the framework chosen; `src/oriel.ts` is the generated client |
 
 One package brings the library, the source generator and the build steps.
 It is on [nuget.org](https://www.nuget.org/packages/Oriel), in preview;
@@ -96,7 +107,7 @@ enums, lists, nullable types, events and more.
 
 ## 4. Develop
 
-While `npm run dev` runs, add a method to `Greeter` and save: the app
+While `oriel dev` runs, add a method to `Greeter` and save: the app
 restarts, `oriel.ts` gets the method, and the page's editor completes it.
 Rename one, and the page's compiler shows each call that broke.
 

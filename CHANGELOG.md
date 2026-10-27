@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Templates and the `oriel` command.** `dotnet new oriel --framework
+  react` (or `vue`, `svelte`, `vanilla`). The new `Oriel.Cli` tool gives
+  `oriel doctor`, which checks what building and shipping apps needs, and
+  `oriel dev`, which runs an app with its frontend's dev server.
+
 - **Clients of several assemblies.** Services in referenced libraries get
   TypeScript clients too: a module per assembly, and an index at
   `OrielTypeScriptOutput` re-exporting them. Names two assemblies export
