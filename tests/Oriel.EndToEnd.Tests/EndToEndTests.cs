@@ -13,6 +13,18 @@ public sealed class EndToEndFactAttribute : FactAttribute
 {
     private bool _linux;
     private bool _macOS;
+    private bool _windows = true;
+
+    /// <summary>Whether the test is for Windows too; false for tests of another backend's own.</summary>
+    public bool Windows
+    {
+        get => _windows;
+        set
+        {
+            _windows = value;
+            Decide();
+        }
+    }
 
     public EndToEndFactAttribute() => Decide();
 
@@ -49,7 +61,7 @@ public sealed class EndToEndFactAttribute : FactAttribute
         else if (!OperatingSystem.IsWindows())
             Skip = "Oriel runs on Windows, Linux and macOS";
         else
-            Skip = null;
+            Skip = _windows ? null : "drives another backend's dialogs";
     }
 }
 
@@ -976,6 +988,56 @@ public sealed class EndToEndTests : IDisposable
         Assert.Empty(errors);
     }
 
+    /// <summary>The GTK dialogs, answered on the UI thread as a person would, titled as asked.</summary>
+    [EndToEndFact(Linux = true, Windows = false)]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public async Task ShowsGtkDialogsModalToTheirWindow()
+    {
+        File.WriteAllText(Path.Combine(_assets, "index.html"), """<script type="module">await oriel.call("E2E.Loaded", []);</script>""");
+        var app = new OrielApp(new AppOptions { Name = _name, AssetsDirectory = _assets });
+        var probe = new Probe();
+        app.Bind(probe);
+        var errors = new List<Exception>();
+        app.Error += errors.Add;
+        OrielWindow? window = null;
+        var run = Task.Run(() => app.Run(() => window = app.OpenWindow(new WindowOptions { Title = "Dialogs", Width = 600, Height = 400 })));
+        await probe.FirstLoad.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        async Task Answer(string title, int response)
+        {
+            for (var i = 0; i < 100; i++)
+            {
+                var answered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                app.Dispatch(() => answered.SetResult(Oriel.Platform.Linux.GtkDialogs.Respond(title, response)));
+                if (await answered.Task)
+                    return;
+                await Task.Delay(100);
+            }
+            throw new TimeoutException($"no dialog \"{title}\" showed");
+        }
+
+        var open = window!.Dialogs.OpenFileAsync(new() { Title = "Oriel open test", Filters = [new("Text", "*.txt")], Directory = _assets });
+        await Answer("Oriel open test", Oriel.Platform.Linux.GtkDialogs.Cancel);
+        Assert.Null(await open.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // Accepted as proposed: the name in the folder, with the filter's extension.
+        var save = window.Dialogs.SaveFileAsync(new() { Title = "Oriel save test", FileName = Path.Combine(_assets, "notes"), Filters = [new("Text", "*.txt")] });
+        await Answer("Oriel save test", Oriel.Platform.Linux.GtkDialogs.Accept);
+        Assert.Equal(Path.Combine(_assets, "notes.txt"), await save.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        var folder = window.Dialogs.PickFolderAsync(new() { Title = "Oriel folder test" });
+        await Answer("Oriel folder test", Oriel.Platform.Linux.GtkDialogs.Closed);
+        Assert.Null(await folder.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        var message = window.Dialogs.MessageAsync(new() { Text = "Keep going? 100% sure", Kind = MessageKind.Question, Buttons = MessageButtons.YesNo });
+        await Answer("Dialogs", Oriel.Platform.Linux.GtkDialogs.No); // titled after its window
+        Assert.Equal(MessageResult.No, await message.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        window.Close();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Empty(errors);
+    }
+
     /// <summary>Finds and drives the system's dialogs of this process, as a person would.</summary>
     private static class Dialog
     {
@@ -1031,7 +1093,7 @@ public sealed class EndToEndTests : IDisposable
         private static extern bool PostMessageW(nint hwnd, uint msg, nint wParam, nint lParam);
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task PrintsThePageToPdfThroughAService()
     {
         var portrait = Path.Combine(_assets, "portrait.pdf");

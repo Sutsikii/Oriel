@@ -101,8 +101,8 @@ CI publishes each with NativeAOT, so they double as tests.
 Oriel is young. It runs on **Windows 10 1809 and later**, with the WebView2
 Runtime, on **Linux** with GTK 3 and WebKitGTK ([linux.md](docs/linux.md)),
 and on **macOS** with AppKit and WKWebView ([macos.md](docs/macos.md)).
-The Linux and macOS backends have the core, and not yet dialogs, menus or
-printing. The macOS one is tested in CI only, since the maintainers have no
+The Linux and macOS backends have the core; Linux has dialogs and
+printing too, and neither has menus yet. The macOS one is tested in CI only, since the maintainers have no
 Mac yet: if you have one, your help is welcome. The calls, events, generator, Windows
 backend, window control, dialogs, menus, installers, tray icons,
 notifications, single instance, signing, updates and the `oriel` command

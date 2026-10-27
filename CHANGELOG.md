@@ -6,6 +6,9 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Linux: dialogs and printing.** File dialogs and message boxes (GTK),
+  the print dialog, and pages to PDF files now work on Linux.
+
 - **Updates.** The `Oriel.Updates` package wires Velopack: the service
   `Updates` checks for a newer version, downloads it with progress, and
   restarts the app into it, from C# or from pages. docs/updates.md says how

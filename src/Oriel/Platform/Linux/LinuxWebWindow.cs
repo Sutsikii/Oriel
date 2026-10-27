@@ -317,13 +317,24 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
 
     public void ShowErrorPage(string html) => Gtk.webkit_web_view_load_html(_webview, html, null);
 
-    public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => throw NotYet("File dialogs");
+    public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => GtkDialogs.ShowFile(_window, request);
 
-    public MessageResult ShowMessage(MessageRequest request) => throw NotYet("Message boxes");
+    public MessageResult ShowMessage(MessageRequest request) => GtkDialogs.ShowMessage(_window, request);
 
-    public void ShowPrintDialog(PrintDialog dialog) => throw NotYet("Printing");
+    /// <summary>GTK's print dialog, whichever is asked: WebKitGTK has no dialog of its own.</summary>
+    public void ShowPrintDialog(PrintDialog dialog)
+    {
+        if (!_destroyed)
+            GtkPrinting.ShowDialog(_webview, _window);
+    }
 
-    public void PrintToPdf(string path, PdfOptions? options, Action<bool> done) => throw NotYet("Printing to PDF");
+    public void PrintToPdf(string path, PdfOptions? options, Action<bool> done)
+    {
+        if (_destroyed)
+            done(false);
+        else
+            GtkPrinting.ToPdf(_webview, path, options, done);
+    }
 
     public void SetMenu(Menu? menu)
     {

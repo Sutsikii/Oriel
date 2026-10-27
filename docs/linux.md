@@ -35,7 +35,13 @@ Tested in real windows, in CI:
 - the app's files, from a folder or embedded in the executable;
 - where pages may go, `window.open`, and no permission for pages, as on
   Windows;
-- reloading a page, which cancels the calls of the page before.
+- reloading a page, which cancels the calls of the page before;
+- file dialogs (open, open several, save, folder) and message boxes, modal
+  to their window: GTK's, through the desktop's portal when the app runs in
+  a sandbox (Flatpak, Snap);
+- printing: GTK's print dialog, which `ShowPrintDialog` shows whichever is
+  asked, and pages to PDF files through GTK's "Print to File" printer,
+  laid out by `PdfOptions` (but `HeaderAndFooter`, which WebKitGTK has not).
 
 There, but not tested yet: several windows, sizes, positions, minimum
 sizes, states, full screen, always on top, frameless windows, placements
@@ -47,9 +53,7 @@ manager, which the tests' virtual display has not.
 
 These throw `NotSupportedException` on Linux, or do nothing for menus:
 
-- file dialogs and message boxes;
 - the menu bar, context menus and accelerators;
-- printing, and pages to PDF;
 - the paths of dropped files (the page still gets its `File` objects).
 
 [#30](https://github.com/Sutsikii/Oriel/issues/30) follows them.
