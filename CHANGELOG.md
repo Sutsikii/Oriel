@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **Clients of several assemblies.** Services in referenced libraries get
+  TypeScript clients too: a module per assembly, and an index at
+  `OrielTypeScriptOutput` re-exporting them. Names two assemblies export
+  fail the build. `CallError` is one class across clients.
+
 - **One instance, links and files.** `AppOptions.SingleInstance` keeps one
   instance per user: later launches send it their arguments
   (`SecondInstanceStarted`). `OpenRequested` tells the links and files a

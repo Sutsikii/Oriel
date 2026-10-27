@@ -87,7 +87,10 @@ internal static class TypeScriptEmitter
         w.Line(" * Errors of [ServiceError] exceptions have their code, which tells their data's type.");
         w.Line(" */");
         w.Line($"export type CallError = CallErrorBase & ({string.Join(" | ", members)});");
-        w.Line("export const CallError = CallErrorBase as unknown as {");
+        w.Line("// One class for the clients of every assembly, so that instanceof CallError holds whichever threw.");
+        w.Line("const callErrors = globalThis as { [key: symbol]: unknown };");
+        w.Line("const SharedCallError = (callErrors[Symbol.for(\"oriel.CallError\")] ??= CallErrorBase) as typeof CallErrorBase;");
+        w.Line("export const CallError = SharedCallError as unknown as {");
         using (w.Indent())
         {
             w.Line("new (method: string, message: string, code?: string | null, data?: unknown): CallError;");

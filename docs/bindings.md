@@ -452,3 +452,27 @@ changed. To write it by hand, run the app with `ORIEL_GENERATE=path/oriel.ts`:
 
 Commit it with the frontend, so the page type-checks without building the C#
 side.
+
+### Services of several assemblies
+
+Services can live in libraries the app references, as modules or plugins:
+each assembly with `[Service]` classes gets a client of its own. When there
+are several, the client path holds an index that re-exports them, and the
+modules go in a folder of the index's name beside it:
+
+```
+frontend/src/oriel.ts             the index: import from "./oriel" as before
+frontend/src/oriel/MyApp.ts       the app's services
+frontend/src/oriel/Acme.Sync.ts   the services of the Acme.Sync library
+```
+
+- The index's imports end in `.js`, which TypeScript (`"moduleResolution":
+  "Bundler"`) and bundlers such as Vite resolve to the `.ts` files.
+- `CallError` is one class for every module: `err instanceof CallError`
+  holds whichever service threw.
+- Two assemblies that export the same name, such as two services or two
+  records named `Files`, fail the build, which names them. Rename one, or
+  give a service another name with `[Service(Name = ...)]`.
+- Modules of assemblies that no longer have services are removed.
+
+With one assembly of services, the client is one file, as before.
