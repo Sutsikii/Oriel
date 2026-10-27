@@ -13,7 +13,7 @@ namespace Oriel.Platform.Linux;
 /// <c>window.__orielReceive</c>, as bridge.js expects of WebKit.
 /// </summary>
 [SupportedOSPlatform("linux")]
-internal sealed unsafe class LinuxWebWindow : IPlatformWindow
+internal sealed unsafe partial class LinuxWebWindow : IPlatformWindow
 {
     private readonly PlatformWindowOptions _options;
     private readonly IPlatformWindowEvents _events;
@@ -21,6 +21,11 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
     private nint _window;
     private nint _webview;
     private nint _content;
+    private nint _box;
+    private nint _bar;
+    private Menu? _menu;
+    private List<string>? _dropped;
+    private DateTime _droppedAt;
     private bool _destroyed;
     private WindowBounds _normal;
     private WindowState _state;
@@ -67,7 +72,12 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
         Gtk.webkit_settings_set_enable_developer_extras(settings, _options.DevTools ? 1 : 0);
         // So that window.open reaches the create signal, and Oriel, which decides: WebKit opens nothing itself.
         Gtk.webkit_settings_set_javascript_can_open_windows_automatically(settings, 1);
-        Gtk.gtk_container_add(_window, _webview);
+        // A column: the menu bar, when there is one, over the page.
+        _box = gtk_box_new(1 /* GTK_ORIENTATION_VERTICAL */, 0);
+        Gtk.gtk_container_add(_window, _box);
+        gtk_box_pack_end(_box, _webview, 1, 1, 0);
+        if (_options.Menu is { } menu)
+            SetMenu(menu);
 
         Connect(_window, "destroy", (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&OnDestroy, self);
         Connect(_window, "delete-event", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnDeleteEvent, self);
@@ -78,6 +88,7 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
         Connect(_webview, "decide-policy", (nint)(delegate* unmanaged[Cdecl]<nint, nint, int, nint, int>)&OnDecidePolicy, self);
         Connect(_webview, "create", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, nint>)&OnCreate, self);
         Connect(_webview, "permission-request", (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, int>)&OnPermission, self);
+        Connect(_webview, "drag-data-received", (nint)(delegate* unmanaged[Cdecl]<nint, nint, int, int, nint, uint, uint, nint, void>)&OnDragDataReceived, self);
         Connect(_webview, "web-process-terminated", (nint)(delegate* unmanaged[Cdecl]<nint, int, nint, void>)&OnWebProcessTerminated, self);
 
         Gtk.gtk_widget_show_all(_window);
@@ -199,8 +210,16 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
         // The handler is the top frame's only, where the bridge runs: its document is the view's.
         var source = AppScheme.FromPage(Gtk.Text(Gtk.webkit_web_view_get_uri(w._webview)) ?? "");
         Tracing.Write($"window received {message}");
+        // A drop: its files are those of the drag WebKit took just before, which the page cannot tell.
+        IReadOnlyList<string>? files = null;
+        if (message is not null && message.StartsWith("{\"t\":\"drop\"", StringComparison.Ordinal) && w._dropped is { } dropped
+            && DateTime.UtcNow - w._droppedAt < TimeSpan.FromSeconds(10))
+        {
+            files = dropped;
+            w._dropped = null;
+        }
         if (message is not null)
-            w._events.MessageReceived(source, message);
+            w._events.MessageReceived(source, message, files);
     });
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -338,15 +357,73 @@ internal sealed unsafe class LinuxWebWindow : IPlatformWindow
 
     public void SetMenu(Menu? menu)
     {
-        if (menu is not null)
-            Tracing.Write("menus are not shown on Linux yet");
+        if (_destroyed)
+            return;
+        if (_bar != 0)
+            GtkMenus.Destroy(_bar);
+        _bar = 0;
+        _menu = menu;
+        if (menu is null)
+            return;
+        _bar = GtkMenus.Bar(menu, item => _events.MenuItemClicked(item));
+        gtk_box_pack_start(_box, _bar, 0, 0, 0);
     }
 
-    public MenuItem? ShowContextMenu(Menu menu, PagePoint? at) => throw NotYet("Context menus");
+    /// <summary>The menu bar, for tests: 0 when there is none.</summary>
+    internal nint MenuBar => _bar;
+
+    /// <summary>At a point of the page in CSS pixels, which GTK's widget coordinates are at its zoom of 1.</summary>
+    public MenuItem? ShowContextMenu(Menu menu, PagePoint? at) =>
+        _destroyed ? null : GtkMenus.ShowContext(menu, _webview, at is { } p ? ((int)Math.Round(p.X), (int)Math.Round(p.Y)) : null);
 
     public void ActivateMenuBar(char mnemonic)
     {
+        if (_bar != 0 && _menu is { } menu)
+            GtkMenus.Open(_bar, menu, mnemonic);
     }
+
+    /// <summary>
+    /// A drag WebKit received: the paths of its files, which the page's drop,
+    /// which comes after, sends with its message.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnDragDataReceived(nint widget, nint context, int x, int y, nint data, uint info, uint time, nint self) => Guard(self, w =>
+    {
+        var uris = gtk_selection_data_get_uris(data);
+        if (uris == 0)
+            return;
+        var paths = new List<string>();
+        for (var uri = (nint*)uris; *uri != 0; uri++)
+        {
+            var path = g_filename_from_uri(*uri, 0, 0);
+            if (Gtk.TakeText(path) is { } file)
+                paths.Add(file);
+        }
+        g_strfreev(uris);
+        if (paths.Count > 0)
+        {
+            w._dropped = paths;
+            w._droppedAt = DateTime.UtcNow;
+        }
+    });
+
+    [LibraryImport("libgtk-3.so.0")]
+    private static partial nint gtk_box_new(int orientation, int spacing);
+
+    [LibraryImport("libgtk-3.so.0")]
+    private static partial void gtk_box_pack_start(nint box, nint child, int expand, int fill, uint padding);
+
+    [LibraryImport("libgtk-3.so.0")]
+    private static partial void gtk_box_pack_end(nint box, nint child, int expand, int fill, uint padding);
+
+    [LibraryImport("libgtk-3.so.0")]
+    private static partial nint gtk_selection_data_get_uris(nint data);
+
+    [LibraryImport("libglib-2.0.so.0")]
+    private static partial nint g_filename_from_uri(nint uri, nint hostname, nint error);
+
+    [LibraryImport("libglib-2.0.so.0")]
+    private static partial void g_strfreev(nint strings);
 
     public void SetBounds(int? x, int? y, int? width, int? height)
     {

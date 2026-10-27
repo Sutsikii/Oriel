@@ -606,7 +606,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(got.Order(), got);
     }
 
-    [EndToEndFact]
+    [EndToEndFact(Linux = true)]
     public async Task AcceleratorsRunTheMenuUnlessThePageHandlesThem()
     {
         var clicks = new List<string>();
@@ -986,6 +986,44 @@ public sealed class EndToEndTests : IDisposable
         window.Close();
         await run.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Empty(errors);
+    }
+
+    /// <summary>The GTK menu bar and a context menu, clicked on the UI thread as a person would.</summary>
+    [EndToEndFact(Linux = true, Windows = false)]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public async Task ShowsGtkMenus()
+    {
+        var clicks = new List<string>();
+        var menu = new Menu(
+            new MenuItem("&File") { Items = [new MenuItem("&Save", "Ctrl+S") { Clicked = _ => clicks.Add("save") }, MenuItem.Separator(), new MenuItem("&Quit")] },
+            new MenuItem("&View") { Items = [new MenuItem("&Wrap") { IsCheckable = true, Clicked = _ => clicks.Add("wrap") }] });
+        await RunWindow(new WindowOptions { Title = "Menus", Menu = menu }, async (app, window) =>
+        {
+            async Task<bool> OnUi(Func<bool> act)
+            {
+                var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                app.Dispatch(() => done.SetResult(act()));
+                return await done.Task;
+            }
+
+            var bar = await OnUi(() => ((Oriel.Platform.Linux.LinuxWebWindow)window.NativeWindow!).MenuBar != 0);
+            Assert.True(bar);
+            Assert.True(await OnUi(() => Oriel.Platform.Linux.GtkMenus.ClickInBar(((Oriel.Platform.Linux.LinuxWebWindow)window.NativeWindow!).MenuBar, "&Save")));
+            Assert.True(await OnUi(() => Oriel.Platform.Linux.GtkMenus.ClickInBar(((Oriel.Platform.Linux.LinuxWebWindow)window.NativeWindow!).MenuBar, "&Wrap")));
+            await Until(() => clicks.Count == 2, "the bar's items ran");
+            Assert.Equal(["save", "wrap"], clicks);
+
+            var shown = window.ShowContextMenuAsync(new Menu(new MenuItem("Copy link"), new MenuItem("Inspect")), 20, 20);
+            var clicked = false;
+            for (var i = 0; i < 100 && !clicked; i++)
+            {
+                clicked = await OnUi(() => Oriel.Platform.Linux.GtkMenus.ClickInContext("Inspect"));
+                if (!clicked)
+                    await Task.Delay(100);
+            }
+            Assert.True(clicked, "the context menu showed");
+            Assert.Equal("Inspect", (await shown.WaitAsync(TimeSpan.FromSeconds(10)))?.Text);
+        });
     }
 
     /// <summary>The GTK dialogs, answered on the UI thread as a person would, titled as asked.</summary>

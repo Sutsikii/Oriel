@@ -41,22 +41,23 @@ Tested in real windows, in CI:
   a sandbox (Flatpak, Snap);
 - printing: GTK's print dialog, which `ShowPrintDialog` shows whichever is
   asked, and pages to PDF files through GTK's "Print to File" printer,
-  laid out by `PdfOptions` (but `HeaderAndFooter`, which WebKitGTK has not).
+  laid out by `PdfOptions` (but `HeaderAndFooter`, which WebKitGTK has not);
+- menus: the menu bar (a GtkMenuBar over the page, with mnemonics, check
+  items and the accelerators they show), context menus, and accelerators,
+  which the page sees first as on Windows; Alt and a mnemonic open the
+  bar's menu.
+
+There, but not tested in CI: the paths of dropped files. WebKitGTK tells
+the window the files of a drag, and the page's drop, which comes after,
+reaches the app with them (`OrielWindow.FilesDropped`, and
+`oriel:filesDropped` in the page); no test can drag files onto a window of
+the virtual display yet.
 
 There, but not tested yet: several windows, sizes, positions, minimum
 sizes, states, full screen, always on top, frameless windows, placements
 remembered across runs, a dev server while developing, and developer
 tools. Moving and resizing were tried by hand; maximizing needs a window
 manager, which the tests' virtual display has not.
-
-## What is not there yet
-
-These throw `NotSupportedException` on Linux, or do nothing for menus:
-
-- the menu bar, context menus and accelerators;
-- the paths of dropped files (the page still gets its `File` objects).
-
-[#30](https://github.com/Sutsikii/Oriel/issues/30) follows them.
 
 ## How it is tested
 

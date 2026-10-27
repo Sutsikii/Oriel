@@ -6,8 +6,9 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
-- **Linux: dialogs and printing.** File dialogs and message boxes (GTK),
-  the print dialog, and pages to PDF files now work on Linux.
+- **Linux: dialogs, printing and menus.** File dialogs and message boxes
+  (GTK), the print dialog, pages to PDF files, the menu bar, context menus,
+  accelerators and dropped files' paths now work on Linux.
 
 - **Updates.** The `Oriel.Updates` package wires Velopack: the service
   `Updates` checks for a newer version, downloads it with progress, and
