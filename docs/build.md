@@ -74,7 +74,7 @@ await browser.close(); // disconnects; the app keeps running
 dotnet publish -c Release -r win-x64
 ```
 
-With `PublishAot`, this gives a native executable of about 2 MB, plus
+With `PublishAot`, this gives a native executable of about 2.5 MB, plus
 `wwwroot`. The published `wwwroot` holds the frontend of this publish only:
 the SDK removes what its earlier publishes with the same options wrote, and
 Oriel removes the rest, such as the bundles of a publish with other options. NativeAOT needs Visual Studio or its Build Tools with the

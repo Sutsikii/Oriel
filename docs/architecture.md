@@ -9,7 +9,7 @@ the generator or a platform backend.
   TypeScript client follows the C# code, documentation included.
 - **No reflection, so NativeAOT.** Everything that depends on the app's types
   is generated at compile time. A published app is a native executable of
-  about 2 MB.
+  about 2.5 MB.
 - **No native dependency of its own.** The system webview is driven directly
   (through COM on Windows): no C++ or Rust library, no WebView2 SDK, no
   loader DLL to ship.

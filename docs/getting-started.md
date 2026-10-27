@@ -107,7 +107,7 @@ dotnet publish -c Release -r win-x64
 ```
 
 In Release, the frontend is built (`npm run build`) and copied to `wwwroot`
-beside a native executable of about 2 MB.
+beside a native executable of about 2.5 MB.
 
 To ship it as a real Windows install, with a setup wizard, shortcuts and an
 uninstaller, install [Inno Setup](https://jrsoftware.org/isinfo.php) once

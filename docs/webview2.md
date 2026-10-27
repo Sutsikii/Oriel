@@ -9,7 +9,7 @@ stays up to date, and what happens on a machine without it.
 An app that bundles its browser engine, as Electron does, ships 100 MB or
 more and updates the engine itself, or never does. WebView2 is Chromium,
 installed once per machine and updated by Windows, so an Oriel app is a
-2 MB executable and its pages get the engine's security fixes without a
+2.5 MB executable and its pages get the engine's security fixes without a
 new release of the app.
 
 The usual worry with system webviews is that each user has a different
