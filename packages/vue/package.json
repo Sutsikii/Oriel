@@ -1,0 +1,37 @@
+{
+  "name": "oriel-vue",
+  "version": "0.0.0",
+  "description": "Vue composables for Oriel: useOrielEvent and useOrielQuery, over a generated client.",
+  "keywords": [
+    "desktop",
+    "webview",
+    "oriel",
+    "vue",
+    "composables"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sutsikii/Oriel.git",
+    "directory": "packages/vue"
+  },
+  "homepage": "https://github.com/Sutsikii/Oriel/blob/main/docs/packages.md",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "oriel-runtime": "0.0.0"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3"
+  }
+}

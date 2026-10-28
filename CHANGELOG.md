@@ -6,6 +6,11 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **npm packages.** `oriel-runtime` (the client's runtime, which clients
+  import with `OrielTypeScriptRuntime`), `oriel-react` and `oriel-vue`
+  (`useOrielEvent`, `useOrielQuery`) and `oriel-tanstack-query`
+  (`invalidateOn`), published with each release.
+
 - **macOS: dialogs, menus and printing.** File dialogs, message boxes, the
   menu bar, context menus, the print dialog, pages to PDF files and dropped
   files' paths now work on macOS, and the app goes on while a dialog is

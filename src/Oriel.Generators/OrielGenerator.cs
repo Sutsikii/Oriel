@@ -42,14 +42,18 @@ public sealed class OrielGenerator : IIncrementalGenerator
 
         var assembly = context.CompilationProvider.Select(static (c, _) => c.AssemblyName ?? "the app");
 
-        context.RegisterSourceOutput(services.Collect().Combine(errors.Collect()).Combine(assembly), static (spc, input) =>
+        // OrielTypeScriptRuntime: the package the client imports its runtime from, such as oriel-runtime; empty, none.
+        var runtime = context.AnalyzerConfigOptionsProvider.Select(static (o, _) =>
+            o.GlobalOptions.TryGetValue("build_property.OrielTypeScriptRuntime", out var value) && !string.IsNullOrWhiteSpace(value) ? value.Trim() : null);
+
+        context.RegisterSourceOutput(services.Collect().Combine(errors.Collect()).Combine(assembly).Combine(runtime), static (spc, input) =>
         {
-            var ((results, errorResults), assemblyName) = input;
+            var (((results, errorResults), assemblyName), runtimePackage) = input;
             var project = Merge(results, errorResults, out var diagnostics);
             foreach (var diagnostic in diagnostics)
                 spc.ReportDiagnostic(diagnostic.ToDiagnostic());
             if (project.Services.Count + project.Errors.Count > 0)
-                spc.AddSource(SourceName, CSharpEmitter.Emit(project, TypeScriptEmitter.Emit(project, assemblyName)));
+                spc.AddSource(SourceName, CSharpEmitter.Emit(project, TypeScriptEmitter.Emit(project, assemblyName, runtimePackage)));
         });
     }
 

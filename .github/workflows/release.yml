@@ -3,7 +3,8 @@ name: Release
 # Pushing a tag v0.1.0-preview.1 tests, packs Oriel, Oriel.Hosting and
 # Oriel.Templates at version 0.1.0-preview.1, publishes them to nuget.org
 # and creates the GitHub release, with that version's section of
-# CHANGELOG.md as its notes.
+# CHANGELOG.md as its notes. The npm packages (packages/) go to npm at the
+# same version, with the NPM_TOKEN secret.
 # On pull requests that touch the release, it runs up to the packages and
 # their notes, and publishes nothing.
 
@@ -17,6 +18,7 @@ on:
       - Directory.Build.props
       - src/*/*.csproj
       - templates/**
+      - packages/**
 
 permissions:
   contents: read
@@ -126,3 +128,55 @@ jobs:
           gh release create "$GITHUB_REF_NAME" artifacts/packages/* \
             --title "Oriel ${{ steps.version.outputs.version }}" \
             --notes-file release-notes.md $prerelease
+
+  npm:
+    name: Publish the npm packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm's provenance: which workflow built the package
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Find the version
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(sed -n 's/^## \([0-9][^ ]*\).*/\1/p' CHANGELOG.md | head -n 1)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Every package at the release's version, and the adapters on that oriel-runtime.
+      - name: Version, build and test them
+        working-directory: packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        # npm pkg set installs nothing: npm version would, before the
+        # adapters depend on the new oriel-runtime.
+        run: |
+          for package in runtime react vue tanstack-query; do
+            npm pkg set "version=$VERSION" --workspace="$package"
+          done
+          for adapter in react vue tanstack-query; do
+            npm pkg set "dependencies.oriel-runtime=$VERSION" --workspace="$adapter"
+          done
+          npm install --no-audit --no-fund
+          npm test
+          npm pack --workspaces --dry-run
+
+      - name: Publish to npm
+        if: github.ref_type == 'tag'
+        working-directory: packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          tag=latest
+          case "${{ steps.version.outputs.version }}" in *-*) tag=next ;; esac
+          npm publish --workspaces --access public --provenance --tag "$tag"

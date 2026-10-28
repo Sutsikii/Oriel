@@ -144,6 +144,31 @@ public class TypeScriptTests
             System.Text.RegularExpressions.Regex.Replace(client, "App[0-9a-f]{32}", assembly);
     }
 
+    /// <summary>
+    /// A client that imports its runtime from the oriel-runtime package
+    /// (OrielTypeScriptRuntime): kept in packages/runtime/test, which the
+    /// packages' tests type-check and run against the package.
+    /// </summary>
+    [Fact]
+    public void ImportsTheRuntimeFromItsPackageWhenAsked()
+    {
+        var client = Harness.Compile(Sample).TypeScript;
+        var imported = System.Text.RegularExpressions.Regex.Replace(
+            Harness.Generate(Sample, new Dictionary<string, string> { ["OrielTypeScriptRuntime"] = "oriel-runtime" }).TypeScript, "App[0-9a-f]{32}", "Sample");
+        Assert.Contains("import { CallErrorBase, bridge, call, on, stream } from \"oriel-runtime\";", imported);
+        Assert.DoesNotContain("class CallErrorBase", imported);
+        Assert.DoesNotContain("function call<T>", imported);
+        Assert.Contains("export const CallError = CallErrorBase as unknown as {", imported);
+        Assert.Contains("export const Decks = {", imported);
+        Assert.Contains("class CallErrorBase", client); // without the property, as before
+
+        var snapshot = Path.Combine(RepositoryRoot(), "packages", "runtime", "test", "client.ts");
+        if (Environment.GetEnvironmentVariable("ORIEL_UPDATE_SNAPSHOTS") == "1")
+            File.WriteAllText(snapshot, Normalize(imported));
+        Assert.True(File.Exists(snapshot), $"{snapshot} is missing; run the tests with ORIEL_UPDATE_SNAPSHOTS=1");
+        Assert.Equal(File.ReadAllText(snapshot), Normalize(imported));
+    }
+
     [Fact]
     public void ReportsNamesTwoAssembliesExport()
     {

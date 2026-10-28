@@ -158,6 +158,7 @@ publishing it warns, and gives a new GUID to use instead.
 | `OrielInstallerLanguages` | `english` | The wizard's languages, by Inno Setup's message files: `english;french;german`… The wizard picks the user's. |
 | `OrielUrlSchemes` | none | Schemes of links the app opens, separated by `;`: `myapp` makes `myapp://…` links start it (see [windows.md](windows.md#links-and-files)). |
 | `OrielFileTypes` | none | Extensions of files the app opens, separated by `;`: `.note;.notes`. The app is offered in Open with; Windows asks the person before making it their default. |
+| `OrielTypeScriptRuntime` | none | The npm package the client imports its runtime from, `oriel-runtime`; none, the client carries it (see [packages.md](packages.md)). |
 | `OrielSignCommand` | none | Signs the executable, the installer and its uninstaller: a command whose `{file}` is the file to sign (see [Signing](#signing)). |
 | `OrielInstallerOutput` | `bin/installer` | Where the installer is written. |
 | `OrielInnoSetupCompiler` | found | The path of `ISCC.exe`, when Inno Setup is not installed where it usually is. |

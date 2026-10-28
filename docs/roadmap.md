@@ -20,6 +20,8 @@ self-contained piece of work.
   command: signtool and a certificate, or Azure Trusted Signing.
 - Examples of what Oriel is for: a back office, a 3D viewer and a
   real-time dashboard, published in CI.
+- npm packages: `oriel-runtime`, which clients can import, and hooks for
+  React and Vue, and TanStack Query.
 - Plugins: `Oriel.Sqlite` and `Oriel.SecureStorage` (Windows), and how to
   write one.
 - Notifications with buttons (Windows).

@@ -1,0 +1,27 @@
+{
+  "name": "oriel-packages",
+  "private": true,
+  "description": "The npm packages of Oriel: built, tested and published together.",
+  "type": "module",
+  "workspaces": [
+    "runtime",
+    "react",
+    "vue",
+    "tanstack-query"
+  ],
+  "scripts": {
+    "build": "tsc -b runtime react vue tanstack-query",
+    "test": "npm run build && tsc -p tsconfig.test.json && node --test \"*/test/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/jsdom": "~30.0.0",
+    "@types/node": "~24.19.2",
+    "@types/react": "~19.3.0",
+    "@types/react-dom": "~19.3.0",
+    "jsdom": "~30.1.3",
+    "react": "~19.3.1",
+    "react-dom": "~19.3.1",
+    "typescript": "~5.9.3",
+    "vue": "~3.5.44"
+  }
+}

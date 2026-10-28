@@ -46,7 +46,10 @@ internal sealed class Harness
     public string Source =>
         Run.Results.Single().GeneratedSources.FirstOrDefault(s => s.HintName == OrielGenerator.SourceName).SourceText?.ToString() ?? "";
 
-    public static Harness Generate(string source)
+    public static Harness Generate(string source) => Generate(source, null);
+
+    /// <summary>Generates with the build properties <paramref name="properties"/>, as MSBuild gives them.</summary>
+    public static Harness Generate(string source, IReadOnlyDictionary<string, string>? properties)
     {
         var tree = CSharpSyntaxTree.ParseText(
             "using Oriel;\nusing System;\nusing System.Collections.Generic;\nusing System.Threading;\nusing System.Threading.Tasks;\n" + source,
@@ -59,6 +62,7 @@ internal sealed class Harness
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new OrielGenerator().AsSourceGenerator()],
+            optionsProvider: properties is null ? null : new Options(properties),
             driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
         return new Harness(output, driver.GetRunResult(), diagnostics);
@@ -135,5 +139,23 @@ internal sealed class Service(object instance, ServiceDispatcher dispatcher)
     {
         var e = await Assert.ThrowsAnyAsync<Exception>(() => Call(method, args));
         return e.Message;
+    }
+}
+
+/// <summary>Build properties, as MSBuild hands them to generators: build_property.Name.</summary>
+internal sealed class Options(IReadOnlyDictionary<string, string> properties) : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptionsProvider
+{
+    private readonly Global _global = new(properties);
+
+    public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GlobalOptions => _global;
+
+    public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetOptions(Microsoft.CodeAnalysis.SyntaxTree tree) => _global;
+
+    public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetOptions(Microsoft.CodeAnalysis.AdditionalText text) => _global;
+
+    private sealed class Global(IReadOnlyDictionary<string, string> properties) : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? value) =>
+            properties.TryGetValue(key.Replace("build_property.", ""), out value);
     }
 }

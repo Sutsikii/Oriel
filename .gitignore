@@ -14,6 +14,7 @@ TestResults/
 # Frontend
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Benchmark results
 BenchmarkDotNet.Artifacts/

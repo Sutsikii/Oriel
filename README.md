@@ -92,6 +92,7 @@ most of an app's footprint, as in every webview-based framework.
 | [back-office](examples/back-office) | SQLite, a grid of 100 000 rows, validated forms with typed errors |
 | [viewer-3d](examples/viewer-3d) | glTF models brought as bytes by the binary channel, rendered with three.js |
 | [dashboard](examples/dashboard) | Metrics at 120 Hz as a coalesced event, a log as a stream |
+| [tasks-react](examples/tasks-react) | React with the npm packages: `useOrielQuery` refreshed by C# events |
 | [chess-next-move](examples/chess-next-move) | A finished app: an engine, a board, an installer |
 
 CI publishes each with NativeAOT, so they double as tests.
@@ -127,6 +128,8 @@ are done and tested. See the [roadmap](docs/roadmap.md).
 - [Plugins](docs/plugins.md): SQLite and secure storage, and writing a
   plugin of your own.
 - [Updates](docs/updates.md): apps that update themselves, with Velopack.
+- [npm packages](docs/packages.md): the client's runtime, React and Vue
+  hooks, and TanStack Query.
 - [Notifications](docs/notifications.md): toasts with buttons; tray icons
   are in [Windows](docs/windows.md#tray-icons).
 - [Building and shipping](docs/build.md): build properties, development

@@ -1,0 +1,37 @@
+{
+  "name": "oriel-react",
+  "version": "0.0.0",
+  "description": "React hooks for Oriel: useOrielEvent and useOrielQuery, over a generated client.",
+  "keywords": [
+    "desktop",
+    "webview",
+    "oriel",
+    "react",
+    "hooks"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sutsikii/Oriel.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/Sutsikii/Oriel/blob/main/docs/packages.md",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "oriel-runtime": "0.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
