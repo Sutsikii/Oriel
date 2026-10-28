@@ -158,12 +158,16 @@ jobs:
         working-directory: packages
         env:
           VERSION: ${{ steps.version.outputs.version }}
+        # npm pkg set installs nothing: npm version would, before the
+        # adapters depend on the new oriel-runtime.
         run: |
-          npm ci
-          npm version "$VERSION" --workspaces --no-git-tag-version
+          for package in runtime react vue tanstack-query; do
+            npm pkg set "version=$VERSION" --workspace="$package"
+          done
           for adapter in react vue tanstack-query; do
             npm pkg set "dependencies.oriel-runtime=$VERSION" --workspace="$adapter"
           done
+          npm install --no-audit --no-fund
           npm test
           npm pack --workspaces --dry-run
 
