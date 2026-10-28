@@ -136,6 +136,23 @@ jobs:
           name: hello-installer
           path: examples/hello/bin/installer
 
+  npm:
+    name: Test the npm packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build and test them
+        working-directory: packages
+        run: |
+          npm ci
+          npm test
+          npm pack --workspaces --dry-run
+
   updates:
     name: Update an installed app
     runs-on: windows-latest
@@ -158,7 +175,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [back-office, viewer-3d, dashboard]
+        example: [back-office, viewer-3d, dashboard, tasks-react]
     steps:
       - uses: actions/checkout@v4
 
@@ -169,6 +186,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # tasks-react takes the repository's npm packages, built.
+      - name: Build the npm packages
+        if: matrix.example == 'tasks-react'
+        working-directory: packages
+        run: |
+          npm ci
+          npm run build
 
       - name: Install the frontend's packages
         working-directory: examples/${{ matrix.example }}/frontend

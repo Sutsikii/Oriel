@@ -22,4 +22,9 @@
     <!-- The tasks Oriel's targets use, shipped in the package. -->
     <OrielBuildTasksAssembly Condition="'$(OrielBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)../tasks/netstandard2.0/Oriel.Build.dll</OrielBuildTasksAssembly>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The npm package the TypeScript client imports its runtime from, such as oriel-runtime. Empty: the client carries it. -->
+    <CompilerVisibleProperty Include="OrielTypeScriptRuntime" />
+  </ItemGroup>
 </Project>
