@@ -606,7 +606,7 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(got.Order(), got);
     }
 
-    [EndToEndFact(Linux = true)]
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task AcceleratorsRunTheMenuUnlessThePageHandlesThem()
     {
         var clicks = new List<string>();
@@ -988,6 +988,43 @@ public sealed class EndToEndTests : IDisposable
         Assert.Empty(errors);
     }
 
+    /// <summary>The app's menu bar with the window's menu, and a context menu, clicked through AppKit.</summary>
+    [EndToEndFact(MacOS = true, Windows = false)]
+    [System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    public async Task ShowsAppKitMenus()
+    {
+        var clicks = new List<string>();
+        var menu = new Menu(
+            new MenuItem("&File") { Items = [new MenuItem("&Save", "Ctrl+S") { Clicked = _ => clicks.Add("save") }, MenuItem.Separator(), new MenuItem("&Quit")] },
+            new MenuItem("&View") { Items = [new MenuItem("&Wrap") { IsCheckable = true, Clicked = _ => clicks.Add("wrap") }] });
+        await RunWindow(new WindowOptions { Title = "Menus", Menu = menu }, async (app, window) =>
+        {
+            async Task Until(Func<bool> act, string what)
+            {
+                for (var i = 0; i < 100; i++)
+                {
+                    var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    app.Dispatch(() => done.SetResult(act()));
+                    if (await done.Task.WaitAsync(TimeSpan.FromSeconds(5)))
+                        return;
+                    await Task.Delay(100);
+                }
+                throw new TimeoutException(what);
+            }
+
+            // In the app's bar once the window is the key one.
+            await Until(() => Oriel.Platform.MacOS.MacMenus.ClickInBar("&Save"), "Save in the menu bar");
+            await Until(() => Oriel.Platform.MacOS.MacMenus.ClickInBar("&Wrap"), "Wrap in the menu bar");
+            for (var i = 0; i < 100 && clicks.Count < 2; i++)
+                await Task.Delay(50);
+            Assert.Equal(["save", "wrap"], clicks);
+
+            var shown = window.ShowContextMenuAsync(new Menu(new MenuItem("Copy link"), new MenuItem("Inspect")), 20, 20);
+            await Until(() => Oriel.Platform.MacOS.MacMenus.ClickInContext("Inspect"), "the context menu");
+            Assert.Equal("Inspect", (await shown.WaitAsync(TimeSpan.FromSeconds(10)))?.Text);
+        });
+    }
+
     /// <summary>The AppKit panels and alerts, answered on the main thread as a person would.</summary>
     [EndToEndFact(MacOS = true, Windows = false)]
     [System.Runtime.Versioning.SupportedOSPlatform("macos")]
@@ -1180,7 +1217,7 @@ public sealed class EndToEndTests : IDisposable
         private static extern bool PostMessageW(nint hwnd, uint msg, nint wParam, nint lParam);
     }
 
-    [EndToEndFact(Linux = true)]
+    [EndToEndFact(Linux = true, MacOS = true)]
     public async Task PrintsThePageToPdfThroughAService()
     {
         var portrait = Path.Combine(_assets, "portrait.pdf");

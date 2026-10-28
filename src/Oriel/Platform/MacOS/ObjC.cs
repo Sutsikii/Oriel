@@ -98,6 +98,40 @@ internal static unsafe partial class ObjC
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
     public static partial nint Send(nint self, nint sel, NSSize a);
 
+    [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
+    public static partial nint Send(nint self, nint sel, double a);
+
+    [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
+    public static partial nint Send(nint self, nint sel, NSRect a);
+
+    /// <summary>-[NSMenu popUpMenuPositioningItem:atLocation:inView:].</summary>
+    [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
+    public static partial byte Send(nint self, nint sel, nint item, NSPoint location, nint view);
+
+    /// <summary>A method that returns a point: two doubles, in registers on both arm64 and x64.</summary>
+    [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
+    public static partial NSPoint SendPoint(nint self, nint sel);
+
+    [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
+    public static partial NSPoint SendPoint(nint self, nint sel, NSPoint point, nint view);
+
+    /// <summary>Calls the superclass's implementation of a method taking one object and returning a BOOL.</summary>
+    public static byte SendSuperBool(nint self, nint superclass, nint sel, nint a)
+    {
+        var super = new ObjCSuper { Receiver = self, SuperClass = superclass };
+        return objc_msgSendSuper(&super, sel, a);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ObjCSuper
+    {
+        public nint Receiver;
+        public nint SuperClass;
+    }
+
+    [LibraryImport(Lib)]
+    private static partial byte objc_msgSendSuper(ObjCSuper* super, nint sel, nint a);
+
     /// <summary>-[NSObject performSelectorOnMainThread:withObject:waitUntilDone:modes:].</summary>
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
     public static partial nint Send(nint self, nint sel, nint selector, nint argument, byte wait, nint modes);
@@ -174,12 +208,16 @@ internal static unsafe partial class ObjC
     /// adopts <paramref name="protocols"/> and has <paramref name="methods"/>;
     /// or finds it, made already by this process.
     /// </summary>
-    public static nint DefineClass(string name, string[] protocols, params (string Selector, nint Function, string Types)[] methods)
+    public static nint DefineClass(string name, string[] protocols, params (string Selector, nint Function, string Types)[] methods) =>
+        DefineSubclass("NSObject", name, protocols, methods);
+
+    /// <summary>As <see cref="DefineClass"/>, of a subclass of <paramref name="superclass"/>.</summary>
+    public static nint DefineSubclass(string superclass, string name, string[] protocols, params (string Selector, nint Function, string Types)[] methods)
     {
         var cls = Class(name);
         if (cls != 0)
             return cls;
-        cls = objc_allocateClassPair(Class("NSObject"), name, 0);
+        cls = objc_allocateClassPair(Class(superclass), name, 0);
         foreach (var protocol in protocols)
         {
             var p = objc_getProtocol(protocol);

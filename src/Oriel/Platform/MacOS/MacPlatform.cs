@@ -126,13 +126,16 @@ internal sealed unsafe class MacPlatform : IPlatform
     }
 
     /// <summary>The app's menu, with Hide and Quit, and the Edit menu, whose keys WKWebView edits with.</summary>
-    private static nint MainMenu()
+    /// <summary>The app's menu bar: the app menu, and the Edit menu unless the window's menu has its own.</summary>
+    internal static nint MainMenu(bool withEdit = true)
     {
         var bar = Send(New("NSMenu"), Sel("autorelease"));
         AddSubmenu(bar, "", [
             ("Hide", "hide:", "h"),
             ("Quit", "stop:", "q"), // Run returns, as with OrielApp.Quit
         ]);
+        if (!withEdit)
+            return bar;
         AddSubmenu(bar, "Edit", [
             ("Undo", "undo:", "z"),
             ("Redo", "redo:", "Z"),
