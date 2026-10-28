@@ -61,7 +61,10 @@ Tested in real windows, in CI on GitHub's macOS 26 runners (Apple silicon):
   reloading it when its web content process dies;
 - moving, resizing, maximizing and restoring, frameless windows, full
   screen, and placements remembered across runs;
-- the editing roles (Undo, Delete, Select All…) run on the page.
+- the editing roles (Undo, Delete, Select All…) run on the page;
+- file dialogs (open, open several, save, folder: NSOpenPanel and
+  NSSavePanel) and message boxes (NSAlert), modal to the app. While one
+  is open, the app goes on: calls return and events reach pages.
 
 There, but not tested yet: several windows, minimum sizes, minimizing,
 always on top, a dev server while developing, the Edit menu's keys
@@ -72,7 +75,6 @@ are not tested.
 
 These throw `NotSupportedException` on macOS, or do nothing for menus:
 
-- file dialogs and message boxes;
 - the app's own menus, context menus and accelerators (the menu bar has
   Oriel's Quit and Edit menus);
 - printing, and pages to PDF;

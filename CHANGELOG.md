@@ -6,6 +6,9 @@ minor version may change the public API, and says so here.
 
 ## Unreleased
 
+- **macOS: dialogs.** File dialogs and message boxes now work on macOS, and
+  the app goes on while one is open.
+
 - **Linux: dialogs, printing and menus.** File dialogs and message boxes
   (GTK), the print dialog, pages to PDF files, the menu bar, context menus,
   accelerators and dropped files' paths now work on Linux.

@@ -100,6 +100,7 @@ internal sealed unsafe class MacPlatform : IPlatform
     {
         using var pool = AutoreleasePool();
         LoadFrameworks();
+        MakeDrainer();
         var app = Send(Class("NSApplication"), Sel("sharedApplication"));
         Send(app, Sel("setActivationPolicy:"), (nint)0); // NSApplicationActivationPolicyRegular: in the Dock, with a menu bar
         if (!s_menuSet)
@@ -163,11 +164,34 @@ internal sealed unsafe class MacPlatform : IPlatform
         _queue.Enqueue(action);
         // Before the loop runs, Run drains the queue once it starts.
         if (_looping)
-            dispatch_async_f(MainQueue, 0, &Dispatch);
+            Send(s_drainer, Sel("performSelectorOnMainThread:withObject:waitUntilDone:modes:"), Sel("drain"), 0, NO, s_commonModes);
+    }
+
+    // The main queue of libdispatch is not served while a panel or an alert
+    // runs modal; the run loop's common modes, which include the modal ones,
+    // are. Posted actions go through them, as Windows' do through its
+    // dialogs' message loops.
+    private static nint s_drainer;
+    private static nint s_commonModes;
+
+    private static void MakeDrainer()
+    {
+        if (s_drainer != 0)
+            return;
+        var cls = DefineClass("OrielDrainer", [], ("drain", (nint)(delegate* unmanaged<nint, nint, void>)&OnDrain, "v@:"));
+        s_drainer = Send(Send(cls, Sel("alloc")), Sel("init"));
+        var foundation = NativeLibrary.Load("/System/Library/Frameworks/Foundation.framework/Foundation");
+        var mode = *(nint*)NativeLibrary.GetExport(foundation, "NSRunLoopCommonModes");
+        s_commonModes = Send(Send(Class("NSArray"), Sel("arrayWithObject:"), mode), Sel("retain"));
     }
 
     [UnmanagedCallersOnly]
-    private static void Dispatch(nint context)
+    private static void OnDrain(nint self, nint sel) => DrainRunning();
+
+    [UnmanagedCallersOnly]
+    private static void Dispatch(nint context) => DrainRunning();
+
+    private static void DrainRunning()
     {
         using var pool = AutoreleasePool();
         try

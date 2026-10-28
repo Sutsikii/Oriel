@@ -98,6 +98,10 @@ internal static unsafe partial class ObjC
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
     public static partial nint Send(nint self, nint sel, NSSize a);
 
+    /// <summary>-[NSObject performSelectorOnMainThread:withObject:waitUntilDone:modes:].</summary>
+    [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
+    public static partial nint Send(nint self, nint sel, nint selector, nint argument, byte wait, nint modes);
+
     /// <summary>+[NSEvent otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:].</summary>
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
     public static partial nint Send(nint self, nint sel, nint type, NSPoint location, nint flags, double time, nint window, nint context, short subtype, nint data1, nint data2);

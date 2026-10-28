@@ -493,9 +493,9 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
             Send(_webview, Sel("loadHTMLString:baseURL:"), Str(html), (nint)0);
     }
 
-    public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => throw NotYet("File dialogs");
+    public IReadOnlyList<string>? ShowFileDialog(FileDialogRequest request) => MacDialogs.ShowFile(request);
 
-    public MessageResult ShowMessage(MessageRequest request) => throw NotYet("Message boxes");
+    public MessageResult ShowMessage(MessageRequest request) => MacDialogs.ShowMessage(request);
 
     public void ShowPrintDialog(PrintDialog dialog) => throw NotYet("Printing");
 
