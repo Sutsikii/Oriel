@@ -76,9 +76,9 @@ self-contained piece of work.
 - **Linux**: GTK and WebKitGTK, through `LibraryImport` of the system's
   libraries. Done, with what Windows has but the clipboard, tray icons
   and notifications ([linux.md](linux.md)).
-- **macOS**: AppKit and WKWebView, through the Objective-C runtime. The
-  core is there ([macos.md](macos.md)), tested in CI only; the same
-  features are next, then app bundles, signing and notarization. Help from
-  Mac users is wanted.
+- **macOS**: AppKit and WKWebView, through the Objective-C runtime, with
+  what Windows has but the clipboard, tray icons and notifications
+  ([macos.md](macos.md)), tested in CI only. App bundles, signing and
+  notarization are next. Help from Mac users is wanted.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) to pick one up.
