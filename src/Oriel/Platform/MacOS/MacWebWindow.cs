@@ -36,6 +36,13 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
     private readonly PlatformWindowOptions _options;
     private readonly IPlatformWindowEvents _events;
     private nint _handler;
+    private Menu? _menu;
+    private nint _bar;
+    private List<string>? _dropped;
+    private DateTime _droppedAt;
+
+    // The windows of the webviews, which the webviews' drags reach.
+    private static readonly Dictionary<nint, MacWebWindow> s_webviews = [];
     private nint _window;
     private nint _webview;
     private bool _destroyed;
@@ -108,7 +115,8 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
         if (_options.DevTools)
             Send(preferences, Sel("setValue:forKey:"), Send(Class("NSNumber"), Sel("numberWithBool:"), YES), Str("developerExtrasEnabled"));
 
-        _webview = Send(Send(Class("WKWebView"), Sel("alloc")), Sel("initWithFrame:configuration:"), content, configuration);
+        _webview = Send(Send(WebViewClass(), Sel("alloc")), Sel("initWithFrame:configuration:"), content, configuration);
+        s_webviews[_webview] = this;
         Release(configuration);
         if (_options.DevTools && RespondsTo(_webview, "setInspectable:"))
             Send(_webview, Sel("setInspectable:"), YES); // macOS 13.3 and later: Safari's Develop menu lists the page
@@ -118,6 +126,8 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
         Send(_window, Sel("setContentView:"), _webview);
         Send(_window, Sel("makeFirstResponder:"), _webview); // the keyboard goes to the page
         Send(_window, Sel("setDelegate:"), _handler);
+        if (_options.Menu is { } menu)
+            SetMenu(menu);
 
         var restored = Restore(_options.Placement, out var zoomed);
         if (!restored)
@@ -196,6 +206,7 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
         finally
         {
             s_windows.Remove(w._handler);
+            s_webviews.Remove(w._webview);
             // Released once AppKit is done closing: the pool of this event drains them.
             Send(w._webview, Sel("autorelease"));
             Send(w._window, Sel("autorelease"));
@@ -241,7 +252,58 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
     }
 
     [UnmanagedCallersOnly]
-    private static void OnBecameKey(nint self, nint sel, nint notification) => Guard(self, w => w._events.FocusChanged(true));
+    private static void OnBecameKey(nint self, nint sel, nint notification) => Guard(self, w =>
+    {
+        // The menu bar is the app's: the key window's menu shows in it.
+        w.ShowMenuBar();
+        w._events.FocusChanged(true);
+    });
+
+    private void ShowMenuBar() =>
+        Send(Send(Class("NSApplication"), Sel("sharedApplication")), Sel("setMainMenu:"), _bar != 0 ? _bar : MacPlatform.MainMenu());
+
+    /// <summary>
+    /// WKWebView, with the paths of the files dropped on it kept for the
+    /// page's drop message, which comes after: WebKit gives the page File
+    /// objects without paths.
+    /// </summary>
+    private static nint WebViewClass() => DefineSubclass("WKWebView", "OrielWKWebView", [],
+        ("performDragOperation:", (nint)(delegate* unmanaged<nint, nint, nint, byte>)&OnPerformDrag, "c@:@"));
+
+    [UnmanagedCallersOnly]
+    private static byte OnPerformDrag(nint self, nint sel, nint info)
+    {
+        try
+        {
+            if (s_webviews.TryGetValue(self, out var window))
+            {
+                var pasteboard = Send(info, Sel("draggingPasteboard"));
+                var classes = Send(Class("NSArray"), Sel("arrayWithObject:"), Class("NSURL"));
+                var only = Send(Class("NSDictionary"), Sel("dictionaryWithObject:forKey:"), Send(Class("NSNumber"), Sel("numberWithBool:"), YES), AppKitConstant("NSPasteboardURLReadingFileURLsOnlyKey"));
+                var urls = Send(pasteboard, Sel("readObjectsForClasses:options:"), classes, only);
+                var paths = new List<string>();
+                var count = urls == 0 ? 0 : (int)Send(urls, Sel("count"));
+                for (var i = 0; i < count; i++)
+                {
+                    if (Text(Send(Send(urls, Sel("objectAtIndex:"), i), Sel("path"))) is { } path)
+                        paths.Add(path);
+                }
+                if (paths.Count > 0)
+                {
+                    window._dropped = paths;
+                    window._droppedAt = DateTime.UtcNow;
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            MacPlatform.Report(e);
+        }
+        return SendSuperBool(self, Class("WKWebView"), sel, info);
+    }
+
+    private static nint AppKitConstant(string name) =>
+        *(nint*)NativeLibrary.GetExport(NativeLibrary.Load("/System/Library/Frameworks/AppKit.framework/AppKit"), name);
 
     [UnmanagedCallersOnly]
     private static void OnResignedKey(nint self, nint sel, nint notification) => Guard(self, w => w._events.FocusChanged(false));
@@ -256,7 +318,14 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
         // The handler is the main frame's only, where the bridge runs: its document is the view's.
         var source = AppScheme.FromPage(UrlText(Send(w._webview, Sel("URL"))) ?? "");
         Tracing.Write($"window received {text}");
-        w._events.MessageReceived(source, text);
+        // A drop: its files are those of the drag the view took just before.
+        IReadOnlyList<string>? files = null;
+        if (text.StartsWith("{\"t\":\"drop\"", StringComparison.Ordinal) && w._dropped is { } dropped && DateTime.UtcNow - w._droppedAt < TimeSpan.FromSeconds(10))
+        {
+            files = dropped;
+            w._dropped = null;
+        }
+        w._events.MessageReceived(source, text, files);
     });
 
     [UnmanagedCallersOnly]
@@ -497,17 +566,38 @@ internal sealed unsafe class MacWebWindow : IPlatformWindow
 
     public MessageResult ShowMessage(MessageRequest request) => MacDialogs.ShowMessage(request);
 
-    public void ShowPrintDialog(PrintDialog dialog) => throw NotYet("Printing");
+    /// <summary>The system's print dialog, whichever is asked: WKWebView has no other.</summary>
+    public void ShowPrintDialog(PrintDialog dialog)
+    {
+        if (!_destroyed)
+            MacPrinting.ShowDialog(_webview, _window);
+    }
 
-    public void PrintToPdf(string path, PdfOptions? options, Action<bool> done) => throw NotYet("Printing to PDF");
+    public void PrintToPdf(string path, PdfOptions? options, Action<bool> done)
+    {
+        if (_destroyed)
+            done(false);
+        else
+            MacPrinting.ToPdf(_webview, _window, path, options, done);
+    }
 
     public void SetMenu(Menu? menu)
     {
-        if (menu is not null)
-            Tracing.Write("menus are not shown on macOS yet");
+        if (_destroyed)
+            return;
+        if (_bar != 0)
+        {
+            MacMenus.Forget(_bar);
+            Release(_bar);
+        }
+        _menu = menu;
+        _bar = menu is null ? 0 : Send(MacMenus.Bar(menu, item => _events.MenuItemClicked(item)), Sel("retain"));
+        if (SendBool(_window, Sel("isKeyWindow")))
+            ShowMenuBar();
     }
 
-    public MenuItem? ShowContextMenu(Menu menu, PagePoint? at) => throw NotYet("Context menus");
+    public MenuItem? ShowContextMenu(Menu menu, PagePoint? at) =>
+        _destroyed ? null : MacMenus.ShowContext(menu, _webview, at is { } p ? (p.X, p.Y) : null);
 
     public void ActivateMenuBar(char mnemonic)
     {

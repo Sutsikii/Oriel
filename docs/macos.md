@@ -64,7 +64,19 @@ Tested in real windows, in CI on GitHub's macOS 26 runners (Apple silicon):
 - the editing roles (Undo, Delete, Select All…) run on the page;
 - file dialogs (open, open several, save, folder: NSOpenPanel and
   NSSavePanel) and message boxes (NSAlert), modal to the app. While one
-  is open, the app goes on: calls return and events reach pages.
+  is open, the app goes on: calls return and events reach pages;
+- menus: a window's menu shows in the app's menu bar while it is the key
+  window, after the app menu (Hide, Quit), and after Oriel's Edit menu
+  unless it has editing items of its own. Titles lose their `&` (macOS has
+  no mnemonics), and accelerators are key equivalents, Ctrl becoming
+  Command; the page still sees keys first, as elsewhere. Context menus too;
+- printing: the system's print dialog, which `ShowPrintDialog` shows
+  whichever is asked, and pages to PDF files laid out by `PdfOptions` (but
+  `HeaderAndFooter`), through WKWebView's print operation.
+
+There, but not tested in CI: the paths of dropped files. The view reads
+the files of a drag, and the page's drop, which comes after, reaches the
+app with them; no test can drag files onto a window of the runner yet.
 
 There, but not tested yet: several windows, minimum sizes, minimizing,
 always on top, a dev server while developing, the Edit menu's keys
@@ -73,17 +85,11 @@ are not tested.
 
 ## What is not there yet
 
-These throw `NotSupportedException` on macOS, or do nothing for menus:
-
-- the app's own menus, context menus and accelerators (the menu bar has
-  Oriel's Quit and Edit menus);
-- printing, and pages to PDF;
-- the paths of dropped files (the page still gets its `File` objects);
-- opening the Web Inspector from code: with `DevTools`, open it from the
+- Opening the Web Inspector from code: with `DevTools`, open it from the
   page's context menu, with Inspect Element, or from Safari's Develop
-  menu.
-
-[#31](https://github.com/Sutsikii/Oriel/issues/31) follows them.
+  menu. WKWebView has no public way to open it.
+- The clipboard, tray icons and notifications, which are Windows's only
+  for now.
 
 ## How it is tested
 
